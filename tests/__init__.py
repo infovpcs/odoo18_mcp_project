@@ -1,0 +1,1 @@
+"""Test package for the Odoo 18 MCP Integration project."""

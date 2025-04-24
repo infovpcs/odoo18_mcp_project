@@ -2,6 +2,55 @@
 requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "odoo18-mcp-integration"
+version = "0.1.0"
+description = "Dynamic Odoo 18 integration with MCP"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Veracious Perfect CS Pvt Ltd", email = "info@vperfectcs.com"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "pydantic>=2.0.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.22.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
+    "mcp>=0.1.0",
+    "sqlparse>=0.4.4",
+    "pandas>=1.5.0",
+    "psycopg2-binary>=2.9.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=23.3.0",
+    "isort>=5.12.0",
+    "mypy>=1.3.0",
+    "pytest>=7.3.1",
+    "pytest-cov>=4.1.0",
+]
+cli = [
+    "mcp[cli]>=0.1.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/infovpcs/odoo18-mcp-integration"
+"Bug Tracker" = "https://github.com/infovpcs/odoo18-mcp-integration/issues"
+
 [tool.black]
 line-length = 88
 target-version = ["py38", "py39", "py310", "py311", "py312"]

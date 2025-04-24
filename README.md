@@ -113,18 +113,18 @@ Add the following to the `servers` section:
 
 ```json
 {
-  "id": "odoo18-mcp",
-  "name": "Odoo 18 Integration",
-  "description": "Dynamic Odoo 18 integration with MCP",
-  "command": "python",
-  "args": ["/full/path/to/your/workspace/odoo18_mcp_project/mcp_server.py"],
-  "env": {
-    "ODOO_URL": "http://localhost:8069",
-    "ODOO_DB": "llmdb18",
-    "ODOO_USERNAME": "admin",
-    "ODOO_PASSWORD": "admin"
-  },
-  "enabled": true
+    "odoo18-mcp":{
+        "name": "Odoo 18 Integration",
+        "description": "Dynamic Odoo 18 integration with MCP",
+        "command": "python",
+        "args": ["/Users/vinusoft85/workspace/odoo18_mcp_project/mcp_server.py"],
+        "env": {
+                "ODOO_URL": "http://localhost:8069",
+                "ODOO_DB": "llmdb18",
+                "ODOO_USERNAME": "admin",
+                "ODOO_PASSWORD": "admin"
+            }
+    }
 }
 ```
 

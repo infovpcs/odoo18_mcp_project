@@ -14,8 +14,14 @@ This document provides instructions for setting up the project on GitHub and dep
 2. Push your local repository to GitHub:
    ```bash
    git remote add origin https://github.com/yourusername/odoo18-mcp-project.git
-   git branch -M main
-   git push -u origin main
+   
+   # Push the master branch
+   git checkout master
+   git push -u origin master
+   
+   # Push the 18.0 branch
+   git checkout 18.0
+   git push -u origin 18.0
    ```
 
 3. Verify that all files have been pushed correctly by checking the GitHub repository.

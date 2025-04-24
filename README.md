@@ -19,6 +19,8 @@ A robust integration server that connects MCP (Master Control Program) with Odoo
 - **Intelligent CRUD Generation**: Generate appropriate CRUD operations based on model metadata
 - **Field Grouping**: Automatically group fields by purpose (basic info, contact info, etc.)
 - **Smart Search Fields**: Identify fields that are good candidates for search operations
+- **Related Records Export/Import**: Export and import parent-child related records in a single operation
+- **Relationship Maintenance**: Automatically maintain relationships between models during import/export
 - **MCP Integration**: API endpoints for MCP integration with standardized request/response format
 - **Claude Desktop Integration**: Seamless integration with Claude Desktop using the MCP SDK
 - **Environment Configuration**: Easy configuration using environment variables
@@ -219,6 +221,11 @@ Once you've configured Claude Desktop, you can use the Odoo 18 MCP integration:
 | **execute_method** | Execute a custom method on a model | `/tool execute_method model_name=res.partner method=name_search args=["Test"]` | ✅ Working |
 | **analyze_field_importance** | Analyze the importance of fields in a model | `/tool analyze_field_importance model_name=res.partner use_nlp=true` | ✅ Working |
 | **get_field_groups** | Group fields by purpose for a model | `/tool get_field_groups model_name=product.product` | ✅ Working |
+| **export_records_to_csv** | Export records from a model to CSV | `/tool export_records_to_csv model_name=res.partner fields=["id","name","email"]` | ✅ Working |
+| **import_records_from_csv** | Import records from CSV to a model | `/tool import_records_from_csv model_name=res.partner import_path="exports/partners.csv"` | ✅ Working |
+| **export_related_records_to_csv** | Export parent-child records to CSV | `/tool export_related_records_to_csv parent_model=account.move child_model=account.move.line relation_field=move_id move_type=out_invoice export_path="./tmp/customer_invoices.csv"` | ✅ Working |
+| **import_related_records_from_csv** | Import parent-child records from CSV | `/tool import_related_records_from_csv parent_model=account.move child_model=account.move.line relation_field=move_id import_path="./tmp/customer_invoices.csv" reset_to_draft=true skip_readonly_fields=true` | ✅ Working |
+| **validate_field_value** | Validate a field value for a model | `/tool validate_field_value model_name=res.partner field_name=email value="test@example.com"` | ✅ Working |
 
 #### Available Prompts
 
@@ -226,6 +233,12 @@ Once you've configured Claude Desktop, you can use the Odoo 18 MCP integration:
 |--------|-------------|--------------|
 | **create_record_prompt** | Get guidance for creating a new record | `/prompt create_record_prompt model_name=res.partner` |
 | **search_records_prompt** | Get guidance for searching records | `/prompt search_records_prompt model_name=product.product` |
+| **export_records_prompt** | Get guidance for exporting records | `/prompt export_records_prompt model_name=res.partner` |
+| **import_records_prompt** | Get guidance for importing records | `/prompt import_records_prompt model_name=res.partner` |
+| **dynamic_export_import_prompt** | Get guidance for dynamic export/import | `/prompt dynamic_export_import_prompt` |
+| **crm_lead_export_import_prompt** | Get guidance for CRM lead export/import | `/prompt crm_lead_export_import_prompt` |
+| **invoice_export_import_prompt** | Get guidance for invoice export/import | `/prompt invoice_export_import_prompt` |
+| **related_records_export_import_prompt** | Get guidance for related records export/import | `/prompt related_records_export_import_prompt` |
 
 ## Usage
 
@@ -587,6 +600,49 @@ Create a `.vscode/settings.json` file:
 4. Configure code formatting to use Black
 
 ## Recent Improvements and Fixes
+
+### Export/Import Functionality
+
+We've implemented robust export and import functionality for Odoo models, with special attention to handling complex models like account.move (invoices):
+
+1. **Related Records Export/Import**: Added tools to export and import parent-child related records in a single operation, maintaining relationships between models.
+
+2. **Invoice Export/Import**: Implemented specialized handling for account.move (invoices) and account.move.line (invoice lines) with support for:
+   - Different invoice types (out_invoice, in_invoice, out_refund, in_refund, etc.)
+   - Handling posted invoices with reset_to_draft functionality
+   - Skipping readonly fields to avoid validation errors
+   - Proper handling of many2one and many2many fields
+   - Maintaining relationships between parent and child records
+
+3. **CSV Processing**: Added robust CSV export and import with proper field mapping and data transformation.
+
+4. **Field Type Handling**: Implemented proper handling of different field types:
+   - many2one fields (extracting IDs from string representations)
+   - many2many fields (converting to proper Odoo format)
+   - date and datetime fields (proper formatting)
+   - selection fields (validation against allowed values)
+
+5. **Error Handling**: Added comprehensive error handling for export/import operations with detailed error messages.
+
+6. **Direct Implementation**: Created a direct implementation for export/import functionality that can be used without LangGraph.
+
+7. **File System Integration**: Added support for exporting to and importing from the file system with proper path handling.
+
+### Challenges and Solutions for Invoice Handling
+
+Working with Odoo's account.move (invoice) model presented several challenges:
+
+1. **Posted Invoices**: Odoo doesn't allow updating posted invoices directly. We implemented a reset_to_draft functionality that attempts to reset the invoice to draft state before updating.
+
+2. **Readonly Fields**: Many fields in account.move are readonly when the invoice is posted. We added a skip_readonly_fields option to automatically remove these fields from the update data.
+
+3. **Balance Requirements**: Odoo requires invoices to be balanced (debits = credits). When updating invoice lines, we need to ensure the invoice remains balanced.
+
+4. **Many2one Field Handling**: Fields like account_id are stored as lists with both ID and name (e.g., [38, 'Local Sales']). We implemented proper extraction of just the ID for update operations.
+
+5. **Move Types**: account.move has different move_types (out_invoice, in_invoice, etc.) with different field requirements. We added a move_type parameter to filter invoices by type.
+
+6. **Relationship Maintenance**: Maintaining the relationship between account.move and account.move.line requires careful handling of the move_id field.
 
 ### MCP Server Fixes
 

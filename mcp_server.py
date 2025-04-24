@@ -25,6 +25,9 @@ try:
     from collections.abc import AsyncIterator
     from dotenv import load_dotenv
 
+    # Import the direct export/import implementation
+    from direct_export_import import export_records, import_records
+
     from mcp.server.fastmcp import FastMCP, Context, Image
 
     # Load environment variables
@@ -920,6 +923,589 @@ try:
         except Exception as e:
             return f"# Error creating template\n\n{str(e)}"
 
+    # Tool for exporting records to CSV
+    @mcp.tool()
+    def export_records_to_csv(model_name: str, fields: Optional[List[str]] = None, filter_domain: Optional[Union[str, List]] = None, limit: int = 1000, export_path: Optional[str] = None) -> str:
+        """Export records from an Odoo model to a CSV file.
+
+        Args:
+            model_name: The technical name of the Odoo model to export
+            fields: List of field names to export (if None, all fields are exported)
+            filter_domain: Domain filter in string format (e.g., "[('name', 'ilike', 'Test')]")
+            limit: Maximum number of records to export
+            export_path: Path to export the CSV file (if None, a default path is used)
+
+        Returns:
+            A confirmation message with the export results
+        """
+        if not model_discovery:
+            return "# Error: Odoo Connection\n\nCould not connect to Odoo server. Please check your connection settings."
+
+        try:
+            # Validate model exists
+            model_schema = model_discovery.get_model_schema(model_name)
+            if not model_schema:
+                return f"# Error: Invalid Model\n\nThe model '{model_name}' does not exist in the Odoo database."
+
+            # Get available fields for the model
+            available_fields = model_schema.get("fields", {})
+            if not available_fields:
+                return f"# Error: No Fields Available\n\nCould not retrieve fields for model '{model_name}'."
+
+            # Validate fields if provided
+            if fields:
+                invalid_fields = [field for field in fields if field not in available_fields]
+                if invalid_fields:
+                    return f"# Error: Invalid Fields\n\nThe following fields do not exist in model '{model_name}':\n- {', '.join(invalid_fields)}\n\nAvailable fields include:\n- {', '.join(list(available_fields.keys())[:20])}\n- ..."
+
+            # Parse filter domain if provided
+            domain = []
+            if filter_domain:
+                # If filter_domain is already a list, use it directly
+                if isinstance(filter_domain, list):
+                    domain = filter_domain
+                else:
+                    try:
+                        # Try to parse as JSON
+                        domain = json.loads(filter_domain)
+                    except (json.JSONDecodeError, TypeError):
+                        try:
+                            # Try to evaluate as Python expression
+                            import ast
+                            domain = ast.literal_eval(filter_domain)
+                        except (SyntaxError, ValueError):
+                            return f"# Error: Invalid Filter Domain\n\nThe filter domain format is invalid: {filter_domain}\n\nExample valid formats:\n- [['name', 'ilike', 'Test']]\n- [('customer_rank', '>', 0)]\n- String representation: \"[('move_type', 'in', ['out_invoice', 'in_invoice']), ('state', '=', 'posted')]\""
+
+                # Validate domain fields
+                try:
+                    for condition in domain:
+                        if isinstance(condition, (list, tuple)) and len(condition) >= 3:
+                            field_name = condition[0]
+                            if field_name not in available_fields and field_name != 'id':
+                                return f"# Error: Invalid Domain Field\n\nThe field '{field_name}' in the domain filter does not exist in model '{model_name}'."
+                except Exception as e:
+                    return f"# Error: Invalid Domain Structure\n\nThe domain filter has an invalid structure: {str(e)}"
+
+            # Set default export path if not provided
+            if not export_path:
+                model_name_safe = model_name.replace('.', '_')
+                export_path = f"./exports/{model_name_safe}_export.csv"
+
+            # Create exports directory if it doesn't exist
+            os.makedirs(os.path.dirname(os.path.abspath(export_path)), exist_ok=True)
+
+            # Run the export flow
+            result = export_records(
+                model_name=model_name,
+                fields=fields,
+                filter_domain=domain,
+                limit=limit,
+                export_path=export_path
+            )
+
+            if not result["success"]:
+                return f"# Error Exporting Records\n\n{result.get('error', 'Unknown error')}"
+
+            # Format the results
+            output = f"# Export Results\n\n"
+            output += f"- **Model**: {result['model_name']}\n"
+            output += f"- **Fields**: {', '.join(result['selected_fields'])}\n"
+            output += f"- **Total Records**: {result['total_records']}\n"
+            output += f"- **Exported Records**: {result['exported_records']}\n"
+            output += f"- **Export Path**: {result['export_path']}\n"
+
+            # Add field type information for reference
+            output += f"\n## Field Types\n\n"
+            output += "This information can be useful when importing the data back:\n\n"
+
+            for field in result['selected_fields'][:10]:  # Limit to 10 fields to avoid too much text
+                if field in available_fields:
+                    field_type = available_fields[field].get('type', 'unknown')
+                    field_string = available_fields[field].get('string', field)
+                    output += f"- **{field_string}** (`{field}`): {field_type}\n"
+
+            if len(result['selected_fields']) > 10:
+                output += f"\n*...and {len(result['selected_fields']) - 10} more fields*\n"
+
+            return output
+
+        except Exception as e:
+            logger.error(f"Error exporting records: {str(e)}")
+            return f"# Error Exporting Records\n\n{str(e)}"
+
+    # Tool for exporting related records to CSV
+    @mcp.tool()
+    def export_related_records_to_csv(parent_model: str, child_model: str, relation_field: str,
+                                     parent_fields: Optional[List[str]] = None, child_fields: Optional[List[str]] = None,
+                                     filter_domain: Optional[Union[str, List]] = None, limit: int = 1000,
+                                     export_path: Optional[str] = None, move_type: Optional[str] = None) -> str:
+        """Export records from related models (parent and child) to a structured CSV file.
+
+        Args:
+            parent_model: The technical name of the parent Odoo model (e.g., 'account.move')
+            child_model: The technical name of the child Odoo model (e.g., 'account.move.line')
+            relation_field: The field in the child model that relates to the parent (e.g., 'move_id')
+            parent_fields: List of field names to export from the parent model
+            child_fields: List of field names to export from the child model
+            filter_domain: Domain filter for the parent model in string format
+            limit: Maximum number of parent records to export
+            export_path: Path to export the CSV file (if None, a default path is used)
+            move_type: For account.move model, specify the move_type to filter by (e.g., 'out_invoice', 'in_invoice')
+
+        Returns:
+            A confirmation message with the export results
+        """
+        if not model_discovery:
+            return "# Error: Odoo Connection\n\nCould not connect to Odoo server. Please check your connection settings."
+
+        try:
+            # Validate parent model exists
+            parent_schema = model_discovery.get_model_schema(parent_model)
+            if not parent_schema:
+                return f"# Error: Invalid Parent Model\n\nThe model '{parent_model}' does not exist in the Odoo database."
+
+            # Validate child model exists
+            child_schema = model_discovery.get_model_schema(child_model)
+            if not child_schema:
+                return f"# Error: Invalid Child Model\n\nThe model '{child_model}' does not exist in the Odoo database."
+
+            # Get available fields for the models
+            parent_available_fields = parent_schema.get("fields", {})
+            child_available_fields = child_schema.get("fields", {})
+
+            if not parent_available_fields:
+                return f"# Error: No Fields Available\n\nCould not retrieve fields for model '{parent_model}'."
+
+            if not child_available_fields:
+                return f"# Error: No Fields Available\n\nCould not retrieve fields for model '{child_model}'."
+
+            # Validate relation field exists in child model
+            if relation_field not in child_available_fields:
+                return f"# Error: Invalid Relation Field\n\nThe field '{relation_field}' does not exist in model '{child_model}'."
+
+            # Validate relation field is a many2one field
+            if child_available_fields[relation_field].get('type') != 'many2one':
+                return f"# Error: Invalid Relation Field Type\n\nThe field '{relation_field}' in model '{child_model}' is not a many2one field."
+
+            # Validate relation field points to parent model
+            if child_available_fields[relation_field].get('relation') != parent_model:
+                return f"# Error: Invalid Relation\n\nThe field '{relation_field}' in model '{child_model}' does not point to model '{parent_model}'."
+
+            # Validate parent fields if provided
+            if parent_fields:
+                invalid_parent_fields = [field for field in parent_fields if field not in parent_available_fields]
+                if invalid_parent_fields:
+                    return f"# Error: Invalid Parent Fields\n\nThe following fields do not exist in model '{parent_model}':\n- {', '.join(invalid_parent_fields)}\n\nAvailable fields include:\n- {', '.join(list(parent_available_fields.keys())[:20])}\n- ..."
+
+            # Validate child fields if provided
+            if child_fields:
+                invalid_child_fields = [field for field in child_fields if field not in child_available_fields]
+                if invalid_child_fields:
+                    return f"# Error: Invalid Child Fields\n\nThe following fields do not exist in model '{child_model}':\n- {', '.join(invalid_child_fields)}\n\nAvailable fields include:\n- {', '.join(list(child_available_fields.keys())[:20])}\n- ..."
+
+            # Parse filter domain if provided
+            domain = []
+            if filter_domain:
+                # If filter_domain is already a list, use it directly
+                if isinstance(filter_domain, list):
+                    domain = filter_domain
+                else:
+                    try:
+                        # Try to parse as JSON
+                        domain = json.loads(filter_domain)
+                    except (json.JSONDecodeError, TypeError):
+                        try:
+                            # Try to evaluate as Python expression
+                            import ast
+                            domain = ast.literal_eval(filter_domain)
+                        except (SyntaxError, ValueError):
+                            return f"# Error: Invalid Filter Domain\n\nThe filter domain format is invalid: {filter_domain}\n\nExample valid formats:\n- [['name', 'ilike', 'Test']]\n- [('customer_rank', '>', 0)]\n- String representation: \"[('move_type', 'in', ['out_invoice', 'in_invoice']), ('state', '=', 'posted')]\""
+
+                # Validate domain fields
+                try:
+                    for condition in domain:
+                        if isinstance(condition, (list, tuple)) and len(condition) >= 3:
+                            field_name = condition[0]
+                            if field_name not in parent_available_fields and field_name != 'id':
+                                return f"# Error: Invalid Domain Field\n\nThe field '{field_name}' in the domain filter does not exist in model '{parent_model}'."
+                except Exception as e:
+                    return f"# Error: Invalid Domain Structure\n\nThe domain filter has an invalid structure: {str(e)}"
+
+            # Set default export path if not provided
+            if not export_path:
+                parent_model_safe = parent_model.replace('.', '_')
+                child_model_safe = child_model.replace('.', '_')
+                # Use a path in the current working directory
+                export_path = f"./exports/{parent_model_safe}_{child_model_safe}_export.csv"
+
+            # Create exports directory if it doesn't exist
+            os.makedirs(os.path.dirname(os.path.abspath(export_path)), exist_ok=True)
+
+            # Import the direct export/import implementation
+            from direct_export_import import export_related_records
+
+            # Add move_type to filter domain if specified
+            if parent_model == 'account.move' and move_type:
+                # Check if we already have a move_type filter
+                has_move_type_filter = False
+                for condition in domain:
+                    if isinstance(condition, (list, tuple)) and len(condition) >= 3 and condition[0] == 'move_type':
+                        has_move_type_filter = True
+                        break
+
+                # If no move_type filter, add one based on the specified move_type
+                if not has_move_type_filter:
+                    if move_type in ['out_invoice', 'out_refund', 'in_invoice', 'in_refund', 'out_receipt', 'in_receipt']:
+                        domain.append(['move_type', '=', move_type])
+                    elif move_type == 'invoice':
+                        domain.append(['move_type', 'in', ['out_invoice', 'in_invoice']])
+                    elif move_type == 'refund':
+                        domain.append(['move_type', 'in', ['out_refund', 'in_refund']])
+                    elif move_type == 'receipt':
+                        domain.append(['move_type', 'in', ['out_receipt', 'in_receipt']])
+                    elif move_type == 'out':
+                        domain.append(['move_type', 'in', ['out_invoice', 'out_refund', 'out_receipt']])
+                    elif move_type == 'in':
+                        domain.append(['move_type', 'in', ['in_invoice', 'in_refund', 'in_receipt']])
+
+                    logger.info(f"Added move_type filter for account.move: {domain[-1]}")
+
+            # Run the export flow
+            result = export_related_records(
+                parent_model=parent_model,
+                child_model=child_model,
+                relation_field=relation_field,
+                parent_fields=parent_fields,
+                child_fields=child_fields,
+                filter_domain=domain,
+                limit=limit,
+                export_path=export_path
+            )
+
+            if not result["success"]:
+                return f"# Error Exporting Related Records\n\n{result.get('error', 'Unknown error')}"
+
+            # Format the results
+            output = f"# Related Records Export Results\n\n"
+            output += f"- **Parent Model**: {result['parent_model']}\n"
+            output += f"- **Child Model**: {result['child_model']}\n"
+            output += f"- **Relation Field**: {result['relation_field']}\n"
+            output += f"- **Parent Records**: {result['parent_records']}\n"
+            output += f"- **Child Records**: {result['child_records']}\n"
+            output += f"- **Combined Records**: {result['combined_records']}\n"
+            output += f"- **Export Path**: {result['export_path']}\n"
+
+            # Add field type information for reference
+            output += f"\n## Field Types\n\n"
+            output += "This information can be useful when importing the data back:\n\n"
+
+            output += "### Parent Fields\n\n"
+            for field in result['parent_fields'][:5]:  # Limit to 5 fields to avoid too much text
+                if field in parent_available_fields:
+                    field_type = parent_available_fields[field].get('type', 'unknown')
+                    field_string = parent_available_fields[field].get('string', field)
+                    output += f"- **{field_string}** (`parent_{field}`): {field_type}\n"
+
+            if len(result['parent_fields']) > 5:
+                output += f"\n*...and {len(result['parent_fields']) - 5} more parent fields*\n"
+
+            output += "\n### Child Fields\n\n"
+            for field in result['child_fields'][:5]:  # Limit to 5 fields to avoid too much text
+                if field in child_available_fields:
+                    field_type = child_available_fields[field].get('type', 'unknown')
+                    field_string = child_available_fields[field].get('string', field)
+                    output += f"- **{field_string}** (`child_{field}`): {field_type}\n"
+
+            if len(result['child_fields']) > 5:
+                output += f"\n*...and {len(result['child_fields']) - 5} more child fields*\n"
+
+            output += f"\n## CSV Structure\n\n"
+            output += "The exported CSV file has the following structure:\n\n"
+            output += "1. **Metadata columns**:\n"
+            output += "   - `_model`: The model(s) for this record (e.g., 'account.move,account.move.line')\n"
+            output += "   - `_record_type`: Either 'parent' (parent record only) or 'combined' (parent with child)\n"
+            output += "   - `_child_count`: Number of child records for this parent\n"
+            output += "   - `_child_index`: Index of this child record (for combined records)\n\n"
+            output += "2. **Parent fields**: All parent fields are prefixed with 'parent_'\n"
+            output += "3. **Child fields**: All child fields are prefixed with 'child_'\n\n"
+            output += "This structure allows for importing the data back while maintaining the parent-child relationships."
+
+            return output
+
+        except Exception as e:
+            logger.error(f"Error exporting related records: {str(e)}")
+            return f"# Error Exporting Related Records\n\n{str(e)}"
+
+    # Tool for importing related records from CSV
+    @mcp.tool()
+    def import_related_records_from_csv(import_path: str, parent_model: str, child_model: str, relation_field: str,
+                                       create_if_not_exists: bool = True, update_if_exists: bool = True,
+                                       draft_only: bool = False, reset_to_draft: bool = False,
+                                       skip_readonly_fields: bool = True) -> str:
+        """Import records from a structured CSV file into related models (parent and child).
+
+        Args:
+            import_path: Path to the CSV file to import
+            parent_model: The technical name of the parent Odoo model (e.g., 'account.move')
+            child_model: The technical name of the child Odoo model (e.g., 'account.move.line')
+            relation_field: The field in the child model that relates to the parent (e.g., 'move_id')
+            create_if_not_exists: Whether to create new records if they don't exist
+            update_if_exists: Whether to update existing records
+            draft_only: Whether to only update records in draft state (important for account.move)
+            reset_to_draft: Whether to reset records to draft before updating (use with caution)
+            skip_readonly_fields: Whether to automatically skip readonly fields for posted records
+
+        Returns:
+            A confirmation message with the import results
+        """
+        if not model_discovery:
+            return "# Error: Odoo Connection\n\nCould not connect to Odoo server. Please check your connection settings."
+
+        try:
+            # Validate parent model exists
+            parent_schema = model_discovery.get_model_schema(parent_model)
+            if not parent_schema:
+                return f"# Error: Invalid Parent Model\n\nThe model '{parent_model}' does not exist in the Odoo database."
+
+            # Validate child model exists
+            child_schema = model_discovery.get_model_schema(child_model)
+            if not child_schema:
+                return f"# Error: Invalid Child Model\n\nThe model '{child_model}' does not exist in the Odoo database."
+
+            # Get available fields for the models
+            parent_available_fields = parent_schema.get("fields", {})
+            child_available_fields = child_schema.get("fields", {})
+
+            if not parent_available_fields:
+                return f"# Error: No Fields Available\n\nCould not retrieve fields for model '{parent_model}'."
+
+            if not child_available_fields:
+                return f"# Error: No Fields Available\n\nCould not retrieve fields for model '{child_model}'."
+
+            # Validate relation field exists in child model
+            if relation_field not in child_available_fields:
+                return f"# Error: Invalid Relation Field\n\nThe field '{relation_field}' does not exist in model '{child_model}'."
+
+            # Validate relation field is a many2one field
+            if child_available_fields[relation_field].get('type') != 'many2one':
+                return f"# Error: Invalid Relation Field Type\n\nThe field '{relation_field}' in model '{child_model}' is not a many2one field."
+
+            # Validate relation field points to parent model
+            if child_available_fields[relation_field].get('relation') != parent_model:
+                return f"# Error: Invalid Relation\n\nThe field '{relation_field}' in model '{child_model}' does not point to model '{parent_model}'."
+
+            # Check if import file exists
+            if not os.path.exists(import_path):
+                return f"# Error: File Not Found\n\nThe file '{import_path}' does not exist."
+
+            # Check if file is a CSV
+            if not import_path.lower().endswith('.csv'):
+                return f"# Error: Invalid File Format\n\nThe file '{import_path}' is not a CSV file."
+
+            # Import the direct export/import implementation
+            from direct_export_import import import_related_records
+
+            # Run the import flow
+            result = import_related_records(
+                import_path=import_path,
+                parent_model=parent_model,
+                child_model=child_model,
+                relation_field=relation_field,
+                create_if_not_exists=create_if_not_exists,
+                update_if_exists=update_if_exists,
+                draft_only=draft_only,
+                reset_to_draft=reset_to_draft,
+                skip_readonly_fields=skip_readonly_fields
+            )
+
+            if not result["success"]:
+                return f"# Error Importing Related Records\n\n{result.get('error', 'Unknown error')}"
+
+            # Format the results
+            output = f"# Related Records Import Results\n\n"
+            output += f"- **Parent Model**: {result['parent_model']}\n"
+            output += f"- **Child Model**: {result['child_model']}\n"
+            output += f"- **Relation Field**: {result['relation_field']}\n"
+            output += f"- **Total Records**: {result['total_records']}\n"
+            output += f"- **Parent Records Created**: {result['parent_created']}\n"
+            output += f"- **Parent Records Updated**: {result['parent_updated']}\n"
+            output += f"- **Parent Records Failed**: {result['parent_failed']}\n"
+            output += f"- **Child Records Created**: {result['child_created']}\n"
+            output += f"- **Child Records Updated**: {result['child_updated']}\n"
+            output += f"- **Child Records Failed**: {result['child_failed']}\n"
+
+            if result['parent_failed'] > 0 or result['child_failed'] > 0:
+                output += f"\n## Failed Records\n\n"
+
+                # Show the first 5 validation errors
+                for i, error in enumerate(result['validation_errors'][:5]):
+                    output += f"### Error {i+1}\n"
+                    output += f"- **Model**: {error.get('model', 'Unknown')}\n"
+                    output += f"- **Error Message**: {error.get('error', 'Unknown error')}\n"
+
+                    # Show record data if available
+                    if 'record' in error:
+                        output += f"- **Record Data**: ```json\n{json.dumps(error['record'], indent=2)}\n```\n"
+
+                if len(result['validation_errors']) > 5:
+                    output += f"\n*...and {len(result['validation_errors']) - 5} more errors*\n"
+
+                # Add suggestions for fixing common errors
+                output += f"\n## Suggestions for Fixing Errors\n\n"
+                output += "1. **Many2one fields**: For fields like `parent_id`, make sure the value is an integer ID, not a string or list\n"
+                output += "2. **Selection fields**: For fields like `state`, ensure the value matches one of the allowed options\n"
+                output += "3. **Date fields**: Ensure dates are in YYYY-MM-DD format\n"
+                output += "4. **Required fields**: Make sure all required fields have values when creating new records\n"
+                output += "5. **Field types**: Check that field values match the expected types (numbers for numeric fields, etc.)\n"
+
+            return output
+
+        except Exception as e:
+            logger.error(f"Error importing related records: {str(e)}")
+            return f"# Error Importing Related Records\n\n{str(e)}"
+
+    # Tool for importing records from CSV
+    @mcp.tool()
+    def import_records_from_csv(import_path: str, model_name: str, field_mapping: Optional[str] = None, create_if_not_exists: bool = True, update_if_exists: bool = True) -> str:
+        """Import records from a CSV file into an Odoo model.
+
+        Args:
+            import_path: Path to the CSV file to import
+            model_name: The technical name of the Odoo model to import into
+            field_mapping: JSON string with mapping from CSV field names to Odoo field names
+            create_if_not_exists: Whether to create new records if they don't exist
+            update_if_exists: Whether to update existing records
+
+        Returns:
+            A confirmation message with the import results
+        """
+        if not model_discovery:
+            return "# Error: Odoo Connection\n\nCould not connect to Odoo server. Please check your connection settings."
+
+        try:
+            # Validate model exists
+            model_schema = model_discovery.get_model_schema(model_name)
+            if not model_schema:
+                return f"# Error: Invalid Model\n\nThe model '{model_name}' does not exist in the Odoo database."
+
+            # Get available fields for the model
+            available_fields = model_schema.get("fields", {})
+            if not available_fields:
+                return f"# Error: No Fields Available\n\nCould not retrieve fields for model '{model_name}'."
+
+            # Check if import file exists
+            if not os.path.exists(import_path):
+                return f"# Error: File Not Found\n\nThe file '{import_path}' does not exist."
+
+            # Check if file is a CSV
+            if not import_path.lower().endswith('.csv'):
+                return f"# Error: Invalid File Format\n\nThe file '{import_path}' is not a CSV file."
+
+            # Read CSV headers to validate field mapping
+            try:
+                import csv
+                with open(import_path, 'r') as f:
+                    reader = csv.reader(f)
+                    csv_headers = next(reader)
+            except Exception as e:
+                return f"# Error: Invalid CSV File\n\nCould not read headers from CSV file: {str(e)}"
+
+            # Parse field mapping if provided
+            mapping = None
+            if field_mapping:
+                try:
+                    mapping = json.loads(field_mapping)
+                except json.JSONDecodeError:
+                    return f"# Error: Invalid Field Mapping\n\nThe field mapping format is invalid: {field_mapping}\n\nExample valid format:\n```json\n{{\n  \"csv_field1\": \"odoo_field1\",\n  \"csv_field2\": \"odoo_field2\"\n}}\n```"
+
+                # Validate field mapping
+                if mapping:
+                    # Check if CSV fields exist in the CSV file
+                    invalid_csv_fields = [field for field in mapping.keys() if field not in csv_headers]
+                    if invalid_csv_fields:
+                        return f"# Error: Invalid CSV Fields in Mapping\n\nThe following CSV fields in the mapping do not exist in the CSV file:\n- {', '.join(invalid_csv_fields)}\n\nAvailable CSV fields:\n- {', '.join(csv_headers)}"
+
+                    # Check if Odoo fields exist in the model
+                    invalid_odoo_fields = [field for field in mapping.values() if field not in available_fields and field != 'id']
+                    if invalid_odoo_fields:
+                        return f"# Error: Invalid Odoo Fields in Mapping\n\nThe following Odoo fields in the mapping do not exist in model '{model_name}':\n- {', '.join(invalid_odoo_fields)}\n\nAvailable Odoo fields include:\n- {', '.join(list(available_fields.keys())[:20])}\n- ..."
+            else:
+                # If no mapping is provided, suggest one based on matching field names
+                mapping = {}
+                for csv_field in csv_headers:
+                    # Direct match
+                    if csv_field in available_fields:
+                        mapping[csv_field] = csv_field
+                    # Try normalized match (lowercase, no underscores)
+                    else:
+                        normalized_csv_field = csv_field.lower().replace('_', '')
+                        for odoo_field in available_fields.keys():
+                            normalized_odoo_field = odoo_field.lower().replace('_', '')
+                            if normalized_csv_field == normalized_odoo_field:
+                                mapping[csv_field] = odoo_field
+                                break
+
+            # Check for required fields
+            required_fields = [field for field, info in available_fields.items()
+                              if info.get('required', False) and field != 'id']
+
+            mapped_odoo_fields = set(mapping.values() if mapping else [])
+            missing_required = [field for field in required_fields if field not in mapped_odoo_fields]
+
+            if missing_required and create_if_not_exists:
+                return f"# Warning: Missing Required Fields\n\nThe following required fields are not mapped but are needed for creating new records:\n- {', '.join(missing_required)}\n\nPlease update your field mapping to include these fields or set create_if_not_exists=False."
+
+            # Run the import flow
+            result = import_records(
+                import_path=import_path,
+                model_name=model_name,
+                field_mapping=mapping,
+                create_if_not_exists=create_if_not_exists,
+                update_if_exists=update_if_exists
+            )
+
+            if not result["success"]:
+                return f"# Error Importing Records\n\n{result.get('error', 'Unknown error')}"
+
+            # Format the results
+            output = f"# Import Results\n\n"
+            output += f"- **Model**: {result['model_name']}\n"
+            output += f"- **Import Path**: {result['import_path']}\n"
+            output += f"- **Field Mapping**: {json.dumps(result['field_mapping'], indent=2)}\n"
+            output += f"- **Total Records**: {result['total_records']}\n"
+            output += f"- **Created Records**: {result['imported_records']}\n"
+            output += f"- **Updated Records**: {result['updated_records']}\n"
+            output += f"- **Failed Records**: {result['failed_records']}\n"
+
+            if result['failed_records'] > 0 and 'validation_errors' in result:
+                output += f"\n## Failed Records\n\n"
+
+                # Show the first 5 validation errors
+                for i, error in enumerate(result['validation_errors'][:5]):
+                    output += f"### Error {i+1}\n"
+                    output += f"- **Error Message**: {error.get('error', 'Unknown error')}\n"
+
+                    # Show record data if available
+                    if 'record' in error:
+                        output += f"- **Record Data**: ```json\n{json.dumps(error['record'], indent=2)}\n```\n"
+
+                if len(result['validation_errors']) > 5:
+                    output += f"\n*...and {len(result['validation_errors']) - 5} more errors*\n"
+
+                # Add suggestions for fixing common errors
+                output += f"\n## Suggestions for Fixing Errors\n\n"
+                output += "1. **Many2one fields**: For fields like `partner_id`, make sure the value is an integer ID, not a string or list\n"
+                output += "2. **Selection fields**: For fields like `priority`, ensure the value matches one of the allowed options\n"
+                output += "3. **Date fields**: Ensure dates are in YYYY-MM-DD format\n"
+                output += "4. **Required fields**: Make sure all required fields have values when creating new records\n"
+                output += "5. **Field types**: Check that field values match the expected types (numbers for numeric fields, etc.)\n"
+
+            return output
+
+        except Exception as e:
+            logger.error(f"Error importing records: {str(e)}")
+            return f"# Error Importing Records\n\n{str(e)}"
+
     # Add a prompt for creating a new record
     @mcp.prompt()
     def create_record_prompt(model_name: str) -> str:
@@ -931,6 +1517,394 @@ try:
     def search_records_prompt(model_name: str) -> str:
         """Create a prompt for searching records in an Odoo model."""
         return f"I need to search for records in the Odoo model '{model_name}'.\n\nPlease help me by:\n1. Asking me what I'm looking for\n2. Using the search_records tool to find matching records\n3. Explaining the results to me"
+
+    # Add a prompt for exporting records
+    @mcp.prompt()
+    def export_records_prompt(model_name: str) -> str:
+        """Create a prompt for exporting records from an Odoo model."""
+        return f"""I need to export records from the Odoo model '{model_name}' to a CSV file.
+
+Please help me by:
+1. Showing me the available fields for this model using the get_model_metadata tool
+2. Guiding me through selecting fields to export (including important fields like ID and name)
+3. Helping me set up filter criteria if needed (e.g., [["customer_rank", ">", 0]] for customers)
+4. Exporting the records using the export_records_to_csv tool
+5. Explaining the field types in the exported data for future reference"""
+
+    # Add a prompt for importing records
+    @mcp.prompt()
+    def import_records_prompt(model_name: str) -> str:
+        """Create a prompt for importing records into an Odoo model."""
+        return f"""I need to import records into the Odoo model '{model_name}' from a CSV file.
+
+Please help me by:
+1. Asking for the path to the CSV file
+2. Showing me the required fields for this model using the get_model_metadata tool
+3. Helping me create a proper field mapping from CSV fields to Odoo fields
+4. Explaining how to handle special field types:
+   - Many2one fields (like partner_id): Need to be integer IDs
+   - Selection fields (like state): Need to match allowed values
+   - Date fields: Need to be in YYYY-MM-DD format
+5. Importing the records using the import_records_from_csv tool
+6. Helping me understand and fix any import errors"""
+
+    # Add a prompt for updating CRM lead descriptions
+    @mcp.prompt()
+    def update_crm_descriptions_prompt() -> str:
+        """Create a prompt for updating CRM lead descriptions."""
+        return f"""I need to update the descriptions of CRM leads (opportunities) in Odoo.
+
+Please help me by:
+1. Exporting CRM leads to a CSV file using the export_records_to_csv tool with these fields:
+   - id (essential for updating existing records)
+   - name (for identification)
+   - description (the field we want to update)
+   - partner_id, stage_id (important relationships)
+   - email_from, phone (contact information)
+
+2. Guiding me through modifying the descriptions in the CSV file
+
+3. Helping me import the updated records back to Odoo with proper field mapping:
+   - Handling many2one fields (partner_id, stage_id) by extracting IDs
+   - Excluding problematic fields like priority and date_deadline
+   - Focusing only on updating the description field
+
+4. Explaining how to troubleshoot common import errors"""
+
+    # Add a prompt for dynamic model export/import
+    @mcp.prompt()
+    def dynamic_export_import_prompt() -> str:
+        """Create a prompt for dynamically exporting and importing any Odoo model."""
+        return f"""I need to export data from an Odoo model and then import it back with modifications.
+
+Please help me by:
+1. Asking which Odoo model I want to work with
+2. Showing me the available fields for that model using get_model_metadata
+3. Guiding me through selecting fields to export, including:
+   - id field (for record identification)
+   - name or other descriptive fields
+   - fields I want to modify
+   - relationship fields (many2one, one2many, many2many)
+
+4. Helping me export the data using export_records_to_csv
+
+5. Explaining how to modify the CSV file based on field types:
+   - Text fields: Can be directly edited
+   - Many2one fields: Need special handling (extract IDs)
+   - Selection fields: Must match allowed values
+   - Date fields: Must use proper format
+
+6. Creating a proper field mapping for import
+
+7. Importing the modified data using import_records_from_csv
+
+8. Helping me understand and fix any import errors"""
+
+    # Add a prompt for invoice export/import
+    @mcp.prompt()
+    def invoice_export_import_prompt() -> str:
+        """Create a prompt for exporting and importing invoices."""
+        return f"""I need to work with invoices (account.move) in Odoo, including exporting existing invoices and importing new ones.
+
+Please help me by:
+1. Explaining the different invoice types in Odoo:
+   - Customer Invoices (out_invoice)
+   - Vendor Bills (in_invoice)
+   - Credit Notes (out_refund, in_refund)
+
+2. Showing me how to export existing invoices:
+   - Using export_records_to_csv with account.move model
+   - Including important fields like id, name, partner_id, invoice_date, amount_total
+   - Filtering by invoice type and state
+
+3. Guiding me through exporting invoice lines:
+   - Using export_records_to_csv with account.move.line model
+   - Including fields like move_id, product_id, account_id, quantity, price_unit
+   - Explaining the relationship between invoices and invoice lines
+
+4. Helping me create new invoices via CSV import:
+   - Creating the invoice header CSV with required fields
+   - Creating the invoice lines CSV with required fields
+   - Importing the header first, then the lines with the correct move_id
+
+5. Explaining how to handle special field types:
+   - Many2one fields (partner_id, product_id, account_id)
+   - Selection fields (move_type, state)
+   - Monetary fields (price_unit, amount_total)
+   - Tax fields (tax_ids)
+
+6. Showing me how to update existing invoices:
+   - Exporting draft invoices
+   - Modifying fields like reference, date, or amounts
+   - Importing back with the correct field mapping
+
+7. Helping me understand and fix any import errors"""
+
+    # Add a prompt for related records export/import
+    @mcp.prompt()
+    def related_records_export_import_prompt() -> str:
+        """Create a prompt for exporting and importing related records."""
+        return f"""I need to work with related models in Odoo, exporting and importing parent and child records together while maintaining their relationships.
+
+Please help me by:
+1. Explaining how parent-child relationships work in Odoo:
+   - Many2one fields (e.g., move_id in account.move.line)
+   - One2many fields (e.g., invoice_line_ids in account.move)
+   - How these relationships are maintained during import/export
+
+2. Guiding me through exporting related records:
+   - Using export_related_records_to_csv with parent and child models
+   - Identifying the relation field that connects them
+   - Selecting appropriate fields from both models
+   - Setting up filter criteria for the parent records
+
+3. Explaining the structure of the exported CSV file:
+   - How parent and child records are combined
+   - The meaning of metadata columns (_model, _record_type, etc.)
+   - How to interpret the prefixed fields (parent_*, child_*)
+
+4. Helping me modify the exported data:
+   - Which fields are safe to modify
+   - How to handle special field types in both parent and child records
+   - Best practices for maintaining data integrity
+
+5. Showing me how to import the modified data:
+   - Using import_related_records_from_csv
+   - Understanding how parent-child relationships are preserved
+   - Options for creating new records vs. updating existing ones
+   - Special handling for posted invoices (draft_only and reset_to_draft parameters)
+   - How to handle computed fields and restricted fields
+
+6. Demonstrating with a real example:
+   - Exporting invoices (account.move) with their lines (account.move.line)
+   - Modifying some fields in both the parent and child records
+   - Importing the data back while maintaining the relationships
+
+7. Helping me understand and fix any import errors
+
+This approach is much more efficient than exporting and importing parent and child records separately, as it automatically maintains the relationships between them."""
+
+    # Tool for validating and converting field values
+    @mcp.tool()
+    def validate_field_value(model_name: str, field_name: str, value: str) -> str:
+        """Validate and convert a value for a specific field in an Odoo model.
+
+        Args:
+            model_name: The technical name of the Odoo model
+            field_name: The name of the field to validate
+            value: The value to validate and convert
+
+        Returns:
+            A formatted string with validation results and conversion suggestions
+        """
+        if not model_discovery:
+            return "# Error: Odoo Connection\n\nCould not connect to Odoo server. Please check your connection settings."
+
+        try:
+            # Get model schema
+            schema = model_discovery.get_model_schema(model_name)
+
+            if not schema:
+                return f"# Error: Invalid Model\n\nThe model '{model_name}' does not exist or could not be accessed."
+
+            fields = schema.get("fields", {})
+
+            if not field_name in fields:
+                return f"# Error: Invalid Field\n\nThe field '{field_name}' does not exist in model '{model_name}'."
+
+            field_info = fields[field_name]
+            field_type = field_info.get("type", "unknown")
+            field_string = field_info.get("string", field_name)
+
+            # Format the results
+            output = f"# Field Validation: {field_string} ({field_name})\n\n"
+            output += f"- **Field Type**: {field_type}\n"
+            output += f"- **Input Value**: `{value}`\n\n"
+
+            # Validate based on field type
+            if field_type == "char" or field_type == "text":
+                output += "## Validation Result\n\n"
+                output += "✅ **Valid**: Text values are accepted for this field.\n\n"
+                output += "## Import Format\n\n"
+                output += "Text fields can be imported directly as strings.\n"
+
+            elif field_type == "integer":
+                try:
+                    int_value = int(value)
+                    output += "## Validation Result\n\n"
+                    output += f"✅ **Valid**: The value `{value}` is a valid integer.\n\n"
+                    output += "## Import Format\n\n"
+                    output += "Integer fields should be imported as numbers without decimal points.\n"
+                except ValueError:
+                    output += "## Validation Result\n\n"
+                    output += f"❌ **Invalid**: The value `{value}` is not a valid integer.\n\n"
+                    output += "## Suggested Fix\n\n"
+                    output += "Use a whole number without decimal points or commas.\n"
+
+            elif field_type == "float":
+                try:
+                    float_value = float(value)
+                    output += "## Validation Result\n\n"
+                    output += f"✅ **Valid**: The value `{value}` is a valid float.\n\n"
+                    output += "## Import Format\n\n"
+                    output += "Float fields should be imported as numbers, optionally with decimal points.\n"
+                except ValueError:
+                    output += "## Validation Result\n\n"
+                    output += f"❌ **Invalid**: The value `{value}` is not a valid float.\n\n"
+                    output += "## Suggested Fix\n\n"
+                    output += "Use a number with or without decimal points. Do not use commas for thousands separators.\n"
+
+            elif field_type == "boolean":
+                if value.lower() in ["true", "1", "yes", "y"]:
+                    output += "## Validation Result\n\n"
+                    output += f"✅ **Valid**: The value `{value}` is interpreted as TRUE.\n\n"
+                    output += "## Import Format\n\n"
+                    output += "Boolean fields accept 'true', '1', 'yes', 'y' for TRUE and 'false', '0', 'no', 'n' for FALSE.\n"
+                elif value.lower() in ["false", "0", "no", "n"]:
+                    output += "## Validation Result\n\n"
+                    output += f"✅ **Valid**: The value `{value}` is interpreted as FALSE.\n\n"
+                    output += "## Import Format\n\n"
+                    output += "Boolean fields accept 'true', '1', 'yes', 'y' for TRUE and 'false', '0', 'no', 'n' for FALSE.\n"
+                else:
+                    output += "## Validation Result\n\n"
+                    output += f"❌ **Invalid**: The value `{value}` is not a valid boolean.\n\n"
+                    output += "## Suggested Fix\n\n"
+                    output += "Use 'true' or 'false' (or '1'/'0', 'yes'/'no').\n"
+
+            elif field_type == "date":
+                try:
+                    import datetime
+                    # Try different date formats
+                    for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d-%m-%Y", "%m-%d-%Y"]:
+                        try:
+                            date_value = datetime.datetime.strptime(value, fmt).date()
+                            output += "## Validation Result\n\n"
+                            output += f"✅ **Valid**: The value `{value}` is a valid date.\n\n"
+                            output += "## Import Format\n\n"
+                            output += f"For import, convert to ISO format: **{date_value.isoformat()}**\n"
+                            break
+                        except ValueError:
+                            continue
+                    else:
+                        output += "## Validation Result\n\n"
+                        output += f"❌ **Invalid**: The value `{value}` is not a valid date.\n\n"
+                        output += "## Suggested Fix\n\n"
+                        output += "Use the format YYYY-MM-DD (e.g., 2023-05-15).\n"
+                except Exception:
+                    output += "## Validation Result\n\n"
+                    output += f"❌ **Invalid**: The value `{value}` is not a valid date.\n\n"
+                    output += "## Suggested Fix\n\n"
+                    output += "Use the format YYYY-MM-DD (e.g., 2023-05-15).\n"
+
+            elif field_type == "datetime":
+                try:
+                    import datetime
+                    # Try different datetime formats
+                    for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%d/%m/%Y %H:%M:%S"]:
+                        try:
+                            dt_value = datetime.datetime.strptime(value, fmt)
+                            output += "## Validation Result\n\n"
+                            output += f"✅ **Valid**: The value `{value}` is a valid datetime.\n\n"
+                            output += "## Import Format\n\n"
+                            output += f"For import, convert to ISO format: **{dt_value.isoformat()}**\n"
+                            break
+                        except ValueError:
+                            continue
+                    else:
+                        output += "## Validation Result\n\n"
+                        output += f"❌ **Invalid**: The value `{value}` is not a valid datetime.\n\n"
+                        output += "## Suggested Fix\n\n"
+                        output += "Use the format YYYY-MM-DD HH:MM:SS (e.g., 2023-05-15 14:30:00).\n"
+                except Exception:
+                    output += "## Validation Result\n\n"
+                    output += f"❌ **Invalid**: The value `{value}` is not a valid datetime.\n\n"
+                    output += "## Suggested Fix\n\n"
+                    output += "Use the format YYYY-MM-DD HH:MM:SS (e.g., 2023-05-15 14:30:00).\n"
+
+            elif field_type == "selection":
+                # Try to get selection options
+                selection_options = field_info.get("selection", [])
+
+                if selection_options:
+                    valid_values = [opt[0] for opt in selection_options]
+                    valid_labels = [opt[1] for opt in selection_options]
+
+                    if value in valid_values:
+                        output += "## Validation Result\n\n"
+                        output += f"✅ **Valid**: The value `{value}` is a valid selection option.\n\n"
+                        output += "## Import Format\n\n"
+                        output += "Selection fields should use the technical value, not the display label.\n"
+                    else:
+                        # Check if the value matches a label instead of a value
+                        matching_values = [opt[0] for opt in selection_options if opt[1].lower() == value.lower()]
+
+                        if matching_values:
+                            output += "## Validation Result\n\n"
+                            output += f"⚠️ **Warning**: You provided a display label instead of a technical value.\n\n"
+                            output += "## Suggested Fix\n\n"
+                            output += f"Use the technical value `{matching_values[0]}` instead of the label `{value}`.\n"
+                        else:
+                            output += "## Validation Result\n\n"
+                            output += f"❌ **Invalid**: The value `{value}` is not a valid selection option.\n\n"
+                            output += "## Suggested Fix\n\n"
+                            output += "Use one of the following values:\n\n"
+
+                            for i, (val, label) in enumerate(selection_options):
+                                output += f"- `{val}` ({label})\n"
+                else:
+                    output += "## Validation Result\n\n"
+                    output += "⚠️ **Warning**: Could not retrieve selection options for validation.\n\n"
+                    output += "## Import Format\n\n"
+                    output += "Selection fields should use the technical value, not the display label.\n"
+
+            elif field_type == "many2one":
+                # Check if the value is a valid ID
+                try:
+                    # If it's a number, it might be an ID
+                    int_value = int(value)
+                    output += "## Validation Result\n\n"
+                    output += f"✅ **Valid Format**: The value `{value}` is a valid ID format.\n\n"
+                    output += "## Import Format\n\n"
+                    output += "Many2one fields should be imported as integer IDs.\n\n"
+                    output += "## Note\n\n"
+                    output += f"This validation only checks the format. It does not verify if ID {int_value} exists in the related model.\n"
+                except ValueError:
+                    # If it's not a number, it might be a string representation like "[id, 'name']"
+                    import re
+                    match = re.search(r'\[(\d+)', value)
+
+                    if match:
+                        extracted_id = match.group(1)
+                        output += "## Validation Result\n\n"
+                        output += f"⚠️ **Warning**: The value appears to be a string representation of a many2one field.\n\n"
+                        output += "## Suggested Fix\n\n"
+                        output += f"Extract the ID: `{extracted_id}`\n\n"
+                        output += "## Import Format\n\n"
+                        output += "Many2one fields should be imported as integer IDs, not string representations.\n"
+                    else:
+                        output += "## Validation Result\n\n"
+                        output += f"❌ **Invalid**: The value `{value}` is not a valid ID format for a many2one field.\n\n"
+                        output += "## Suggested Fix\n\n"
+                        output += "Use an integer ID for many2one fields.\n"
+
+            elif field_type in ["one2many", "many2many"]:
+                output += "## Validation Result\n\n"
+                output += "⚠️ **Warning**: One2many and many2many fields are complex to import directly.\n\n"
+                output += "## Import Format\n\n"
+                output += "For many2many fields, you can use a comma-separated list of IDs: `1,2,3`\n"
+                output += "For one2many fields, direct import is usually not supported. Consider importing the related records separately.\n"
+
+            else:
+                output += "## Validation Result\n\n"
+                output += f"⚠️ **Unknown field type**: `{field_type}`\n\n"
+                output += "## Import Format\n\n"
+                output += "The validation for this field type is not implemented. Proceed with caution.\n"
+
+            return output
+
+        except Exception as e:
+            logger.error(f"Error validating field value: {str(e)}")
+            return f"# Error validating field value\n\n{str(e)}"
 
     # Main entry point
     if __name__ == "__main__":

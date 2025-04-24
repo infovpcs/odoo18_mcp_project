@@ -72,6 +72,16 @@
 - [x] Add migration utilities
 - [x] Create release notes
 
+## Phase 9: LangGraph Agent Flows (2025-05-01)
+- [x] Add LangGraph and LangChain dependencies
+- [x] Create agent directory structure
+- [x] Implement export agent components
+- [x] Implement import agent components
+- [x] Create main agent flow
+- [x] Integrate with MCP server
+- [x] Create testing scripts
+- [x] Update documentation
+
 ## Discovered During Work
 - [x] Add environment variable support (2023-12-20)
 - [x] Create .env.example file (2023-12-20)
@@ -108,6 +118,36 @@
 - [ ] Add support for connection pooling
 - [ ] Implement retry mechanism for failed operations
 - [ ] Add support for custom Odoo modules
+- [x] Create LangGraph agent flow for export/import operations (2025-05-01)
+- [x] Implement CSV export functionality for Odoo models (2025-05-01)
+- [x] Implement CSV import functionality with field mapping (2025-05-01)
+- [x] Add MCP tools for triggering export/import agent flows (2025-05-01)
+- [x] Create direct implementation for export/import functionality (2025-05-01)
+- [x] Fix recursion issues in LangGraph implementation (2025-05-01)
+- [x] Add CRM lead export/import test cases (2025-05-01)
+- [x] Implement description update functionality for CRM leads (2025-05-01)
+- [x] Handle complex field types in import/export (many2one, selection, date) (2025-05-01)
+- [x] Add CRM description update prompt to MCP server (2025-05-01)
+- [x] Enhance MCP server with dynamic model and field validation (2025-05-01)
+- [x] Add field value validation tool for import/export operations (2025-05-01)
+- [x] Improve error handling and reporting for import/export operations (2025-05-01)
+- [x] Add invoice (account.move) export/import test cases (2025-05-01)
+- [x] Add invoice line (account.move.line) export/import test cases (2025-05-01)
+- [x] Add invoice creation and update workflow test (2025-05-01)
+- [x] Add invoice export/import prompt to MCP server (2025-05-01)
+- [x] Successfully test invoice export/import workflow (2025-05-01)
+- [x] Add related records export/import functionality (2025-05-01)
+- [x] Add related records export/import test cases (2025-05-01)
+- [x] Add related records export/import prompt to MCP server (2025-05-01)
+- [x] Fix account.move (invoice) export/import issues (2025-05-02)
+- [x] Implement proper handling of many2one fields in CSV import (2025-05-02)
+- [x] Add move_type parameter for invoice filtering (2025-05-02)
+- [x] Implement reset_to_draft functionality for posted invoices (2025-05-02)
+- [x] Add skip_readonly_fields option for invoice updates (2025-05-02)
+- [x] Fix balance issues in invoice updates (2025-05-02)
+- [x] Improve error handling for invoice import failures (2025-05-02)
+- [x] Add direct export/import implementation for reliability (2025-05-02)
+- [x] Update documentation with export/import best practices (2025-05-02)
 
 ## Completed Tasks
 - [x] Initialize project structure (2023-12-20)
@@ -180,3 +220,25 @@
 - [x] Implement version management (2025-04-25)
 - [x] Add migration utilities (2025-04-25)
 - [x] Create release notes (2025-04-25)
+- [x] Add LangGraph and LangChain dependencies (2025-05-01)
+- [x] Create agent directory structure (2025-05-01)
+- [x] Implement export agent components (2025-05-01)
+- [x] Implement import agent components (2025-05-01)
+- [x] Create main agent flow (2025-05-01)
+- [x] Integrate with MCP server (2025-05-01)
+- [x] Create testing scripts (2025-05-01)
+- [x] Update documentation (2025-05-01)
+- [x] Create fallback direct implementation (2025-05-01)
+- [x] Create LangGraph agent flow for export/import operations (2025-05-01)
+- [x] Implement CSV export functionality for Odoo models (2025-05-01)
+- [x] Implement CSV import functionality with field mapping (2025-05-01)
+- [x] Add MCP tools for triggering export/import agent flows (2025-05-01)
+- [x] Fix account.move (invoice) export/import issues (2025-05-02)
+- [x] Implement proper handling of many2one fields in CSV import (2025-05-02)
+- [x] Add move_type parameter for invoice filtering (2025-05-02)
+- [x] Implement reset_to_draft functionality for posted invoices (2025-05-02)
+- [x] Add skip_readonly_fields option for invoice updates (2025-05-02)
+- [x] Fix balance issues in invoice updates (2025-05-02)
+- [x] Improve error handling for invoice import failures (2025-05-02)
+- [x] Add direct export/import implementation for reliability (2025-05-02)
+- [x] Update documentation with export/import best practices (2025-05-02)

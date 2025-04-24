@@ -21,6 +21,8 @@ A robust integration server that connects MCP (Master Control Program) with Odoo
 - **Smart Search Fields**: Identify fields that are good candidates for search operations
 - **Related Records Export/Import**: Export and import parent-child related records in a single operation
 - **Relationship Maintenance**: Automatically maintain relationships between models during import/export
+- **LangGraph Agent Flow**: Structured agent-based approach for complex export/import operations using LangGraph
+- **Dual Implementation Approach**: Both LangGraph-based and direct implementation options for export/import operations
 - **MCP Integration**: API endpoints for MCP integration with standardized request/response format
 - **Claude Desktop Integration**: Seamless integration with Claude Desktop using the MCP SDK
 - **Environment Configuration**: Easy configuration using environment variables
@@ -43,6 +45,7 @@ A robust integration server that connects MCP (Master Control Program) with Odoo
 - Python 3.8 or higher
 - Odoo 18.0 instance
 - Access to Odoo database
+- LangGraph and LangChain (for agent-based export/import operations)
 - Claude Desktop (optional, for AI integration)
 
 ### Setup
@@ -276,6 +279,75 @@ python test_mcp_tools.py
 
 The standalone server provides the same functionality as the MCP server used by Claude Desktop, but with a simple HTTP interface for testing purposes.
 
+### Using the LangGraph Export/Import Agent
+
+The project includes a LangGraph-based agent flow for complex export/import operations. This approach provides a structured, step-by-step process for exporting and importing data with proper field mapping and validation.
+
+#### When to Use LangGraph Implementation
+
+- For complex export/import operations involving multiple models
+- When you need guided, step-by-step processing
+- For operations requiring field mapping and validation
+- When working with related records (parent-child relationships)
+
+```python
+from src.agents.export_import.main import create_export_import_agent
+
+# Create the agent
+agent = create_export_import_agent(
+    odoo_url="http://localhost:8069",
+    odoo_db="llmdb18",
+    odoo_username="admin",
+    odoo_password="admin"
+)
+
+# Run the export flow
+result = agent.invoke({
+    "mode": "export",
+    "model_name": "res.partner",
+    "fields": ["id", "name", "email", "phone"],
+    "filter_domain": [["is_company", "=", True]],
+    "export_path": "./exports/companies.csv"
+})
+
+# Run the import flow
+result = agent.invoke({
+    "mode": "import",
+    "model_name": "res.partner",
+    "import_path": "./exports/companies.csv",
+    "create_if_not_exists": False,
+    "update_if_exists": True
+})
+```
+
+#### When to Use Direct Implementation
+
+- For simple, straightforward export/import operations
+- When you need a more procedural approach
+- For batch processing or automation scripts
+- When you don't need the overhead of the agent flow
+
+```python
+from direct_export_import import export_records, import_records
+
+# Export records
+result = export_records(
+    model_name="res.partner",
+    fields=["id", "name", "email", "phone"],
+    filter_domain=[["is_company", "=", True]],
+    export_path="./exports/companies.csv"
+)
+
+# Import records
+result = import_records(
+    import_path="./exports/companies.csv",
+    model_name="res.partner",
+    field_mapping={"id": "id", "name": "name", "email": "email", "phone": "phone"},
+    create_if_not_exists=False,
+    update_if_exists=True
+)
+```
+
 ### API Endpoints
 
 - `POST /api/v1/odoo`: Main endpoint for Odoo operations
@@ -467,6 +539,16 @@ print(response.json())
 ```
 odoo18_mcp_project/
 ├── src/                    # Source code
+│   ├── agents/             # Agent implementations
+│   │   └── export_import/  # Export/Import agent flow
+│   │       ├── main.py     # LangGraph flow definition
+│   │       ├── state.py    # State management
+│   │       ├── nodes/      # Node implementations
+│   │       │   ├── export_nodes.py  # Export operation nodes
+│   │       │   └── import_nodes.py  # Import operation nodes
+│   │       └── utils/      # Utility functions
+│   │           ├── csv_handler.py   # CSV processing
+│   │           └── field_mapper.py  # Field mapping utilities
 │   ├── core/               # Core functionality
 │   │   ├── config.py       # Configuration management
 │   │   └── logger.py       # Logging system
@@ -624,7 +706,14 @@ We've implemented robust export and import functionality for Odoo models, with s
 
 5. **Error Handling**: Added comprehensive error handling for export/import operations with detailed error messages.
 
-6. **Direct Implementation**: Created a direct implementation for export/import functionality that can be used without LangGraph.
+6. **Dual Implementation Approach**:
+   - **LangGraph Implementation**: Created a structured agent-based approach using LangGraph for complex export/import operations with:
+     - State management system (`AgentState` class)
+     - Export nodes (`select_model`, `select_fields`, `set_filter`, `execute_export`)
+     - Import nodes (`select_import_file`, `select_import_model`, `map_fields`, `validate_mapping`, `execute_import`)
+     - Directed graph flow for step-by-step processing
+     - Conversational interface for guided export/import operations
+   - **Direct Implementation**: Created a simpler, procedural implementation for export/import functionality that can be used without LangGraph for straightforward operations.
 
 7. **File System Integration**: Added support for exporting to and importing from the file system with proper path handling.
 

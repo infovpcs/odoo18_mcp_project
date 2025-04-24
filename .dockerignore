@@ -1,6 +1,7 @@
 .git
 .env
 venv
+.venv
 __pycache__
 *.pyc
 *.pyo
@@ -17,3 +18,8 @@ htmlcov
 dist
 build
 *.egg-info
+logs/
+.vscode/
+.idea/
+*.log
+uv.lock

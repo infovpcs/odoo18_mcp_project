@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: odoo18-mcp-server
+    ports:
+      - "8000:8000"
+    environment:
+      - ODOO_URL=${ODOO_URL:-http://odoo:8069}
+      - ODOO_DB=${ODOO_DB:-llmdb18}
+      - ODOO_USERNAME=${ODOO_USERNAME:-admin}
+      - ODOO_PASSWORD=${ODOO_PASSWORD:-admin}
+    volumes:
+      - ./logs:/app/logs
+    command: []  # Default command from Dockerfile
+
+  standalone-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: odoo18-standalone-server
+    ports:
+      - "8001:8000"
+    environment:
+      - ODOO_URL=${ODOO_URL:-http://odoo:8069}
+      - ODOO_DB=${ODOO_DB:-llmdb18}
+      - ODOO_USERNAME=${ODOO_USERNAME:-admin}
+      - ODOO_PASSWORD=${ODOO_PASSWORD:-admin}
+    volumes:
+      - ./logs:/app/logs
+    command: ["standalone"]
+
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: odoo18-test-runner
+    environment:
+      - ODOO_URL=${ODOO_URL:-http://odoo:8069}
+      - ODOO_DB=${ODOO_DB:-llmdb18}
+      - ODOO_USERNAME=${ODOO_USERNAME:-admin}
+      - ODOO_PASSWORD=${ODOO_PASSWORD:-admin}
+    volumes:
+      - ./logs:/app/logs
+    command: ["test", "all"]

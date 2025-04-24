@@ -221,13 +221,33 @@ try:
                 logger.error(f"Error deleting record {record_id} from {model_name}: {str(e)}")
                 return False
 
-        def execute_method(self, model_name, method, args_list):
-            """Execute a custom method on a model"""
+        def execute_method(self, model_name, method, args_list, kwargs_dict=None):
+            """Execute a custom method on a model
+
+            Args:
+                model_name: The name of the model
+                method: The method to execute
+                args_list: List of positional arguments
+                kwargs_dict: Dictionary of keyword arguments (optional)
+
+            Returns:
+                The result of the method execution
+            """
             try:
-                result = self.models_proxy.execute_kw(
-                    self.db, self.uid, self.password,
-                    model_name, method, args_list
-                )
+                if kwargs_dict:
+                    # If we have keyword arguments, pass them as the 7th parameter
+                    logger.debug(f"Executing {model_name}.{method} with args={args_list} and kwargs={kwargs_dict}")
+                    result = self.models_proxy.execute_kw(
+                        self.db, self.uid, self.password,
+                        model_name, method, args_list, kwargs_dict
+                    )
+                else:
+                    # Otherwise, just pass the positional arguments
+                    logger.debug(f"Executing {model_name}.{method} with args={args_list}")
+                    result = self.models_proxy.execute_kw(
+                        self.db, self.uid, self.password,
+                        model_name, method, args_list
+                    )
                 return result
             except Exception as e:
                 logger.error(f"Error executing method {method} on {model_name}: {str(e)}")
@@ -427,12 +447,12 @@ try:
 
     # Tool for creating records
     @mcp.tool()
-    def create_record(model_name: str, values: str) -> str:
+    def create_record(model_name: str, values: Union[str, Dict[str, Any]]) -> str:
         """Create a new record in an Odoo model.
 
         Args:
             model_name: The technical name of the Odoo model
-            values: JSON string with field values for the new record
+            values: JSON string or dictionary with field values for the new record
 
         Returns:
             A confirmation message with the new record ID
@@ -441,8 +461,20 @@ try:
             return "# Error: Odoo Connection\n\nCould not connect to Odoo server. Please check your connection settings."
 
         try:
-            # Parse the values JSON
-            values_dict = json.loads(values)
+            # Handle both string and dictionary inputs for values
+            values_dict = {}
+            if isinstance(values, str):
+                try:
+                    values_dict = json.loads(values)
+                except json.JSONDecodeError:
+                    return "Error: Invalid JSON format for values. Please provide a valid JSON object."
+            elif isinstance(values, dict):
+                values_dict = values
+            else:
+                return f"Error: Invalid type for values: {type(values)}. Please provide a JSON string or dictionary."
+
+            # Log the values for debugging
+            logger.debug(f"Creating record with values: {values_dict}")
 
             # Create the record
             record_id = model_discovery.create_record(model_name, values_dict)
@@ -452,20 +484,19 @@ try:
 
             # Return a success message
             return f"Record created successfully with ID: {record_id}"
-        except json.JSONDecodeError:
-            return "Error: Invalid JSON format for values. Please provide a valid JSON object."
         except Exception as e:
+            logger.error(f"Error creating record: {str(e)}")
             return f"Error creating record: {str(e)}"
 
     # Tool for updating records
     @mcp.tool()
-    def update_record(model_name: str, record_id: int, values: str) -> str:
+    def update_record(model_name: str, record_id: int, values: Union[str, Dict[str, Any]]) -> str:
         """Update an existing record in an Odoo model.
 
         Args:
             model_name: The technical name of the Odoo model
             record_id: The ID of the record to update
-            values: JSON string with field values to update
+            values: JSON string or dictionary with field values to update
 
         Returns:
             A confirmation message
@@ -474,8 +505,20 @@ try:
             return "# Error: Odoo Connection\n\nCould not connect to Odoo server. Please check your connection settings."
 
         try:
-            # Parse the values JSON
-            values_dict = json.loads(values)
+            # Handle both string and dictionary inputs for values
+            values_dict = {}
+            if isinstance(values, str):
+                try:
+                    values_dict = json.loads(values)
+                except json.JSONDecodeError:
+                    return "Error: Invalid JSON format for values. Please provide a valid JSON object."
+            elif isinstance(values, dict):
+                values_dict = values
+            else:
+                return f"Error: Invalid type for values: {type(values)}. Please provide a JSON string or dictionary."
+
+            # Log the values for debugging
+            logger.debug(f"Updating record {record_id} with values: {values_dict}")
 
             # Update the record
             result = model_discovery.update_record(model_name, record_id, values_dict)
@@ -485,9 +528,8 @@ try:
 
             # Return a success message
             return f"Record {record_id} updated successfully"
-        except json.JSONDecodeError:
-            return "Error: Invalid JSON format for values. Please provide a valid JSON object."
         except Exception as e:
+            logger.error(f"Error updating record: {str(e)}")
             return f"Error updating record: {str(e)}"
 
     # Tool for deleting records
@@ -519,13 +561,13 @@ try:
 
     # Tool for executing custom Odoo methods
     @mcp.tool()
-    def execute_method(model_name: str, method: str, args: str) -> str:
+    def execute_method(model_name: str, method: str, args: Union[str, List, Dict[str, Any]]) -> str:
         """Execute a custom method on an Odoo model.
 
         Args:
             model_name: The technical name of the Odoo model
             method: The method name to execute
-            args: JSON string with arguments for the method
+            args: Arguments for the method (can be a JSON string, list, or dictionary)
 
         Returns:
             The result of the method execution
@@ -534,23 +576,66 @@ try:
             return "# Error: Odoo Connection\n\nCould not connect to Odoo server. Please check your connection settings."
 
         try:
-            # Parse the args JSON
-            try:
-                args_list = json.loads(args)
-                if not isinstance(args_list, list):
-                    args_list = [args_list]
-            except json.JSONDecodeError:
-                # If not valid JSON, try to interpret as a simple list or string
-                if args.startswith('[') and args.endswith(']'):
-                    # Try to evaluate as a Python list
-                    import ast
-                    args_list = ast.literal_eval(args)
+            # Handle different types of args input
+            args_list = []
+            kwargs_dict = None
+
+            if isinstance(args, str):
+                # If it's a string, try to parse it as JSON
+                try:
+                    parsed_args = json.loads(args)
+                    if isinstance(parsed_args, list):
+                        args_list = parsed_args
+                    elif isinstance(parsed_args, dict):
+                        # For name_search and similar methods, dictionaries should be passed as kwargs
+                        if method in ['name_search', 'search', 'search_read', 'fields_get']:
+                            kwargs_dict = parsed_args
+                            args_list = []
+                        else:
+                            args_list = [parsed_args]
+                    else:
+                        args_list = [parsed_args]
+                except json.JSONDecodeError:
+                    # If not valid JSON, try to interpret as a simple list or string
+                    if args.startswith('[') and args.endswith(']'):
+                        # Try to evaluate as a Python list
+                        import ast
+                        try:
+                            args_list = ast.literal_eval(args)
+                        except (SyntaxError, ValueError):
+                            # If that fails, treat as a single string argument
+                            args_list = [args]
+                    else:
+                        # Treat as a single string argument
+                        args_list = [args]
+            elif isinstance(args, list):
+                # If it's already a list, use it directly
+                args_list = args
+            elif isinstance(args, dict):
+                # For name_search and similar methods, dictionaries should be passed as kwargs
+                if method in ['name_search', 'search', 'search_read', 'fields_get']:
+                    kwargs_dict = args
+                    args_list = []
                 else:
-                    # Treat as a single string argument
                     args_list = [args]
+            else:
+                # For any other type, convert to string and use as a single argument
+                args_list = [str(args)]
+
+            # Special handling for name_search with a single string
+            if method == 'name_search' and len(args_list) == 1 and isinstance(args_list[0], str):
+                # If args is just a string for name_search, convert it to the proper format
+                kwargs_dict = {'name': args_list[0]}
+                args_list = []
+
+            # Log the arguments for debugging
+            if kwargs_dict:
+                logger.debug(f"Executing method {method} on {model_name} with args: {args_list} and kwargs: {kwargs_dict}")
+            else:
+                logger.debug(f"Executing method {method} on {model_name} with args: {args_list}")
 
             # Execute the method
-            result = model_discovery.execute_method(model_name, method, args_list)
+            result = model_discovery.execute_method(model_name, method, args_list, kwargs_dict)
 
             # Format the result
             if isinstance(result, (dict, list)):
@@ -558,6 +643,7 @@ try:
             else:
                 return str(result)
         except Exception as e:
+            logger.error(f"Error executing method: {str(e)}")
             return f"Error executing method: {str(e)}"
 
     # Tool for getting field importance

@@ -1,4 +1,4 @@
-# Odoo 18 MCP Integration
+# Odoo 18 MCP Integration (18.0 Branch)
 
 A robust integration server that connects MCP (Master Control Program) with Odoo 18.0 ERP system, focusing on efficient data synchronization, API management, and secure communications. This implementation provides a standardized interface for performing CRUD operations on Odoo 18 models through a simple API.
 

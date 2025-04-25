@@ -28,6 +28,9 @@ try:
     # Import the direct export/import implementation
     from direct_export_import import export_records, import_records
 
+    # Import the advanced search implementation
+    from advanced_search import AdvancedSearch
+
     from mcp.server.fastmcp import FastMCP, Context, Image
 
     # Load environment variables
@@ -260,9 +263,14 @@ try:
     try:
         model_discovery = OdooModelDiscovery(ODOO_URL, ODOO_DB, ODOO_USERNAME, ODOO_PASSWORD)
         logger.info("Odoo model discovery initialized successfully")
+
+        # Initialize advanced search
+        advanced_search_instance = AdvancedSearch(model_discovery)
+        logger.info("Advanced search initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize Odoo model discovery: {str(e)}")
         model_discovery = None
+        advanced_search_instance = None
 
     # Create the MCP server
     mcp = FastMCP(
@@ -447,6 +455,39 @@ try:
             return result
         except Exception as e:
             return f"# Error searching records\n\n{str(e)}"
+
+    # Tool for advanced searching across models
+    @mcp.tool()
+    def advanced_search(query: str, limit: int = 10) -> str:
+        """Perform an advanced search using natural language queries.
+
+        This tool can handle complex queries across multiple Odoo models,
+        automatically identifying the relevant models and fields based on the query.
+
+        Examples:
+        - "List all sales orders under the customer's name, Gemini Furniture"
+        - "List all customer invoices for the customer name Wood Corner"
+        - "List out all projects"
+        - "List out all Project tasks for project name Research & Development"
+        - "List all unpaid bills with respect of vendor details"
+        - "List all project tasks according to their deadline date"
+
+        Args:
+            query: Natural language query string
+            limit: Maximum number of records to return per model
+
+        Returns:
+            A formatted string with the search results
+        """
+        if not model_discovery or not advanced_search_instance:
+            return "# Error: Odoo Connection\n\nCould not connect to Odoo server. Please check your connection settings."
+
+        try:
+            # Execute the query
+            return advanced_search_instance.execute_query(query, limit)
+        except Exception as e:
+            logger.error(f"Error in advanced search: {str(e)}")
+            return f"# Error in Advanced Search\n\n{str(e)}"
 
     # Tool for creating records
     @mcp.tool()
@@ -1505,6 +1546,26 @@ try:
         except Exception as e:
             logger.error(f"Error importing records: {str(e)}")
             return f"# Error Importing Records\n\n{str(e)}"
+
+    # Add a prompt for advanced search
+    @mcp.prompt()
+    def advanced_search_prompt() -> str:
+        """Create a prompt for performing advanced searches across Odoo models."""
+        return """I need to search for information across multiple Odoo models using natural language.
+
+Please help me by:
+1. Using the advanced_search tool to interpret my query and find relevant records
+2. Explaining the results and relationships between different models
+3. Suggesting follow-up queries if needed
+
+Examples of queries I can use:
+- "List all sales orders under the customer's name, Gemini Furniture"
+- "List all customer invoices for the customer name Wood Corner"
+- "List out all projects"
+- "List out all Project tasks for project name Research & Development"
+- "List all unpaid bills with respect of vendor details"
+- "List all project tasks according to their deadline date"
+"""
 
     # Add a prompt for creating a new record
     @mcp.prompt()

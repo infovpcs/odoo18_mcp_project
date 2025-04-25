@@ -35,6 +35,7 @@ This project aims to create a robust integration server that connects MCP (Maste
    - Automatic field grouping ✅
    - Smart search field identification ✅
    - Record templates ✅
+   - Advanced natural language search ✅
 
 3. **Data Models**
    - Pydantic models for validation ✅

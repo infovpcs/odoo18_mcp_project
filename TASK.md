@@ -148,6 +148,12 @@
 - [x] Improve error handling for invoice import failures (2025-05-02)
 - [x] Add direct export/import implementation for reliability (2025-05-02)
 - [x] Update documentation with export/import best practices (2025-05-02)
+- [x] Implement advanced natural language search functionality (2025-04-25)
+- [x] Create query parser for natural language queries (2025-04-25)
+- [x] Implement relationship handler for multi-model queries (2025-04-25)
+- [x] Add advanced search tool to MCP server (2025-04-25)
+- [x] Create test script for advanced search functionality (2025-04-25)
+- [x] Add advanced search prompt to MCP server (2025-04-25)
 
 ## Completed Tasks
 - [x] Initialize project structure (2023-12-20)

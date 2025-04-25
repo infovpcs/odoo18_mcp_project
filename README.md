@@ -19,6 +19,9 @@ A robust integration server that connects MCP (Master Control Program) with Odoo
 - **Intelligent CRUD Generation**: Generate appropriate CRUD operations based on model metadata
 - **Field Grouping**: Automatically group fields by purpose (basic info, contact info, etc.)
 - **Smart Search Fields**: Identify fields that are good candidates for search operations
+- **Advanced Natural Language Search**: Parse natural language queries to search across multiple models
+- **Multi-Model Query Support**: Handle complex queries that span multiple related models
+- **Relationship-Aware Search**: Automatically identify and traverse relationships between models
 - **Related Records Export/Import**: Export and import parent-child related records in a single operation
 - **Relationship Maintenance**: Automatically maintain relationships between models during import/export
 - **LangGraph Agent Flow**: Structured agent-based approach for complex export/import operations using LangGraph
@@ -228,6 +231,7 @@ Once you've configured Claude Desktop, you can use the Odoo 18 MCP integration:
 | **import_records_from_csv** | Import records from CSV to a model | `/tool import_records_from_csv model_name=res.partner import_path="exports/partners.csv"` | ✅ Working |
 | **export_related_records_to_csv** | Export parent-child records to CSV | `/tool export_related_records_to_csv parent_model=account.move child_model=account.move.line relation_field=move_id move_type=out_invoice export_path="./tmp/customer_invoices.csv"` | ✅ Working |
 | **import_related_records_from_csv** | Import parent-child records from CSV | `/tool import_related_records_from_csv parent_model=account.move child_model=account.move.line relation_field=move_id import_path="./tmp/customer_invoices.csv" reset_to_draft=true skip_readonly_fields=true` | ✅ Working |
+| **advanced_search** | Perform advanced natural language search | `/tool advanced_search query="List all unpaid bills with respect of vendor details" limit=10` | ✅ Working |
 | **validate_field_value** | Validate a field value for a model | `/tool validate_field_value model_name=res.partner field_name=email value="test@example.com"` | ✅ Working |
 
 #### Available Prompts
@@ -238,6 +242,7 @@ Once you've configured Claude Desktop, you can use the Odoo 18 MCP integration:
 | **search_records_prompt** | Get guidance for searching records | `/prompt search_records_prompt model_name=product.product` |
 | **export_records_prompt** | Get guidance for exporting records | `/prompt export_records_prompt model_name=res.partner` |
 | **import_records_prompt** | Get guidance for importing records | `/prompt import_records_prompt model_name=res.partner` |
+| **advanced_search_prompt** | Get guidance for advanced natural language search | `/prompt advanced_search_prompt` |
 | **dynamic_export_import_prompt** | Get guidance for dynamic export/import | `/prompt dynamic_export_import_prompt` |
 | **crm_lead_export_import_prompt** | Get guidance for CRM lead export/import | `/prompt crm_lead_export_import_prompt` |
 | **invoice_export_import_prompt** | Get guidance for invoice export/import | `/prompt invoice_export_import_prompt` |
@@ -549,6 +554,10 @@ odoo18_mcp_project/
 │   │       └── utils/      # Utility functions
 │   │           ├── csv_handler.py   # CSV processing
 │   │           └── field_mapper.py  # Field mapping utilities
+│   ├── search/             # Advanced search functionality
+│   │   ├── query_parser.py # Natural language query parser
+│   │   ├── relationship_handler.py # Model relationship handler
+│   │   └── advanced_search.py # Advanced search implementation
 │   ├── core/               # Core functionality
 │   │   ├── config.py       # Configuration management
 │   │   └── logger.py       # Logging system
@@ -570,6 +579,10 @@ odoo18_mcp_project/
 ├── client_test.py          # Client test script
 ├── advanced_client_test.py # Advanced client test
 ├── dynamic_model_test.py   # Dynamic model test
+├── test_advanced_search.py # Advanced search test
+├── query_parser.py         # Natural language query parser
+├── relationship_handler.py # Model relationship handler
+├── advanced_search.py      # Advanced search implementation
 ├── test_mcp_client.py      # MCP client test
 ├── test_odoo_connection.py # Odoo connection test
 ├── sql_schema_generator.py # SQL schema generator
@@ -589,6 +602,7 @@ python advanced_client_test.py    # Advanced client test
 python dynamic_model_test.py      # Dynamic model test
 python test_mcp_functions.py      # Test MCP server functions directly
 python test_mcp_tools.py          # Test MCP server tools via HTTP
+python test_advanced_search.py    # Test advanced search functionality
 ```
 
 ### Test Results
@@ -620,6 +634,7 @@ We've thoroughly tested all MCP server functionality to ensure it works correctl
 | `execute_method` | Execute name_search | List of matching records | List of matching records | ✅ Passed |
 | `analyze_field_importance` | Analyze partner fields | Field importance table | Field importance table | ✅ Passed |
 | `get_field_groups` | Group product fields | Grouped fields | Grouped fields by purpose | ✅ Passed |
+| `advanced_search` | Natural language query | Formatted search results | Formatted search results | ✅ Passed |
 
 #### Test Output Example
 
@@ -683,6 +698,29 @@ Create a `.vscode/settings.json` file:
 
 ## Recent Improvements and Fixes
 
+### Advanced Natural Language Search
+
+We've implemented a powerful advanced search functionality that can handle complex natural language queries across multiple Odoo models:
+
+1. **Natural Language Query Parsing**: The system can parse natural language queries like "List all unpaid bills with respect of vendor details" or "List all project tasks according to their deadline date" and convert them into appropriate Odoo domain filters.
+
+2. **Multi-Model Query Support**: The advanced search can handle queries that span multiple related models, such as "List all sales orders under the customer's name, Gemini Furniture" or "List out all Project tasks for project name Research & Development".
+
+3. **Relationship Handling**: The system automatically identifies relationships between models (one2many, many2one, many2many) and traverses these relationships to provide comprehensive results.
+
+4. **Query Components**:
+   - **QueryParser**: Parses natural language queries into model names, domain filters, and fields to display
+   - **RelationshipHandler**: Identifies and handles relationships between models
+   - **AdvancedSearch**: Executes searches and formats results in a user-friendly way
+
+5. **MCP Integration**: The advanced search functionality is fully integrated with the MCP server, providing a new `advanced_search` tool and `advanced_search_prompt` for Claude Desktop.
+
+6. **Comprehensive Testing**: We've created a test script (`test_advanced_search.py`) to verify the functionality works correctly with various query types.
+
+7. **Field Mapping**: The system includes mappings for common fields across different models, making it easier to search for related information.
+
+8. **Result Formatting**: Search results are formatted in a user-friendly way, with tables for single-model results and structured output for multi-model results.
+
 ### Export/Import Functionality
 
 We've implemented robust export and import functionality for Odoo models, with special attention to handling complex models like account.move (invoices):
@@ -733,7 +771,7 @@ Working with Odoo's account.move (invoice) model presented several challenges:
 
 6. **Relationship Maintenance**: Maintaining the relationship between account.move and account.move.line requires careful handling of the move_id field.
 
-### MCP Server Fixes
+### MCP Server Fixes and Enhancements
 
 We've made several improvements to the MCP server to ensure all tools work correctly with Odoo 18:
 
@@ -746,6 +784,10 @@ We've made several improvements to the MCP server to ensure all tools work corre
 4. **Added standalone MCP server for testing**: We created a standalone FastAPI server that exposes the MCP tools as HTTP endpoints for easier testing without Claude Desktop.
 
 5. **Added comprehensive test suite**: We created test scripts to verify all MCP functions and tools work correctly with Odoo 18.
+
+6. **Added advanced search functionality**: We implemented a powerful natural language search capability that can handle complex queries across multiple models.
+
+7. **Created query parser and relationship handler**: We developed components to parse natural language queries and handle relationships between models for advanced search.
 
 ### Performance Improvements
 

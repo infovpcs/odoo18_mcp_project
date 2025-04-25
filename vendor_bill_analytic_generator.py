@@ -34,7 +34,7 @@ import argparse
 import json
 import xmlrpc.client
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 from dotenv import load_dotenv
 
 # Set up logging
@@ -179,23 +179,16 @@ def get_project_for_bill(uid: int, models: xmlrpc.client.ServerProxy, bill: Dict
     Note: This function first checks if the project.project model exists in the Odoo installation.
     """
     try:
-        # First check if the project.project model exists
-        model_exists = False
-        try:
-            # Try to get the model's fields to check if it exists
-            models.execute_kw(
-                ODOO_DB, uid, ODOO_PASSWORD,
-                'project.project', 'fields_get',
-                [], {'attributes': ['string']}
-            )
-            model_exists = True
-        except Exception:
-            logger.info("The project.project model is not installed in this Odoo instance")
+        # Check if project model exists and get its fields
+        project_fields = check_model_fields(uid, models, 'project.project')
+        if not project_fields:
+            logger.info("Project module is not installed. Skipping project lookup.")
             return None
 
-        # If the model doesn't exist, return None
-        if not model_exists:
-            return None
+        # In Odoo 18, project.project has a many2one field named account_id that links to account.analytic.account
+        analytic_field = 'account_id'
+        field_list = ['id', 'name', 'partner_id', 'account_id']
+        logger.info("Using 'account_id' field for project lookup (many2one to account.analytic.account)")
 
         partner_id = bill['partner_id'][0]
         partner_name = bill['partner_id'][1]
@@ -205,12 +198,20 @@ def get_project_for_bill(uid: int, models: xmlrpc.client.ServerProxy, bill: Dict
             ODOO_DB, uid, ODOO_PASSWORD,
             'project.project', 'search_read',
             [[('partner_id', '=', partner_id)]],
-            {'fields': ['id', 'name', 'analytic_account_id'], 'limit': 1}
+            {'fields': field_list, 'limit': 1}
         )
 
-        if projects and projects[0].get('analytic_account_id'):
-            logger.info(f"Found project for partner {partner_name}: {projects[0]['name']} (ID: {projects[0]['id']})")
-            return projects[0]
+        if projects:
+            project = projects[0]
+            project_name = project['name']
+            project_id = project['id']
+
+            # In Odoo 18, we only need to check for account_id field
+            if project.get('account_id'):
+                logger.info(f"Found project for partner {partner_name}: {project_name} (ID: {project_id}) with account_id: {project['account_id'][1]}")
+                # Add analytic_account_id to project dict for compatibility with existing code
+                project['analytic_account_id'] = project['account_id']
+                return project
 
         return None
 
@@ -235,9 +236,9 @@ def get_or_create_analytic_account(uid: int, models: xmlrpc.client.ServerProxy, 
 
         # Step 1: Check for project with analytic account
         project = get_project_for_bill(uid, models, bill)
-        if project and project.get('analytic_account_id'):
-            analytic_account_id = project['analytic_account_id'][0]
-            logger.info(f"Using project's analytic account: {project['analytic_account_id'][1]} (ID: {analytic_account_id})")
+        if project and project.get('account_id'):
+            analytic_account_id = project['account_id'][0]
+            logger.info(f"Using project's account_id: {project['account_id'][1]} (ID: {analytic_account_id})")
             return analytic_account_id
 
         # Step 2: Try to find an existing analytic account for this partner
@@ -272,16 +273,57 @@ def get_or_create_analytic_account(uid: int, models: xmlrpc.client.ServerProxy, 
         if project:
             account_name = f"Project - {project['name']}"
 
-        new_account_id = models.execute_kw(
+        # Get the company of the partner to avoid company mismatch errors
+        partner_info = models.execute_kw(
             ODOO_DB, uid, ODOO_PASSWORD,
-            'account.analytic.account', 'create',
-            [{
-                'name': account_name,
-                'partner_id': partner_id,
-                'plan_id': plan_id,
-                'code': f"P-{partner_id}"
-            }]
+            'res.partner', 'read',
+            [partner_id],
+            {'fields': ['company_id']}
         )
+
+        company_id = 1  # Default company ID
+        if partner_info and partner_info[0].get('company_id'):
+            company_id = partner_info[0]['company_id'][0]
+            logger.info(f"Using partner's company ID: {company_id}")
+
+        # Get the current user's company
+        user_info = models.execute_kw(
+            ODOO_DB, uid, ODOO_PASSWORD,
+            'res.users', 'read',
+            [uid],
+            {'fields': ['company_id']}
+        )
+
+        if user_info and user_info[0].get('company_id'):
+            # Use the user's company ID to avoid company mismatch
+            company_id = user_info[0]['company_id'][0]
+            logger.info(f"Using user's company ID: {company_id}")
+
+        try:
+            new_account_id = models.execute_kw(
+                ODOO_DB, uid, ODOO_PASSWORD,
+                'account.analytic.account', 'create',
+                [{
+                    'name': account_name,
+                    'partner_id': partner_id,
+                    'plan_id': plan_id,
+                    'code': f"P-{partner_id}",
+                    'company_id': company_id
+                }]
+            )
+        except Exception as e:
+            logger.warning(f"Error creating analytic account with partner_id: {str(e)}")
+            # Try again without partner_id to avoid company mismatch
+            new_account_id = models.execute_kw(
+                ODOO_DB, uid, ODOO_PASSWORD,
+                'account.analytic.account', 'create',
+                [{
+                    'name': account_name,
+                    'plan_id': plan_id,
+                    'code': f"P-{partner_id}",
+                    'company_id': company_id
+                }]
+            )
 
         logger.info(f"Created new analytic account: {account_name} (ID: {new_account_id})")
         return new_account_id
@@ -391,6 +433,32 @@ def create_analytic_line(uid: int, models: xmlrpc.client.ServerProxy, move_line:
         return None
 
 
+def check_model_fields(uid: int, models: xmlrpc.client.ServerProxy, model_name: str) -> Dict[str, Any]:
+    """
+    Check if a model exists and get its fields.
+
+    Args:
+        uid: User ID
+        models: XML-RPC models proxy
+        model_name: Name of the model to check
+
+    Returns:
+        Dict with fields information or empty dict if model doesn't exist
+    """
+    try:
+        # Try to get the model's fields to check if it exists
+        fields = models.execute_kw(
+            ODOO_DB, uid, ODOO_PASSWORD,
+            model_name, 'fields_get',
+            [], {'attributes': ['string', 'type', 'relation']}
+        )
+        logger.info(f"Model {model_name} exists with {len(fields)} fields")
+        return fields
+    except Exception as e:
+        logger.warning(f"Model {model_name} is not installed or accessible: {str(e)}")
+        return {}
+
+
 def check_and_setup_project_analytics(uid: int, models: xmlrpc.client.ServerProxy) -> bool:
     """
     Check all projects in the system and ensure they have analytic accounts.
@@ -400,56 +468,68 @@ def check_and_setup_project_analytics(uid: int, models: xmlrpc.client.ServerProx
         bool: True if successful, False otherwise
     """
     try:
-        # Check if the project.project model exists
-        model_exists = False
-        try:
-            # Try to get the model's fields to check if it exists
-            models.execute_kw(
-                ODOO_DB, uid, ODOO_PASSWORD,
-                'project.project', 'fields_get',
-                [], {'attributes': ['string']}
-            )
-            model_exists = True
-        except Exception as e:
-            logger.warning(f"The project.project model is not installed in this Odoo instance: {str(e)}")
-            return False
-
-        if not model_exists:
+        # Check if the project.project model exists and get its fields
+        project_fields = check_model_fields(uid, models, 'project.project')
+        if not project_fields:
             logger.warning("Project module is not installed. Skipping project analytics setup.")
             return False
 
+        # In Odoo 18, project.project has a many2one field named account_id that links to account.analytic.account
+        analytic_field = 'account_id'
+        logger.info("Using 'account_id' field in project.project model (many2one to account.analytic.account)")
+
         # Get all projects
+        field_list = ['id', 'name', 'partner_id']
+        if analytic_field:
+            field_list.append(analytic_field)
+
         projects = models.execute_kw(
             ODOO_DB, uid, ODOO_PASSWORD,
             'project.project', 'search_read',
             [[]],
-            {'fields': ['id', 'name', 'partner_id', 'analytic_account_id']}
+            {'fields': field_list}
         )
 
         logger.info(f"Found {len(projects)} projects in the system")
 
-        # Get default analytic plan
-        analytic_plans = models.execute_kw(
-            ODOO_DB, uid, ODOO_PASSWORD,
-            'account.analytic.plan', 'search_read',
-            [[]],
-            {'fields': ['id', 'name'], 'limit': 1}
-        )
+        # Check if analytic plan model exists
+        analytic_plan_fields = check_model_fields(uid, models, 'account.analytic.plan')
+        if not analytic_plan_fields:
+            logger.warning("account.analytic.plan model not found. Using default plan_id=1")
+            plan_id = 1
+        else:
+            # Get default analytic plan
+            analytic_plans = models.execute_kw(
+                ODOO_DB, uid, ODOO_PASSWORD,
+                'account.analytic.plan', 'search_read',
+                [[]],
+                {'fields': ['id', 'name'], 'limit': 1}
+            )
 
-        if not analytic_plans:
-            logger.error("No analytic plan found. Cannot create analytic accounts.")
-            return False
-
-        plan_id = analytic_plans[0]['id']
+            if not analytic_plans:
+                logger.warning("No analytic plan found. Using default plan_id=1")
+                plan_id = 1
+            else:
+                plan_id = analytic_plans[0]['id']
+                logger.info(f"Using analytic plan: {analytic_plans[0]['name']} (ID: {plan_id})")
 
         # Process each project
         for project in projects:
             project_id = project['id']
             project_name = project['name']
 
+            # Check if project has an analytic account
+            has_analytic = False
+            analytic_account_id = None
+
+            # Check the detected analytic field
+            if analytic_field and project.get(analytic_field):
+                has_analytic = True
+                analytic_account_id = project[analytic_field][0]
+                logger.info(f"Project {project_name} (ID: {project_id}) has {analytic_field}: {project[analytic_field][1]} (ID: {analytic_account_id})")
+
             # Skip if project already has an analytic account
-            if project.get('analytic_account_id'):
-                logger.info(f"Project {project_name} (ID: {project_id}) already has analytic account: {project['analytic_account_id'][1]}")
+            if has_analytic:
                 continue
 
             # Check if an analytic account with the same name exists
@@ -465,11 +545,11 @@ def check_and_setup_project_analytics(uid: int, models: xmlrpc.client.ServerProx
                 analytic_account_id = analytic_accounts[0]['id']
                 logger.info(f"Found existing analytic account with name {project_name} (ID: {analytic_account_id})")
 
-                # Update project with analytic account
+                # Update project with analytic account (using account_id field)
                 models.execute_kw(
                     ODOO_DB, uid, ODOO_PASSWORD,
                     'project.project', 'write',
-                    [[project_id], {'analytic_account_id': analytic_account_id}]
+                    [[project_id], {'account_id': analytic_account_id}]
                 )
 
                 logger.info(f"Assigned existing analytic account {project_name} (ID: {analytic_account_id}) to project {project_name} (ID: {project_id})")
@@ -477,27 +557,66 @@ def check_and_setup_project_analytics(uid: int, models: xmlrpc.client.ServerProx
                 # Create new analytic account for project
                 partner_id = project.get('partner_id') and project['partner_id'][0] or False
 
+                # Get the current user's company
+                user_info = models.execute_kw(
+                    ODOO_DB, uid, ODOO_PASSWORD,
+                    'res.users', 'read',
+                    [uid],
+                    {'fields': ['company_id']}
+                )
+
+                company_id = 1  # Default company ID
+                if user_info and user_info[0].get('company_id'):
+                    company_id = user_info[0]['company_id'][0]
+                    logger.info(f"Using user's company ID: {company_id}")
+
                 # Create a new analytic account
                 new_account_values = {
                     'name': project_name,
                     'plan_id': plan_id,
-                    'code': f"P-{project_id}"
+                    'code': f"P-{project_id}",
+                    'company_id': company_id
                 }
 
+                # Only add partner_id if it's from the same company
                 if partner_id:
-                    new_account_values['partner_id'] = partner_id
+                    try:
+                        partner_info = models.execute_kw(
+                            ODOO_DB, uid, ODOO_PASSWORD,
+                            'res.partner', 'read',
+                            [partner_id],
+                            {'fields': ['company_id']}
+                        )
 
-                new_account_id = models.execute_kw(
-                    ODOO_DB, uid, ODOO_PASSWORD,
-                    'account.analytic.account', 'create',
-                    [new_account_values]
-                )
+                        if not partner_info[0].get('company_id') or partner_info[0]['company_id'][0] == company_id:
+                            new_account_values['partner_id'] = partner_id
+                        else:
+                            logger.warning(f"Partner {partner_id} belongs to a different company. Not adding to analytic account.")
+                    except Exception as e:
+                        logger.warning(f"Error checking partner company: {str(e)}")
 
-                # Update project with new analytic account
+                try:
+                    new_account_id = models.execute_kw(
+                        ODOO_DB, uid, ODOO_PASSWORD,
+                        'account.analytic.account', 'create',
+                        [new_account_values]
+                    )
+                except Exception as e:
+                    logger.warning(f"Error creating analytic account: {str(e)}")
+                    # Try again without partner_id
+                    if 'partner_id' in new_account_values:
+                        del new_account_values['partner_id']
+                        new_account_id = models.execute_kw(
+                            ODOO_DB, uid, ODOO_PASSWORD,
+                            'account.analytic.account', 'create',
+                            [new_account_values]
+                        )
+
+                # Update project with new analytic account (using account_id field)
                 models.execute_kw(
                     ODOO_DB, uid, ODOO_PASSWORD,
                     'project.project', 'write',
-                    [[project_id], {'analytic_account_id': new_account_id}]
+                    [[project_id], {'account_id': new_account_id}]
                 )
 
                 logger.info(f"Created new analytic account {project_name} (ID: {new_account_id}) for project {project_name} (ID: {project_id})")

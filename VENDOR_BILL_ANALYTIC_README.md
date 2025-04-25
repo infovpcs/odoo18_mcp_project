@@ -18,6 +18,15 @@ Before processing bills, the script will:
 
 This ensures that all projects have proper analytic accounts before processing bills.
 
+## Odoo 18 Project-Analytic Integration
+
+In Odoo 18, the `project.project` model has a many2one field named `account_id` that links to `account.analytic.account`. The script is specifically designed to work with this field structure.
+
+The script will:
+1. Check for the `account_id` field in projects
+2. Use this field to link projects with analytic accounts
+3. When creating new analytic accounts for projects, update the project's `account_id` field
+
 ## Analytic Account Selection
 
 For invoice lines that already have analytic distributions set, the script will use those distributions to create analytic lines.
@@ -27,6 +36,14 @@ For invoice lines without analytic distributions, the script will:
 1. First check if there's a project linked to the partner with an analytic account
 2. If not, check for any existing analytic account for this partner
 3. If still not found, create a new analytic account with the project name (or partner name if no project exists)
+
+## Company Compatibility
+
+The script includes special handling for company compatibility issues:
+
+1. When creating analytic accounts, it uses the current user's company ID
+2. If a partner belongs to a different company, the script will create the analytic account without linking to the partner
+3. This prevents "Incompatible companies" errors when working with partners from different companies
 
 ## Purpose
 

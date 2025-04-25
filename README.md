@@ -26,6 +26,7 @@ A robust integration server that connects MCP (Master Control Program) with Odoo
 - **Relationship Maintenance**: Automatically maintain relationships between models during import/export
 - **LangGraph Agent Flow**: Structured agent-based approach for complex export/import operations using LangGraph
 - **Dual Implementation Approach**: Both LangGraph-based and direct implementation options for export/import operations
+- **Dynamic Query Parsing**: Natural language query parsing with dynamic model and field discovery using ir.model and ir.model.fields
 - **MCP Integration**: API endpoints for MCP integration with standardized request/response format
 - **Claude Desktop Integration**: Seamless integration with Claude Desktop using the MCP SDK
 - **Environment Configuration**: Easy configuration using environment variables
@@ -720,6 +721,16 @@ We've implemented a powerful advanced search functionality that can handle compl
 7. **Field Mapping**: The system includes mappings for common fields across different models, making it easier to search for related information.
 
 8. **Result Formatting**: Search results are formatted in a user-friendly way, with tables for single-model results and structured output for multi-model results.
+
+9. **Dynamic Model Discovery**: The query parser now uses Odoo's ir.model and ir.model.fields to dynamically discover models and their fields, making it work with any Odoo model without hardcoding.
+
+10. **Field Categorization**: Fields are automatically categorized based on their types and names (e.g., date fields, amount fields, status fields), making it easier to map natural language concepts to Odoo fields.
+
+11. **Field Validation**: All field references are validated against the actual model fields to ensure they exist, with fallbacks for different Odoo versions.
+
+12. **Enhanced Entity Extraction**: The system can extract entities from queries using dynamic model information, improving the accuracy of search results.
+
+13. **Cross-Version Compatibility**: The query parser includes special handling for field name changes between Odoo versions (e.g., move_type vs. type, customer_rank vs. customer).
 
 ### Export/Import Functionality
 

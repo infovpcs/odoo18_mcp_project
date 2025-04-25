@@ -239,6 +239,28 @@ odoo18-mcp-project/
    - Metadata columns for record type and relationships ✅
    - Support for multiple children per parent ✅
 
+### Advanced Natural Language Search
+1. **Query Parsing**
+   - Natural language query parsing ✅
+   - Dynamic model discovery using ir.model ✅
+   - Dynamic field mapping using ir.model.fields ✅
+   - Field categorization based on field types and names ✅
+   - Field validation against model_fields ✅
+   - Support for different Odoo versions ✅
+   - Enhanced entity extraction with dynamic model information ✅
+
+2. **Relationship Handling**
+   - Identify relationships between models ✅
+   - Traverse relationships for complex queries ✅
+   - Join results from multiple models ✅
+   - Handle one2many, many2one, and many2many relationships ✅
+
+3. **Search Execution**
+   - Convert natural language to Odoo domains ✅
+   - Execute searches across multiple models ✅
+   - Format results in a user-friendly way ✅
+   - Handle complex multi-model queries ✅
+
 ## Performance Goals
 - Response time < 200ms ✅
 - Support for concurrent connections ✅

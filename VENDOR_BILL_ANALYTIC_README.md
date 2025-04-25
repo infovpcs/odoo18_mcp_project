@@ -9,6 +9,29 @@ This tool automatically generates analytic lines for vendor bills and bill refun
 
 This sign convention ensures that vendor bills (which represent expenses) decrease the analytic account balance, while bill refunds (which represent expense reversals) increase the analytic account balance.
 
+## Project Analytics Setup
+
+Before processing bills, the script will:
+
+1. Check all projects in the system and ensure they have analytic accounts
+2. If a project has a blank analytic account, create a new one or assign an existing one with the same name
+
+This ensures that all projects have proper analytic accounts before processing bills.
+
+## Analytic Account Selection
+
+For invoice lines that already have analytic distributions set, the script will use those distributions to create analytic lines.
+
+For invoice lines without analytic distributions, the script will:
+
+1. First check if there's a project linked to the partner with an analytic account
+2. If not, check for any existing analytic account for this partner
+3. If still not found, create a new analytic account with the project name (or partner name if no project exists)
+
+## Purpose
+
+This script is designed for generating historic data costing entries. For new bills, analytic entries will be automatically generated from the purchase order cycle with linked bills.
+
 ## Prerequisites
 
 - Python 3.8 or higher

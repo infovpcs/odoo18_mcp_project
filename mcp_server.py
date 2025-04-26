@@ -83,12 +83,16 @@ try:
                     self.db, self.uid, self.password,
                     'ir.model', 'read',
                     [model_ids],
-                    {'fields': ['name', 'model', 'description']}
+                    {'fields': ['name', 'model']}
                 )
                 return models
             except Exception as e:
                 logger.error(f"Error getting models: {str(e)}")
                 return []
+
+        def get_available_models(self):
+            """Get all available models (alias for get_all_models)"""
+            return self.get_all_models()
 
         def get_model_fields(self, model_name):
             """Get all fields for a specific model"""

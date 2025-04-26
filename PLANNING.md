@@ -1,7 +1,7 @@
 # Odoo 18 Integration MCP Server - Project Planning
 
 ## Project Overview
-This project aims to create a robust integration server that connects MCP (Master Control Program) with Odoo 18.0 ERP system, focusing on efficient data synchronization, API management, and secure communications. The implementation provides a standardized interface for performing CRUD operations on Odoo 18 models through a simple API, with dynamic model discovery and field analysis capabilities. The project also includes LangGraph agent flows for advanced operations like data export and import.
+This project aims to create a robust integration server that connects MCP (Master Control Program) with Odoo 18.0 ERP system, focusing on efficient data synchronization, API management, and secure communications. The implementation provides a standardized interface for performing CRUD operations on Odoo 18 models through a simple API, with dynamic model discovery and field analysis capabilities. The project includes direct implementation for advanced operations like data export and import, with dynamic model and field discovery using ir.model and ir.model.fields.
 
 ## Architecture
 
@@ -16,7 +16,7 @@ This project aims to create a robust integration server that connects MCP (Maste
    - Resource endpoints for model discovery ✅
    - Tools for CRUD operations ✅
    - Prompts for common operations ✅
-   - LangGraph agent flows for advanced operations ✅
+   - Direct implementation for advanced operations ✅
    - Export/Import data processing ✅
    - Related records export/import ✅
    - Field mapping and transformation ✅
@@ -72,20 +72,6 @@ odoo18-mcp-project/
 │   │       ├── field_analyzer.py   # Field analysis
 │   │       ├── crud_generator.py   # CRUD operations
 │   │       └── nlp_analyzer.py     # NLP-based analysis
-│   ├── agents/
-│   │   ├── __init__.py
-│   │   └── export_import/   # Export/Import agent flow
-│   │       ├── __init__.py
-│   │       ├── main.py      # Main agent flow
-│   │       ├── state.py     # State management
-│   │       ├── nodes/       # Agent nodes
-│   │       │   ├── __init__.py
-│   │       │   ├── export_nodes.py  # Export nodes
-│   │       │   └── import_nodes.py  # Import nodes
-│   │       └── utils/       # Utility functions
-│   │           ├── __init__.py
-│   │           ├── csv_handler.py   # CSV handling
-│   │           └── field_mapper.py  # Field mapping
 │   └── core/
 │       ├── __init__.py
 │       ├── config.py        # Configuration management
@@ -115,8 +101,7 @@ odoo18-mcp-project/
 - pytest (for testing) ✅
 - python-dotenv (for configuration) ✅
 - uv (for virtual environment management) ✅
-- LangGraph (for agent workflows)
-- LangChain (for agent components)
+
 - pandas (for data processing) ✅
 - csv (standard library, for CSV handling) ✅
 
@@ -189,7 +174,7 @@ odoo18-mcp-project/
 - Support for complex field types (many2one, many2many, etc.) ✅
 - Error handling and validation ✅
 - Direct implementation for reliability ✅
-- LangGraph agent flow for advanced operations ✅
+- Dynamic model and field discovery using ir.model and ir.model.fields ✅
 
 ### Export Process
 1. **Model Validation**: Verify that the model exists and is accessible ✅

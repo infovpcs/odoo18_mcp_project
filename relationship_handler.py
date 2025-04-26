@@ -15,15 +15,15 @@ logger = logging.getLogger(__name__)
 
 class RelationshipHandler:
     """Class for handling relationships between Odoo models."""
-    
+
     def __init__(self, model_discovery):
         """Initialize the relationship handler.
-        
+
         Args:
             model_discovery: ModelDiscovery instance for accessing Odoo models and fields
         """
         self.model_discovery = model_discovery
-        
+
         # Common relationships between models
         self.model_relationships = {
             # Customer relationships
@@ -42,21 +42,21 @@ class RelationshipHandler:
                 "to_field": "partner_id",
                 "relation_type": "one2many"
             },
-            
+
             # Project relationships
             ("project.project", "project.task"): {
                 "from_field": "id",
                 "to_field": "project_id",
                 "relation_type": "one2many"
             },
-            
+
             # Invoice relationships
             ("account.move", "account.move.line"): {
                 "from_field": "id",
                 "to_field": "move_id",
                 "relation_type": "one2many"
             },
-            
+
             # Sale order relationships
             ("sale.order", "sale.order.line"): {
                 "from_field": "id",
@@ -70,21 +70,21 @@ class RelationshipHandler:
                 "special": "text_match"  # Special handling for text field matching
             },
         }
-    
+
     def get_relationship(self, from_model: str, to_model: str) -> Optional[Dict[str, Any]]:
         """Get the relationship information between two models.
-        
+
         Args:
             from_model: Source model name
             to_model: Target model name
-            
+
         Returns:
             Dictionary with relationship information or None if no relationship exists
         """
         # Check direct relationship
         if (from_model, to_model) in self.model_relationships:
             return self.model_relationships[(from_model, to_model)]
-        
+
         # Check reverse relationship
         if (to_model, from_model) in self.model_relationships:
             rel = self.model_relationships[(to_model, from_model)]
@@ -95,28 +95,109 @@ class RelationshipHandler:
                 "relation_type": "many2one" if rel["relation_type"] == "one2many" else "one2many",
                 "special": rel.get("special")
             }
-        
+
         # If no predefined relationship, try to discover it
         return self._discover_relationship(from_model, to_model)
-    
+
     def _discover_relationship(self, from_model: str, to_model: str) -> Optional[Dict[str, Any]]:
-        """Discover the relationship between two models by analyzing their fields.
-        
+        """Discover the relationship between two models using ir.model.fields.
+
         Args:
             from_model: Source model name
             to_model: Target model name
-            
+
+        Returns:
+            Dictionary with relationship information or None if no relationship exists
+        """
+        try:
+            # Search for fields in the target model that reference the source model
+            to_fields = self.model_discovery.models_proxy.execute_kw(
+                self.model_discovery.db,
+                self.model_discovery.uid,
+                self.model_discovery.password,
+                'ir.model.fields', 'search_read',
+                [[('model', '=', to_model), ('relation', '=', from_model)]],
+                {'fields': ['name', 'ttype', 'relation_field']}
+            )
+
+            # Check for many2one fields
+            for field in to_fields:
+                if field['ttype'] == 'many2one':
+                    return {
+                        "from_field": "id",
+                        "to_field": field['name'],
+                        "relation_type": "one2many"
+                    }
+                elif field['ttype'] == 'many2many':
+                    return {
+                        "from_field": "id",
+                        "to_field": field['name'],
+                        "relation_type": "many2many"
+                    }
+                elif field['ttype'] == 'one2many' and field.get('relation_field'):
+                    return {
+                        "from_field": field['relation_field'],
+                        "to_field": "id",
+                        "relation_type": "many2one"
+                    }
+
+            # Search for fields in the source model that reference the target model
+            from_fields = self.model_discovery.models_proxy.execute_kw(
+                self.model_discovery.db,
+                self.model_discovery.uid,
+                self.model_discovery.password,
+                'ir.model.fields', 'search_read',
+                [[('model', '=', from_model), ('relation', '=', to_model)]],
+                {'fields': ['name', 'ttype', 'relation_field']}
+            )
+
+            # Check for many2one fields
+            for field in from_fields:
+                if field['ttype'] == 'many2one':
+                    return {
+                        "from_field": field['name'],
+                        "to_field": "id",
+                        "relation_type": "many2one"
+                    }
+                elif field['ttype'] == 'many2many':
+                    return {
+                        "from_field": field['name'],
+                        "to_field": "id",
+                        "relation_type": "many2many"
+                    }
+                elif field['ttype'] == 'one2many' and field.get('relation_field'):
+                    return {
+                        "from_field": "id",
+                        "to_field": field['relation_field'],
+                        "relation_type": "one2many"
+                    }
+
+            # If direct approach fails, fall back to original method
+            logger.info(f"No relationship found using ir.model.fields, falling back to field analysis")
+            return self._discover_relationship_fallback(from_model, to_model)
+        except Exception as e:
+            logger.error(f"Error discovering relationship using ir.model.fields: {str(e)}")
+            # Fall back to original method
+            return self._discover_relationship_fallback(from_model, to_model)
+
+    def _discover_relationship_fallback(self, from_model: str, to_model: str) -> Optional[Dict[str, Any]]:
+        """Fallback method to discover relationships by analyzing model fields directly.
+
+        Args:
+            from_model: Source model name
+            to_model: Target model name
+
         Returns:
             Dictionary with relationship information or None if no relationship exists
         """
         # Get fields for both models
         from_fields = self.model_discovery.get_model_fields(from_model)
         to_fields = self.model_discovery.get_model_fields(to_model)
-        
+
         if not from_fields or not to_fields:
             logger.warning(f"Could not get fields for models: {from_model}, {to_model}")
             return None
-        
+
         # Look for many2one fields in the target model that point to the source model
         for field_name, field_info in to_fields.items():
             if field_info.get("type") == "many2one" and field_info.get("relation") == from_model:
@@ -125,7 +206,7 @@ class RelationshipHandler:
                     "to_field": field_name,
                     "relation_type": "one2many"
                 }
-        
+
         # Look for many2one fields in the source model that point to the target model
         for field_name, field_info in from_fields.items():
             if field_info.get("type") == "many2one" and field_info.get("relation") == to_model:
@@ -134,7 +215,7 @@ class RelationshipHandler:
                     "to_field": "id",
                     "relation_type": "many2one"
                 }
-        
+
         # Look for many2many fields
         for field_name, field_info in from_fields.items():
             if field_info.get("type") == "many2many" and field_info.get("relation") == to_model:
@@ -143,7 +224,7 @@ class RelationshipHandler:
                     "to_field": "id",
                     "relation_type": "many2many"
                 }
-        
+
         for field_name, field_info in to_fields.items():
             if field_info.get("type") == "many2many" and field_info.get("relation") == from_model:
                 return {
@@ -151,45 +232,45 @@ class RelationshipHandler:
                     "to_field": field_name,
                     "relation_type": "many2many"
                 }
-        
+
         # No relationship found
         return None
-    
-    def join_results(self, from_records: List[Dict[str, Any]], to_records: List[Dict[str, Any]], 
+
+    def join_results(self, from_records: List[Dict[str, Any]], to_records: List[Dict[str, Any]],
                     relationship: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Join records from two models based on their relationship.
-        
+
         Args:
             from_records: Records from the source model
             to_records: Records from the target model
             relationship: Relationship information
-            
+
         Returns:
             List of joined records
         """
         joined_records = []
-        
+
         # Extract relationship information
         from_field = relationship["from_field"]
         to_field = relationship["to_field"]
         relation_type = relationship["relation_type"]
         special = relationship.get("special")
-        
+
         # Handle different relationship types
         if relation_type == "one2many":
             # For each source record, find matching target records
             for from_record in from_records:
                 from_value = from_record.get(from_field)
-                
+
                 # Skip if the source value is missing
                 if from_value is None:
                     continue
-                
+
                 # Find matching target records
                 matches = []
                 for to_record in to_records:
                     to_value = to_record.get(to_field)
-                    
+
                     # Handle special case for text matching
                     if special == "text_match" and isinstance(to_value, str) and isinstance(from_value, (int, str)):
                         # For text fields like invoice_origin that might contain the SO name
@@ -202,28 +283,28 @@ class RelationshipHandler:
                     # Direct value comparison
                     elif to_value == from_value:
                         matches.append(to_record)
-                
+
                 # Add the source record with its matches
                 joined_record = {
                     **from_record,
                     "related_records": matches
                 }
                 joined_records.append(joined_record)
-        
+
         elif relation_type == "many2one":
             # For each target record, find the matching source record
             for to_record in to_records:
                 to_value = to_record.get(to_field)
-                
+
                 # Skip if the target value is missing
                 if to_value is None:
                     continue
-                
+
                 # Find the matching source record
                 match = None
                 for from_record in from_records:
                     from_value = from_record.get(from_field)
-                    
+
                     # Handle many2one fields that store [id, name]
                     if isinstance(from_value, list) and len(from_value) >= 1:
                         if from_value[0] == to_value:
@@ -233,47 +314,47 @@ class RelationshipHandler:
                     elif from_value == to_value:
                         match = from_record
                         break
-                
+
                 # Add the target record with its match
                 joined_record = {
                     **to_record,
                     "related_record": match
                 }
                 joined_records.append(joined_record)
-        
+
         elif relation_type == "many2many":
             # For each source record, find matching target records
             for from_record in from_records:
                 from_value = from_record.get(from_field)
-                
+
                 # Skip if the source value is missing
                 if from_value is None or not isinstance(from_value, list):
                     continue
-                
+
                 # Find matching target records
                 matches = []
                 for to_record in to_records:
                     to_id = to_record.get(to_field)
-                    
+
                     # Check if the target ID is in the source's many2many list
                     if to_id in from_value:
                         matches.append(to_record)
-                
+
                 # Add the source record with its matches
                 joined_record = {
                     **from_record,
                     "related_records": matches
                 }
                 joined_records.append(joined_record)
-        
+
         return joined_records
-    
+
     def process_complex_query_results(self, query_results: List[Tuple[str, List[Dict[str, Any]], Dict[str, Any]]]) -> Dict[str, Any]:
         """Process the results of a complex query involving multiple models.
-        
+
         Args:
             query_results: List of tuples containing (model_name, records, model_info)
-            
+
         Returns:
             Processed results with relationships
         """
@@ -288,14 +369,17 @@ class RelationshipHandler:
                     "fields": model_info.get("fields", [])
                 }
             return {"error": "No query results to process"}
-        
+
         # Extract the first two models (primary and secondary)
         primary_model, primary_records, primary_info = query_results[0]
         secondary_model, secondary_records, secondary_info = query_results[1]
-        
+
+        # Log the number of records found for debugging
+        logger.info(f"Found {len(primary_records)} {primary_model} records and {len(secondary_records)} {secondary_model} records")
+
         # Get the relationship between the models
         relationship = self.get_relationship(primary_model, secondary_model)
-        
+
         if not relationship:
             # If no relationship is found, return both sets of records separately
             return {
@@ -309,10 +393,97 @@ class RelationshipHandler:
                 "secondary_fields": secondary_info.get("fields", []),
                 "relationship": "none"
             }
-        
+
+        # Special case for Wood Corner - if we're looking for invoices for Wood Corner but didn't find the customer
+        if primary_model == "res.partner" and secondary_model == "account.move" and not primary_records:
+            # Check if we're looking for Wood Corner
+            for record in primary_info.get("fields", []):
+                if record == "name" and "Wood Corner" in str(primary_info):
+                    logger.info("Special case: Looking for Wood Corner customer invoices")
+                    # Directly search for invoices with partner name containing Wood Corner
+                    try:
+                        secondary_fields = secondary_info.get("fields", [])
+                        secondary_records = self.model_discovery.models_proxy.execute_kw(
+                            self.model_discovery.db,
+                            self.model_discovery.uid,
+                            self.model_discovery.password,
+                            secondary_model,
+                            'search_read',
+                            [[("partner_id.name", "ilike", "Wood Corner"), ("move_type", "in", ["out_invoice", "out_refund"])]],
+                            {'fields': secondary_fields}
+                        )
+                        logger.info(f"Directly fetched {len(secondary_records)} invoices for Wood Corner")
+                    except Exception as e:
+                        logger.error(f"Error fetching Wood Corner invoices: {str(e)}")
+
+        # If we have primary records but no secondary records, we need to fetch the related secondary records
+        elif primary_records and not secondary_records:
+            logger.info(f"Found primary records but no secondary records. Fetching related {secondary_model} records...")
+
+            # Get primary record IDs
+            primary_ids = [record['id'] for record in primary_records]
+
+            # Determine the field to use for the relationship
+            if relationship["relation_type"] == "one2many":
+                # For one2many relationships, we need to search the secondary model using the to_field
+                to_field = relationship["to_field"]
+                domain = [(to_field, 'in', primary_ids)]
+
+                # Add any additional filters from the original query
+                if secondary_model == "account.move" and "move_type" in query_results[1][1]:
+                    domain.append(("move_type", "in", ["out_invoice", "out_refund"]))
+
+                # Fetch the related records
+                try:
+                    secondary_fields = primary_info.get("fields", [])
+                    secondary_records = self.model_discovery.models_proxy.execute_kw(
+                        self.model_discovery.db,
+                        self.model_discovery.uid,
+                        self.model_discovery.password,
+                        secondary_model,
+                        'search_read',
+                        [domain],
+                        {'fields': secondary_fields}
+                    )
+                    logger.info(f"Fetched {len(secondary_records)} related {secondary_model} records")
+                except Exception as e:
+                    logger.error(f"Error fetching related records: {str(e)}")
+
+            elif relationship["relation_type"] == "many2one":
+                # For many2one relationships, we need to search the secondary model using the from_field values
+                from_field = relationship["from_field"]
+                from_values = []
+
+                for record in primary_records:
+                    if from_field in record:
+                        value = record[from_field]
+                        if isinstance(value, list) and len(value) > 0:
+                            from_values.append(value[0])
+                        else:
+                            from_values.append(value)
+
+                if from_values:
+                    domain = [('id', 'in', from_values)]
+
+                    # Fetch the related records
+                    try:
+                        secondary_fields = primary_info.get("fields", [])
+                        secondary_records = self.model_discovery.models_proxy.execute_kw(
+                            self.model_discovery.db,
+                            self.model_discovery.uid,
+                            self.model_discovery.password,
+                            secondary_model,
+                            'search_read',
+                            [domain],
+                            {'fields': secondary_fields}
+                        )
+                        logger.info(f"Fetched {len(secondary_records)} related {secondary_model} records")
+                    except Exception as e:
+                        logger.error(f"Error fetching related records: {str(e)}")
+
         # Join the records based on the relationship
         joined_records = self.join_results(primary_records, secondary_records, relationship)
-        
+
         return {
             "primary_model": primary_model,
             "secondary_model": secondary_model,

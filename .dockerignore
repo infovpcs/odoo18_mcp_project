@@ -1,25 +1,76 @@
+# Version control
 .git
+.gitignore
+.github/
+
+# Environment files
 .env
+.env.*
+!.env.example
 venv
 .venv
-__pycache__
+env
+.Python
+.python-version
+
+# Python cache files
+__pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.so
+*.dll
+*.exe
 .Python
-env
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
 pip-log.txt
 pip-delete-this-directory.txt
-.tox
+wheels/
+
+# Test and coverage
+.tox/
 .coverage
-htmlcov
-.pytest_cache
-.mypy_cache
-dist
-build
-*.egg-info
+.coverage.*
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.hypothesis/
+.nox/
+
+# Logs and data
 logs/
+*.log
+data/
+exports/
+tmp/
+
+# IDE files
 .vscode/
 .idea/
-*.log
+*.swp
+*.swo
+.DS_Store
+
+# Package manager files
 uv.lock
+poetry.lock
+Pipfile.lock
+
+# Docker files (not needed inside the container)
+docker-compose*.yml
+docker-compose*.yaml
+Dockerfile.*
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Temporary files
+*.tmp
+*.bak
+*.backup

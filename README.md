@@ -153,50 +153,146 @@ This will create distribution packages in the `dist/` directory.
 
 ### Docker Support
 
-The project includes Docker support for easy deployment and testing:
+The project includes comprehensive Docker support for development, testing, and production deployment.
 
-#### Building the Docker Image
+#### Quick Start with Make
 
-```bash
-docker build -t odoo18-mcp-integration .
-```
-
-#### Running with Docker
-
-Run the MCP server:
-```bash
-docker run -p 8000:8000 --name mcp-server odoo18-mcp-integration
-```
-
-Run the standalone MCP server for testing:
-```bash
-docker run -p 8000:8000 --name standalone-server odoo18-mcp-integration standalone
-```
-
-Run tests:
-```bash
-docker run --name test-runner odoo18-mcp-integration test all
-```
-
-#### Using Docker Compose
-
-The project includes a `docker-compose.yml` file for easy orchestration:
+We provide a Makefile for common Docker operations:
 
 ```bash
-# Start the MCP server
-docker-compose up mcp-server
+# Set up required directories
+make setup
 
-# Start the standalone server
-docker-compose up standalone-server
+# Build Docker images
+make build
+
+# Start development environment
+make dev
 
 # Run tests
-docker-compose run test-runner
+make test
+
+# Start production environment
+make prod
+
+# View logs
+make logs
+
+# Stop all services
+make down
+
+# Clean up everything
+make clean
 ```
 
-You can customize the Odoo connection details by setting environment variables:
+#### Docker Compose Configuration
+
+The project includes multiple Docker Compose files for different environments:
+
+- `docker-compose.yml`: Base configuration for all environments
+- `docker-compose.override.yml`: Development-specific overrides (automatically used with `docker-compose up`)
+- `docker-compose.prod.yml`: Production-specific configuration
+
+#### Development Environment
+
+For local development:
 
 ```bash
-ODOO_URL=http://your-odoo-server:8069 ODOO_DB=your_db docker-compose up mcp-server
+# Start all services in development mode
+docker-compose up -d
+
+# Or using the Makefile
+make dev
+```
+
+This will:
+- Mount your local code into the container for live development
+- Enable debug mode and detailed logging
+- Create required directories for logs, exports, and temporary files
+- Set up appropriate environment variables
+
+#### Production Deployment
+
+For production deployment:
+
+```bash
+# Start production environment
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+# Or using the Makefile
+make prod
+```
+
+Production mode includes:
+- Multi-stage build for smaller image size
+- Non-root user for better security
+- Resource limits to prevent container resource exhaustion
+- Health checks for better reliability
+- Restart policies for automatic recovery
+- Log rotation to prevent disk space issues
+- Network isolation for better security
+
+#### Container Architecture
+
+The Docker setup includes three main services:
+
+1. **mcp-server**: The main MCP server for integration with Claude Desktop
+   - Exposes port 8000 for API access
+   - Connects to Odoo via XML-RPC
+   - Provides MCP tools for Claude Desktop
+
+2. **standalone-server**: A standalone server for testing MCP tools
+   - Exposes port 8001 for API access
+   - Provides HTTP endpoints for testing MCP tools
+   - Useful for development and testing without Claude Desktop
+
+3. **test-runner**: A service for running automated tests
+   - Runs function tests and tool tests
+   - Validates the MCP server functionality
+   - Useful for CI/CD pipelines
+
+#### Environment Variables
+
+You can customize the Docker environment by setting environment variables:
+
+```bash
+# In .env file or command line
+ODOO_URL=http://your-odoo-server:8069
+ODOO_DB=your_database
+ODOO_USERNAME=your_username
+ODOO_PASSWORD=your_password
+MCP_DEBUG=true
+MCP_LOG_LEVEL=DEBUG
+```
+
+#### Volume Management
+
+The Docker setup includes several volumes for persistent data:
+
+- `mcp_data`: Persistent data storage
+- `mcp_logs`: Persistent logs storage
+- `./exports`: Directory for exported files
+- `./tmp`: Directory for temporary files
+
+#### Health Checks
+
+All services include health checks to ensure they're running properly:
+
+```bash
+# Check the health of the MCP server
+docker inspect --format='{{json .State.Health}}' odoo18-mcp-server | jq
+```
+
+#### Custom Docker Builds
+
+You can customize the Docker build process:
+
+```bash
+# Build with specific build arguments
+docker build --build-arg BUILD_TARGET=production -t odoo18-mcp-integration:prod .
+
+# Run with specific environment variables
+docker run -p 8000:8000 -e ODOO_URL=http://your-odoo-server:8069 -e ODOO_DB=your_db odoo18-mcp-integration:prod
 ```
 
 ### Using with Claude Desktop

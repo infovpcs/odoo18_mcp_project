@@ -1,11 +1,20 @@
 version: '3.8'
 
+networks:
+  mcp_network:
+    driver: bridge
+
+volumes:
+  mcp_data:
+  mcp_logs:
+
 services:
   mcp-server:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: odoo18-mcp-server
+    restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
@@ -13,8 +22,31 @@ services:
       - ODOO_DB=${ODOO_DB:-llmdb18}
       - ODOO_USERNAME=${ODOO_USERNAME:-admin}
       - ODOO_PASSWORD=${ODOO_PASSWORD:-admin}
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8000
+      - MCP_DEBUG=${MCP_DEBUG:-false}
+      - MCP_LOG_LEVEL=${MCP_LOG_LEVEL:-INFO}
     volumes:
       - ./logs:/app/logs
+      - mcp_data:/app/data
+      - ./exports:/app/exports
+      - ./tmp:/app/tmp
+    networks:
+      - mcp_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
     command: []  # Default command from Dockerfile
 
   standalone-server:
@@ -22,6 +54,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: odoo18-standalone-server
+    restart: unless-stopped
     ports:
       - "8001:8000"
     environment:
@@ -29,8 +62,31 @@ services:
       - ODOO_DB=${ODOO_DB:-llmdb18}
       - ODOO_USERNAME=${ODOO_USERNAME:-admin}
       - ODOO_PASSWORD=${ODOO_PASSWORD:-admin}
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8000
+      - MCP_DEBUG=${MCP_DEBUG:-true}
+      - MCP_LOG_LEVEL=${MCP_LOG_LEVEL:-INFO}
     volumes:
       - ./logs:/app/logs
+      - mcp_data:/app/data
+      - ./exports:/app/exports
+      - ./tmp:/app/tmp
+    networks:
+      - mcp_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
     command: ["standalone"]
 
   test-runner:
@@ -43,6 +99,17 @@ services:
       - ODOO_DB=${ODOO_DB:-llmdb18}
       - ODOO_USERNAME=${ODOO_USERNAME:-admin}
       - ODOO_PASSWORD=${ODOO_PASSWORD:-admin}
+      - MCP_DEBUG=${MCP_DEBUG:-true}
+      - MCP_LOG_LEVEL=${MCP_LOG_LEVEL:-DEBUG}
     volumes:
       - ./logs:/app/logs
+      - ./exports:/app/exports
+      - ./tmp:/app/tmp
+    networks:
+      - mcp_network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
     command: ["test", "all"]

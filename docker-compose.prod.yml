@@ -1,0 +1,100 @@
+version: '3.8'
+
+# Production configuration for Docker Compose
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+networks:
+  mcp_network:
+    driver: bridge
+  odoo_network:
+    external: true  # Connect to an existing Odoo network
+
+volumes:
+  mcp_data:
+    driver: local
+  mcp_logs:
+    driver: local
+
+services:
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BUILD_TARGET=production
+    container_name: odoo18-mcp-server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ODOO_URL=${ODOO_URL:-http://odoo:8069}
+      - ODOO_DB=${ODOO_DB:-llmdb18}
+      - ODOO_USERNAME=${ODOO_USERNAME:-admin}
+      - ODOO_PASSWORD=${ODOO_PASSWORD:-admin}
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8000
+      - MCP_DEBUG=false
+      - MCP_LOG_LEVEL=INFO
+      - ENVIRONMENT=production
+    volumes:
+      - mcp_logs:/app/logs
+      - mcp_data:/app/data
+      - ./exports:/app/exports
+    networks:
+      - mcp_network
+      - odoo_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    command: []  # Default command from Dockerfile
+
+  # Optional: Add a reverse proxy like Traefik or Nginx for SSL termination
+  # traefik:
+  #   image: traefik:v2.9
+  #   command:
+  #     - "--api.insecure=false"
+  #     - "--providers.docker=true"
+  #     - "--providers.docker.exposedbydefault=false"
+  #     - "--entrypoints.web.address=:80"
+  #     - "--entrypoints.websecure.address=:443"
+  #     - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+  #     - "--certificatesresolvers.myresolver.acme.email=${ACME_EMAIL:-admin@example.com}"
+  #     - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - "/var/run/docker.sock:/var/run/docker.sock:ro"
+  #     - "traefik-certificates:/letsencrypt"
+  #   networks:
+  #     - mcp_network
+  #   restart: unless-stopped
+
+# volumes:
+#   traefik-certificates:

@@ -1,0 +1,71 @@
+version: '3.8'
+
+# This file is used for local development and is not committed to version control
+# It overrides settings in the main docker-compose.yml file
+
+services:
+  mcp-server:
+    # Mount the source code for live development
+    volumes:
+      - ./:/app
+      - ./logs:/app/logs
+      - ./exports:/app/exports
+      - ./tmp:/app/tmp
+    environment:
+      - MCP_DEBUG=true
+      - MCP_LOG_LEVEL=DEBUG
+      - PYTHONDONTWRITEBYTECODE=1
+    # Use a development-specific command
+    command: ["--host", "0.0.0.0", "--port", "8000"]
+    # Enable hot reloading for development
+    # This requires installing watchdog in the container
+    # You can do this by adding a development.txt requirements file
+    # and installing it in the Dockerfile for development builds
+
+  standalone-server:
+    # Mount the source code for live development
+    volumes:
+      - ./:/app
+      - ./logs:/app/logs
+      - ./exports:/app/exports
+      - ./tmp:/app/tmp
+    environment:
+      - MCP_DEBUG=true
+      - MCP_LOG_LEVEL=DEBUG
+      - PYTHONDONTWRITEBYTECODE=1
+
+  # Add a development database service if needed
+  # db:
+  #   image: postgres:14-alpine
+  #   environment:
+  #     - POSTGRES_USER=postgres
+  #     - POSTGRES_PASSWORD=postgres
+  #     - POSTGRES_DB=mcp_dev
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   networks:
+  #     - mcp_network
+
+  # Add a development Odoo service if needed
+  # odoo:
+  #   image: odoo:18
+  #   depends_on:
+  #     - db
+  #   environment:
+  #     - HOST=db
+  #     - USER=odoo
+  #     - PASSWORD=odoo
+  #   ports:
+  #     - "8069:8069"
+  #   volumes:
+  #     - odoo_data:/var/lib/odoo
+  #     - ./odoo/addons:/mnt/extra-addons
+  #   networks:
+  #     - mcp_network
+
+# Add additional volumes if needed
+# volumes:
+#   postgres_data:
+#   odoo_data:

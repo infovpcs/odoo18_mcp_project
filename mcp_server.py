@@ -462,7 +462,7 @@ try:
 
     # Tool for advanced searching across models
     @mcp.tool()
-    def advanced_search(query: str, limit: int = 10) -> str:
+    def advanced_search(query: str, limit: int = 100) -> str:
         """Perform an advanced search using natural language queries.
 
         This tool can handle complex queries across multiple Odoo models,
@@ -478,7 +478,7 @@ try:
 
         Args:
             query: Natural language query string
-            limit: Maximum number of records to return per model
+            limit: Maximum number of records to return per model (default: 100)
 
         Returns:
             A formatted string with the search results
@@ -487,7 +487,8 @@ try:
             return "# Error: Odoo Connection\n\nCould not connect to Odoo server. Please check your connection settings."
 
         try:
-            # Execute the query
+            # Execute the query with a higher limit to ensure we get all records
+            # For complex queries involving relationships, the limit is applied to each model separately
             return advanced_search_instance.execute_query(query, limit)
         except Exception as e:
             logger.error(f"Error in advanced search: {str(e)}")

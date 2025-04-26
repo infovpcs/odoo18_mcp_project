@@ -58,7 +58,7 @@ class AdvancedSearch:
                 # Set up search parameters
                 search_params = {
                     'fields': fields,
-                    'limit': limit
+                    'limit': limit if limit > 0 else 1000  # Use a higher default limit to get more records
                 }
 
                 # Add ordering for specific queries

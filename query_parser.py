@@ -975,7 +975,8 @@ class QueryParser:
             order_model = "sale.order"
             # We'll use a domain that will be updated by the relationship handler
             order_domain = []
-            order_fields = ["id", "name", "date_order", "amount_total", "state"]
+            # Make sure to include partner_id for the relationship handler to work properly
+            order_fields = ["id", "name", "partner_id", "date_order", "amount_total", "state"]
 
             return [(customer_model, customer_domain, customer_fields),
                     (order_model, order_domain, order_fields)]
@@ -1021,7 +1022,8 @@ class QueryParser:
             invoice_model = "account.move"
             # We'll use a domain that will be updated by the relationship handler
             invoice_domain = [["move_type", "in", ["out_invoice", "out_refund"]]]
-            invoice_fields = ["id", "name", "invoice_date", "amount_total", "payment_state"]
+            # Make sure to include partner_id for the relationship handler to work properly
+            invoice_fields = ["id", "name", "partner_id", "invoice_date", "amount_total", "payment_state"]
 
             return [(customer_model, customer_domain, customer_fields),
                     (invoice_model, invoice_domain, invoice_fields)]
@@ -1048,7 +1050,8 @@ class QueryParser:
             task_model = "project.task"
             # We'll need to update this domain with the actual project ID
             task_domain = []
-            task_fields = ["id", "name", "user_ids", "date_deadline", "stage_id"]
+            # Make sure to include project_id for the relationship handler to work properly
+            task_fields = ["id", "name", "project_id", "user_ids", "date_deadline", "stage_id"]
 
             return [(project_model, project_domain, project_fields),
                     (task_model, task_domain, task_fields)]

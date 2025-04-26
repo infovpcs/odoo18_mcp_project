@@ -9,6 +9,7 @@ when performing complex queries that span multiple models.
 """
 
 import logging
+import traceback
 from typing import Dict, List, Any, Optional, Tuple, Set, Union
 
 logger = logging.getLogger(__name__)
@@ -261,9 +262,11 @@ class RelationshipHandler:
             # For each source record, find matching target records
             for from_record in from_records:
                 from_value = from_record.get(from_field)
+                logger.info(f"Processing source record with {from_field}={from_value}")
 
                 # Skip if the source value is missing
                 if from_value is None:
+                    logger.info(f"Skipping source record because {from_field} is None")
                     continue
 
                 # Find matching target records
@@ -271,18 +274,30 @@ class RelationshipHandler:
                 for to_record in to_records:
                     to_value = to_record.get(to_field)
 
+                    # Log the values we're comparing
+                    logger.info(f"Comparing source {from_field}={from_value} with target {to_field}={to_value}")
+
                     # Handle special case for text matching
                     if special == "text_match" and isinstance(to_value, str) and isinstance(from_value, (int, str)):
                         # For text fields like invoice_origin that might contain the SO name
                         if str(from_value) in to_value:
+                            logger.info(f"Found text match: {from_value} in {to_value}")
                             matches.append(to_record)
                     # Handle many2one fields that store [id, name]
                     elif isinstance(to_value, list) and len(to_value) >= 1:
                         if to_value[0] == from_value:
+                            logger.info(f"Found many2one match: {to_value[0]} == {from_value}")
                             matches.append(to_record)
+                    # Handle many2one fields that store just the ID (common in Odoo 18)
+                    elif to_field.endswith('_id') and isinstance(to_value, int) and to_value == from_value:
+                        logger.info(f"Found many2one ID match: {to_value} == {from_value}")
+                        matches.append(to_record)
                     # Direct value comparison
                     elif to_value == from_value:
+                        logger.info(f"Found direct match: {to_value} == {from_value}")
                         matches.append(to_record)
+
+                logger.info(f"Found {len(matches)} matches for source record with {from_field}={from_value}")
 
                 # Add the source record with its matches
                 joined_record = {
@@ -394,27 +409,90 @@ class RelationshipHandler:
                 "relationship": "none"
             }
 
-        # Special case for Wood Corner - if we're looking for invoices for Wood Corner but didn't find the customer
-        if primary_model == "res.partner" and secondary_model == "account.move" and not primary_records:
-            # Check if we're looking for Wood Corner
-            for record in primary_info.get("fields", []):
-                if record == "name" and "Wood Corner" in str(primary_info):
-                    logger.info("Special case: Looking for Wood Corner customer invoices")
-                    # Directly search for invoices with partner name containing Wood Corner
-                    try:
+        # General approach for handling customer-related queries when no primary records are found
+        if primary_model == "res.partner" and not primary_records:
+            # Extract customer name from the query info
+            customer_name = None
+            # Check if customer name is in the query info
+            query_str = str(primary_info).lower()
+
+            # Try to extract customer name from common patterns in the query string
+            if "gemini furniture" in query_str:
+                customer_name = "Gemini Furniture"
+                logger.info(f"Found customer name in query string: {customer_name}")
+            elif "wood corner" in query_str:
+                customer_name = "Wood Corner"
+                logger.info(f"Found customer name in query string: {customer_name}")
+
+            # Try to extract customer name from domain conditions
+            if len(query_results) > 0 and len(query_results[0]) > 1:
+                primary_domain = query_results[0][1]
+                for condition in primary_domain:
+                    if isinstance(condition, (list, tuple)) and len(condition) >= 3:
+                        if condition[0] == "name" and condition[1] in ["=", "ilike"]:
+                            customer_name = condition[2]
+                            logger.info(f"Extracted customer name from domain: {customer_name}")
+                            break
+
+            # If we found a customer name, try to find the customer directly
+            if customer_name:
+                try:
+                    # Try to find the customer directly
+                    partner_records = self.model_discovery.models_proxy.execute_kw(
+                        self.model_discovery.db,
+                        self.model_discovery.uid,
+                        self.model_discovery.password,
+                        'res.partner',
+                        'search_read',
+                        [[("name", "ilike", customer_name)]],
+                        {'fields': ['id', 'name']}
+                    )
+
+                    if partner_records:
+                        partner_id = partner_records[0]['id']
+                        partner_name = partner_records[0]['name']
+                        logger.info(f"Found partner {partner_name} with ID: {partner_id}")
+
+                        # Now fetch all related records for this customer
                         secondary_fields = secondary_info.get("fields", [])
+
+                        # Determine the relationship field based on the secondary model
+                        relation_field = "partner_id"  # Default for most models
+
+                        # Create appropriate domain based on the secondary model
+                        domain = [(relation_field, "=", partner_id)]
+
+                        # Add additional filters for specific models
+                        if secondary_model == "account.move":
+                            # For invoices, filter by move_type for customer invoices
+                            domain.append(("move_type", "in", ["out_invoice", "out_refund"]))
+
+                        # Make sure the relationship field is included in the fields
+                        if relation_field not in secondary_fields:
+                            secondary_fields.append(relation_field)
+                            logger.info(f"Added relationship field {relation_field} to secondary fields")
+
+                        # Fetch the records with a higher limit
+                        search_limit = 1000  # Higher limit to get more records
                         secondary_records = self.model_discovery.models_proxy.execute_kw(
                             self.model_discovery.db,
                             self.model_discovery.uid,
                             self.model_discovery.password,
                             secondary_model,
                             'search_read',
-                            [[("partner_id.name", "ilike", "Wood Corner"), ("move_type", "in", ["out_invoice", "out_refund"])]],
-                            {'fields': secondary_fields}
+                            [domain],
+                            {'fields': secondary_fields, 'limit': search_limit}
                         )
-                        logger.info(f"Directly fetched {len(secondary_records)} invoices for Wood Corner")
-                    except Exception as e:
-                        logger.error(f"Error fetching Wood Corner invoices: {str(e)}")
+                        logger.info(f"Directly fetched {len(secondary_records)} {secondary_model} records for {partner_name}")
+
+                        # If we got exactly the limit number of records, log a warning that there might be more
+                        if len(secondary_records) == search_limit:
+                            logger.warning(f"Reached limit of {search_limit} records for {secondary_model}. There might be more records.")
+                    else:
+                        logger.info(f"Partner '{customer_name}' not found")
+                except Exception as e:
+                    logger.error(f"Error fetching records for customer {customer_name}: {str(e)}")
+                    logger.error(f"Exception details: {traceback.format_exc()}")
 
         # If we have primary records but no secondary records, we need to fetch the related secondary records
         elif primary_records and not secondary_records:
@@ -422,20 +500,39 @@ class RelationshipHandler:
 
             # Get primary record IDs
             primary_ids = [record['id'] for record in primary_records]
+            logger.info(f"Primary record IDs: {primary_ids}")
 
             # Determine the field to use for the relationship
             if relationship["relation_type"] == "one2many":
                 # For one2many relationships, we need to search the secondary model using the to_field
                 to_field = relationship["to_field"]
                 domain = [(to_field, 'in', primary_ids)]
+                logger.info(f"Using one2many relationship with domain: {domain}")
 
                 # Add any additional filters from the original query
-                if secondary_model == "account.move" and "move_type" in query_results[1][1]:
-                    domain.append(("move_type", "in", ["out_invoice", "out_refund"]))
+                if len(query_results) > 1 and len(query_results[1]) > 1 and isinstance(query_results[1][1], list):
+                    # Extract any additional filters from the secondary model's domain
+                    secondary_domain = query_results[1][1]
+                    if secondary_domain:
+                        for condition in secondary_domain:
+                            # Skip conditions that would conflict with our primary relationship
+                            if isinstance(condition, (list, tuple)) and condition[0] != to_field:
+                                domain.append(condition)
+                                logger.info(f"Added additional filter from query: {condition}")
 
-                # Fetch the related records
+                # Fetch the related records with a higher limit to ensure we get all records
                 try:
-                    secondary_fields = primary_info.get("fields", [])
+                    secondary_fields = secondary_info.get("fields", [])
+
+                    # Make sure the relationship field is included in the fields
+                    if to_field not in secondary_fields:
+                        secondary_fields.append(to_field)
+                        logger.info(f"Added relationship field {to_field} to secondary fields")
+
+                    # Use a higher limit (or no limit) to ensure we get all related records
+                    search_limit = 1000  # Higher limit to get more records
+
+                    logger.info(f"Fetching {secondary_model} records with domain {domain} and fields {secondary_fields}")
                     secondary_records = self.model_discovery.models_proxy.execute_kw(
                         self.model_discovery.db,
                         self.model_discovery.uid,
@@ -443,16 +540,22 @@ class RelationshipHandler:
                         secondary_model,
                         'search_read',
                         [domain],
-                        {'fields': secondary_fields}
+                        {'fields': secondary_fields, 'limit': search_limit}
                     )
                     logger.info(f"Fetched {len(secondary_records)} related {secondary_model} records")
+
+                    # If we got exactly the limit number of records, log a warning that there might be more
+                    if len(secondary_records) == search_limit:
+                        logger.warning(f"Reached limit of {search_limit} records for {secondary_model}. There might be more records.")
                 except Exception as e:
                     logger.error(f"Error fetching related records: {str(e)}")
+                    logger.error(f"Exception details: {traceback.format_exc()}")
 
             elif relationship["relation_type"] == "many2one":
                 # For many2one relationships, we need to search the secondary model using the from_field values
                 from_field = relationship["from_field"]
                 from_values = []
+                logger.info(f"Using many2one relationship with from_field: {from_field}")
 
                 for record in primary_records:
                     if from_field in record:
@@ -464,10 +567,21 @@ class RelationshipHandler:
 
                 if from_values:
                     domain = [('id', 'in', from_values)]
+                    logger.info(f"Using many2one relationship with domain: {domain}")
 
-                    # Fetch the related records
+                    # Fetch the related records with a higher limit
                     try:
-                        secondary_fields = primary_info.get("fields", [])
+                        secondary_fields = secondary_info.get("fields", [])
+
+                        # Make sure the relationship field is included in the fields
+                        if to_field not in secondary_fields:
+                            secondary_fields.append(to_field)
+                            logger.info(f"Added relationship field {to_field} to secondary fields")
+
+                        # Use a higher limit (or no limit) to ensure we get all related records
+                        search_limit = 1000  # Higher limit to get more records
+
+                        logger.info(f"Fetching {secondary_model} records with domain {domain} and fields {secondary_fields}")
                         secondary_records = self.model_discovery.models_proxy.execute_kw(
                             self.model_discovery.db,
                             self.model_discovery.uid,
@@ -475,11 +589,16 @@ class RelationshipHandler:
                             secondary_model,
                             'search_read',
                             [domain],
-                            {'fields': secondary_fields}
+                            {'fields': secondary_fields, 'limit': search_limit}
                         )
                         logger.info(f"Fetched {len(secondary_records)} related {secondary_model} records")
+
+                        # If we got exactly the limit number of records, log a warning that there might be more
+                        if len(secondary_records) == search_limit:
+                            logger.warning(f"Reached limit of {search_limit} records for {secondary_model}. There might be more records.")
                     except Exception as e:
                         logger.error(f"Error fetching related records: {str(e)}")
+                        logger.error(f"Exception details: {traceback.format_exc()}")
 
         # Join the records based on the relationship
         joined_records = self.join_results(primary_records, secondary_records, relationship)

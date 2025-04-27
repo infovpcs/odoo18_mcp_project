@@ -1,6 +1,6 @@
 # Odoo 18 MCP Integration (18.0 Branch)
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Odoo 18.0](https://img.shields.io/badge/odoo-18.0-green.svg)](https://www.odoo.com/)
 [![MCP SDK](https://img.shields.io/badge/mcp-sdk-purple.svg)](https://github.com/modelcontextprotocol/python-sdk)
 [![Status](https://img.shields.io/badge/status-stable-brightgreen.svg)]()
@@ -47,10 +47,12 @@ A robust integration server that connects MCP (Master Control Program) with Odoo
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.10 or higher
 - Odoo 18.0 instance
 - Access to Odoo database
 - Claude Desktop (optional, for AI integration)
+- Compatible PyTorch version (2.2.x recommended for macOS)
+- NumPy <2.0.0 (for compatibility with other packages)
 
 ### Setup
 
@@ -375,13 +377,45 @@ We've created a standalone MCP server that can be used for testing the MCP tools
 python standalone_mcp_server.py
 ```
 
-This will start a FastAPI server on port 8000 that you can use to test the MCP tools. You can then use the `test_mcp_tools.py` script to test all the tools:
+This will start a FastAPI server on port 8001 that you can use to test the MCP tools. You can then use the `test_mcp_tools.py` script to test all the tools:
 
 ```bash
 python test_mcp_tools.py
 ```
 
 The standalone server provides the same functionality as the MCP server used by Claude Desktop, but with a simple HTTP interface for testing purposes.
+
+#### Testing Individual Tools
+
+You can test individual tools using curl or any HTTP client:
+
+```bash
+# Test the retrieve_odoo_documentation tool
+curl -X POST "http://127.0.0.1:8001/call_tool" \
+  -H "Content-Type: application/json" \
+  -d '{"tool": "retrieve_odoo_documentation", "params": {"query": "How to create a custom module in Odoo 18", "max_results": 5}}'
+
+# Test the advanced_search tool
+curl -X POST "http://127.0.0.1:8001/call_tool" \
+  -H "Content-Type: application/json" \
+  -d '{"tool": "advanced_search", "params": {"query": "List all unpaid bills with respect of vendor details", "limit": 10}}'
+```
+
+#### Listing Available Tools
+
+You can list all available tools using the `/list_tools` endpoint:
+
+```bash
+curl -X GET "http://127.0.0.1:8001/list_tools"
+```
+
+#### Health Check
+
+You can check if the server is running using the `/health` endpoint:
+
+```bash
+curl -X GET "http://127.0.0.1:8001/health"
+```
 
 ### Using the Direct Export/Import Implementation
 
@@ -753,7 +787,7 @@ Create a `.vscode/settings.json` file:
 
 ## Odoo Documentation RAG Tool
 
-We've implemented a powerful Retrieval Augmented Generation (RAG) tool for accessing Odoo 18 documentation:
+We've implemented a powerful Retrieval Augmented Generation (RAG) tool for accessing Odoo 18 documentation. This tool uses sentence-transformers and FAISS to provide semantic search capabilities for finding relevant information in the Odoo 18 documentation:
 
 1. **Documentation Repository Integration**: The tool clones and processes the official Odoo 18 documentation repository (https://github.com/odoo/documentation/tree/18.0) to extract relevant content.
 
@@ -777,13 +811,33 @@ We've implemented a powerful Retrieval Augmented Generation (RAG) tool for acces
 
 ### Example Usage
 
-Using the MCP tool in Claude Desktop:
+#### Using the MCP tool in Claude Desktop:
 
 ```
 /tool retrieve_odoo_documentation query="How to create a custom module in Odoo 18" max_results=5
 ```
 
 This will return relevant sections from the Odoo 18 documentation about creating custom modules, with source information and context.
+
+#### Using the Standalone MCP Server:
+
+```bash
+curl -X POST "http://127.0.0.1:8001/call_tool" \
+  -H "Content-Type: application/json" \
+  -d '{"tool": "retrieve_odoo_documentation", "params": {"query": "How to create a custom module in Odoo 18", "max_results": 5}}'
+```
+
+#### Testing the RAG Tool
+
+The quality of the RAG tool's responses depends on the documentation available in the index. The tool currently indexes 32 documents from the Odoo 18 documentation repository. To improve the quality of responses, you can add more documentation files to the `odoo_docs` directory and rebuild the index by setting `force_rebuild=True` in the `OdooDocsRetriever` constructor.
+
+```python
+odoo_docs_retriever_instance = OdooDocsRetriever(
+    docs_dir=docs_dir,
+    index_dir=index_dir,
+    force_rebuild=True  # Force rebuilding the index
+)
+```
 
 ## Recent Improvements and Fixes
 
@@ -896,7 +950,61 @@ We've made several improvements to the MCP server to ensure all tools work corre
 
 3. **Improved error handling**: Added better error handling and reporting for more reliable operation.
 
+### Dependency Management Improvements
+
+1. **Python version compatibility**: Updated the project to require Python 3.10+ for compatibility with the MCP SDK.
+
+2. **PyTorch version constraints**: Added version constraints for PyTorch to ensure compatibility with macOS.
+
+3. **NumPy version constraints**: Added version constraints for NumPy to ensure compatibility with FAISS and other dependencies.
+
+4. **Standalone MCP server**: Created a standalone MCP server for testing tools without Claude Desktop.
+
+5. **Improved error handling**: Enhanced error handling for dependency issues with clear error messages.
+
+6. **Documentation updates**: Updated documentation with dependency management best practices.
+
 ## Troubleshooting
+
+### Dependency Management
+
+#### Python Version Compatibility
+
+The project requires Python 3.10 or higher due to the MCP SDK dependency. If you're using an older version of Python, you'll need to upgrade.
+
+#### PyTorch Version Compatibility
+
+On macOS, you may encounter issues with PyTorch compatibility. We recommend using PyTorch 2.2.x for best compatibility:
+
+```bash
+pip install "torch>=2.2.0,<=2.2.2"
+```
+
+#### NumPy Version Compatibility
+
+Some dependencies (like FAISS) may have issues with NumPy 2.x. We recommend using NumPy <2.0.0 for compatibility:
+
+```bash
+pip install "numpy>=1.26.0,<2.0.0"
+```
+
+#### Using uv for Dependency Management
+
+We recommend using uv for dependency management as it provides better error messages and faster installation:
+
+```bash
+# Install uv
+pip install uv
+
+# Create a virtual environment
+uv venv
+
+# Activate the virtual environment
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
+uv pip install -e .
+```
 
 ### Common Issues
 

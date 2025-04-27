@@ -100,7 +100,7 @@ odoo18-mcp-project/
 ## Technical Specifications
 
 ### Python Requirements
-- Python 3.8+ ✅
+- Python 3.10+ ✅
 - Pydantic 2.x ✅
 - XML-RPC client (standard library) ✅
 - FastAPI (for API endpoints) ✅
@@ -108,9 +108,15 @@ odoo18-mcp-project/
 - pytest (for testing) ✅
 - python-dotenv (for configuration) ✅
 - uv (for virtual environment management) ✅
-
 - pandas (for data processing) ✅
 - csv (standard library, for CSV handling) ✅
+- sentence-transformers (for document embedding) ✅
+- torch (for sentence-transformers, version constraints for macOS) ✅
+- numpy (version <2.0.0 for compatibility) ✅
+- faiss-cpu (for vector storage and retrieval) ✅
+- beautifulsoup4 (for documentation processing) ✅
+- markdown (for documentation processing) ✅
+- gitpython (for documentation repository management) ✅
 
 ### Odoo Requirements
 - Odoo 18.0 compatibility ✅

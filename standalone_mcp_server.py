@@ -66,8 +66,27 @@ if not mcp:
 
 # Get the tools from the MCP server
 tools = {}
-for tool_name, tool_func in mcp._tools.items():
-    tools[tool_name] = tool_func
+try:
+    # Import the specific tools we want to test
+    from mcp_server import retrieve_odoo_documentation, advanced_search, search_records, create_record, update_record, delete_record, execute_method, export_records_to_csv, import_records_from_csv, export_related_records_to_csv, import_related_records_from_csv, validate_field_value
+    
+    # Add the tools to our dictionary
+    tools['retrieve_odoo_documentation'] = retrieve_odoo_documentation
+    tools['advanced_search'] = advanced_search
+    tools['search_records'] = search_records
+    tools['create_record'] = create_record
+    tools['update_record'] = update_record
+    tools['delete_record'] = delete_record
+    tools['execute_method'] = execute_method
+    tools['export_records_to_csv'] = export_records_to_csv
+    tools['import_records_from_csv'] = import_records_from_csv
+    tools['export_related_records_to_csv'] = export_related_records_to_csv
+    tools['import_related_records_from_csv'] = import_related_records_from_csv
+    tools['validate_field_value'] = validate_field_value
+    
+except Exception as e:
+    logger.error(f"Error getting tools from MCP server: {str(e)}")
+    tools = {}
 
 logger.info(f"Loaded {len(tools)} tools from MCP server: {', '.join(tools.keys())}")
 
@@ -121,4 +140,4 @@ async def health_check():
 
 if __name__ == "__main__":
     logger.info("Starting standalone MCP server...")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)

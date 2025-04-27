@@ -1,0 +1,20 @@
+# Core dependencies
+pydantic>=2.0.0
+fastapi>=0.100.0
+uvicorn>=0.22.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+mcp>=0.1.0
+sqlparse>=0.4.4
+
+# Database dependencies
+pandas>=1.5.0,<2.0.0  # Using pandas 1.x for compatibility
+psycopg2-binary>=2.9.5
+
+# RAG tool dependencies
+sentence-transformers>=2.2.2
+faiss-cpu>=1.7.4
+beautifulsoup4>=4.12.2
+markdown>=3.4.3
+gitpython>=3.1.30
+numpy>=1.26.0,<2.0.0  # Using numpy 1.x for compatibility with other packages

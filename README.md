@@ -41,6 +41,7 @@ A robust integration server that connects MCP (Master Control Program) with Odoo
 - **Performance Optimization**: Caching and resource usage optimization
 - **Monitoring**: Built-in monitoring capabilities for tracking performance
 - **Comprehensive Documentation**: API docs, setup guides, and troubleshooting information
+- **Odoo Documentation Retrieval**: RAG-based retrieval of information from the official Odoo 18 documentation
 
 ## Installation
 
@@ -328,6 +329,7 @@ Once you've configured Claude Desktop, you can use the Odoo 18 MCP integration:
 | **export_related_records_to_csv** | Export parent-child records to CSV | `/tool export_related_records_to_csv parent_model=account.move child_model=account.move.line relation_field=move_id move_type=out_invoice export_path="./tmp/customer_invoices.csv"` | ✅ Working |
 | **import_related_records_from_csv** | Import parent-child records from CSV | `/tool import_related_records_from_csv parent_model=account.move child_model=account.move.line relation_field=move_id import_path="./tmp/customer_invoices.csv" reset_to_draft=true skip_readonly_fields=true` | ✅ Working |
 | **advanced_search** | Perform advanced natural language search | `/tool advanced_search query="List all unpaid bills with respect of vendor details" limit=10` | ✅ Working |
+| **retrieve_odoo_documentation** | Retrieve information from Odoo 18 documentation | `/tool retrieve_odoo_documentation query="How to create a custom module in Odoo 18" max_results=5` | ✅ Working |
 | **validate_field_value** | Validate a field value for a model | `/tool validate_field_value model_name=res.partner field_name=email value="test@example.com"` | ✅ Working |
 
 #### Available Prompts
@@ -343,6 +345,7 @@ Once you've configured Claude Desktop, you can use the Odoo 18 MCP integration:
 | **crm_lead_export_import_prompt** | Get guidance for CRM lead export/import | `/prompt crm_lead_export_import_prompt` |
 | **invoice_export_import_prompt** | Get guidance for invoice export/import | `/prompt invoice_export_import_prompt` |
 | **related_records_export_import_prompt** | Get guidance for related records export/import | `/prompt related_records_export_import_prompt` |
+| **odoo_documentation_prompt** | Get guidance for retrieving Odoo documentation | `/prompt odoo_documentation_prompt` |
 
 ## Usage
 
@@ -747,6 +750,40 @@ Create a `.vscode/settings.json` file:
 2. Configure the Python interpreter to use your virtual environment
 3. Set up the environment variables from your `.env` file
 4. Configure code formatting to use Black
+
+## Odoo Documentation RAG Tool
+
+We've implemented a powerful Retrieval Augmented Generation (RAG) tool for accessing Odoo 18 documentation:
+
+1. **Documentation Repository Integration**: The tool clones and processes the official Odoo 18 documentation repository (https://github.com/odoo/documentation/tree/18.0) to extract relevant content.
+
+2. **Semantic Search**: Using sentence-transformers and FAISS vector database, the tool provides semantic search capabilities for finding relevant documentation based on natural language queries.
+
+3. **Chunking and Processing**: The documentation is processed and chunked into manageable segments with proper metadata extraction for improved retrieval.
+
+4. **MCP Integration**: The RAG tool is fully integrated with the MCP server, providing a new `retrieve_odoo_documentation` tool and `odoo_documentation_prompt` for Claude Desktop.
+
+5. **Comprehensive Results**: Search results include relevant documentation sections with source information and context.
+
+6. **Persistent Storage**: The tool uses persistent storage for embeddings and processed documentation, making subsequent queries faster.
+
+7. **Automatic Updates**: The tool can update the documentation repository to ensure the latest information is available.
+
+8. **Error Handling**: Comprehensive error handling ensures the tool works reliably even when dependencies are missing or the documentation repository is unavailable.
+
+9. **Dependency Management**: The tool handles dependencies gracefully, with proper error messages when required packages are missing.
+
+10. **Test Script**: A test script (`test_odoo_docs_rag.py`) is provided to verify the functionality works correctly with various query types.
+
+### Example Usage
+
+Using the MCP tool in Claude Desktop:
+
+```
+/tool retrieve_odoo_documentation query="How to create a custom module in Odoo 18" max_results=5
+```
+
+This will return relevant sections from the Odoo 18 documentation about creating custom modules, with source information and context.
 
 ## Recent Improvements and Fixes
 

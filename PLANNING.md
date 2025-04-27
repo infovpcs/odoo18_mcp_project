@@ -21,6 +21,7 @@ This project aims to create a robust integration server that connects MCP (Maste
    - Related records export/import ✅
    - Field mapping and transformation ✅
    - CSV handling and processing ✅
+   - Odoo documentation retrieval (RAG) ✅
 
 2. **Odoo 18 Connector**
    - XML-RPC client implementation ✅
@@ -72,6 +73,12 @@ odoo18-mcp-project/
 │   │       ├── field_analyzer.py   # Field analysis
 │   │       ├── crud_generator.py   # CRUD operations
 │   │       └── nlp_analyzer.py     # NLP-based analysis
+│   ├── odoo_docs_rag/       # Odoo documentation RAG tool
+│   │   ├── __init__.py
+│   │   ├── docs_retriever.py      # Main retrieval functionality
+│   │   ├── docs_processor.py      # Documentation processing
+│   │   ├── embedding_engine.py    # Embedding and vector storage
+│   │   └── utils.py               # Utility functions
 │   └── core/
 │       ├── __init__.py
 │       ├── config.py        # Configuration management
@@ -245,6 +252,28 @@ odoo18-mcp-project/
    - Execute searches across multiple models ✅
    - Format results in a user-friendly way ✅
    - Handle complex multi-model queries ✅
+
+### Odoo Documentation RAG Tool
+1. **Documentation Processing**
+   - Clone and process Odoo 18 documentation repository ✅
+   - Extract text from Markdown and HTML files ✅
+   - Chunk text into manageable segments ✅
+   - Extract metadata from file paths and content ✅
+   - Handle documentation updates ✅
+
+2. **Embedding and Vector Storage**
+   - Generate embeddings using sentence-transformers ✅
+   - Store embeddings in FAISS vector database ✅
+   - Implement efficient similarity search ✅
+   - Persist index and documents for reuse ✅
+   - Handle model loading and initialization ✅
+
+3. **Retrieval and Integration**
+   - Implement semantic search for documentation ✅
+   - Format search results with context ✅
+   - Integrate with MCP server as a tool ✅
+   - Provide prompt for documentation queries ✅
+   - Handle error cases and fallbacks ✅
 
 ## Performance Goals
 - Response time < 200ms ✅

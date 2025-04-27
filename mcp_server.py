@@ -31,6 +31,19 @@ try:
     # Import the advanced search implementation
     from advanced_search import AdvancedSearch
 
+    # Import the Odoo documentation retriever
+    try:
+        from src.odoo_docs_rag import OdooDocsRetriever
+        odoo_docs_retriever_available = True
+        logger.info("Odoo documentation retriever imported successfully")
+    except ImportError as e:
+        logger.warning(f"Odoo documentation retriever not available. Import error: {e}")
+        logger.warning("Install the required dependencies: sentence-transformers, faiss-cpu, beautifulsoup4, markdown, gitpython")
+        odoo_docs_retriever_available = False
+    except Exception as e:
+        logger.error(f"Error importing Odoo documentation retriever: {e}")
+        odoo_docs_retriever_available = False
+
     from mcp.server.fastmcp import FastMCP, Context, Image
 
     # Load environment variables
@@ -275,6 +288,43 @@ try:
         logger.error(f"Failed to initialize Odoo model discovery: {str(e)}")
         model_discovery = None
         advanced_search_instance = None
+        
+    # Initialize Odoo documentation retriever
+    odoo_docs_retriever_instance = None
+    if odoo_docs_retriever_available:
+        try:
+            # Use a directory in the project for storing the documentation
+            docs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "odoo_docs")
+            index_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "odoo_docs_index")
+            
+            # Create directories if they don't exist
+            os.makedirs(docs_dir, exist_ok=True)
+            os.makedirs(index_dir, exist_ok=True)
+            
+            logger.info(f"Initializing Odoo documentation retriever with docs_dir={docs_dir}, index_dir={index_dir}")
+            
+            # Check if the required dependencies are available
+            try:
+                import sentence_transformers
+                import faiss
+                import bs4
+                import markdown
+                import git
+                logger.info("All required dependencies for Odoo documentation retriever are available")
+                
+                odoo_docs_retriever_instance = OdooDocsRetriever(
+                    docs_dir=docs_dir,
+                    index_dir=index_dir,
+                    force_rebuild=False  # Set to True to force rebuilding the index
+                )
+                logger.info("Odoo documentation retriever initialized successfully")
+            except ImportError as e:
+                logger.warning(f"Missing dependency for Odoo documentation retriever: {e}")
+                logger.warning("Install the required dependencies: sentence-transformers, faiss-cpu, beautifulsoup4, markdown, gitpython")
+                odoo_docs_retriever_instance = None
+        except Exception as e:
+            logger.error(f"Failed to initialize Odoo documentation retriever: {str(e)}")
+            odoo_docs_retriever_instance = None
 
     # Create the MCP server
     mcp = FastMCP(
@@ -1706,6 +1756,27 @@ Please help me by:
 
 7. Helping me understand and fix any import errors"""
 
+    # Add a prompt for Odoo documentation retrieval
+    @mcp.prompt()
+    def odoo_documentation_prompt() -> str:
+        """Create a prompt for retrieving information from Odoo documentation."""
+        return """I need to find information in the Odoo 18 documentation.
+
+Please help me by:
+1. Using the retrieve_odoo_documentation tool to search for relevant information
+2. Explaining the results and providing context
+3. Suggesting related topics if needed
+
+Examples of queries I can use:
+- "How to create a custom module in Odoo 18"
+- "Odoo 18 ORM API reference"
+- "Odoo 18 view inheritance"
+- "How to implement a wizard in Odoo 18"
+- "Odoo 18 security and access rights"
+- "Odoo 18 report creation"
+- "Odoo 18 field types and attributes"
+"""
+
     # Add a prompt for related records export/import
     @mcp.prompt()
     def related_records_export_import_prompt() -> str:
@@ -1749,6 +1820,32 @@ Please help me by:
 7. Helping me understand and fix any import errors
 
 This approach is much more efficient than exporting and importing parent and child records separately, as it automatically maintains the relationships between them."""
+
+    # Tool for retrieving Odoo documentation
+    @mcp.tool()
+    def retrieve_odoo_documentation(query: str, max_results: int = 5) -> str:
+        """Retrieve information from Odoo 18 documentation based on a query.
+
+        This tool searches the official Odoo 18 documentation repository and returns
+        relevant information based on your query. It uses semantic search to find
+        the most relevant documentation sections.
+
+        Args:
+            query: The query to search for in the Odoo documentation
+            max_results: Maximum number of results to return (default: 5)
+
+        Returns:
+            A formatted string with the search results from the Odoo documentation
+        """
+        if not odoo_docs_retriever_available or not odoo_docs_retriever_instance:
+            return "# Error: Odoo Documentation Retriever Not Available\n\nThe Odoo documentation retriever is not available. Please make sure the required dependencies are installed."
+
+        try:
+            # Query the documentation
+            return odoo_docs_retriever_instance.query(query, max_results=max_results)
+        except Exception as e:
+            logger.error(f"Error retrieving Odoo documentation: {str(e)}")
+            return f"# Error Retrieving Odoo Documentation\n\n{str(e)}"
 
     # Tool for validating and converting field values
     @mcp.tool()

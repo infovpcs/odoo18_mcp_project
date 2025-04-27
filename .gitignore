@@ -5,12 +5,20 @@ __pycache__/
 *.so
 .Python
 build/
+develop-eggs/
 dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
 wheels/
 *.egg-info/
+.installed.cfg
 *.egg
-EGGS/
-.eggs/
 
 # Virtual environments
 .venv
@@ -58,3 +66,10 @@ local_settings.py
 # Temporary files
 tmp/
 temp/
+
+# Exports
+exports/
+
+# Odoo Documentation RAG
+odoo_docs/
+odoo_docs_index/

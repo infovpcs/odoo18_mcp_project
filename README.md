@@ -127,7 +127,7 @@ Add the following to the `servers` section:
     "odoo18-mcp":{
         "name": "Odoo 18 Integration",
         "description": "Dynamic Odoo 18 integration with MCP",
-        "command": "python",
+        "command": "/full/path/to/your/python",
         "args": ["/Users/vinusoft85/workspace/odoo18_mcp_project/mcp_server.py"],
         "env": {
                 "ODOO_URL": "http://localhost:8069",
@@ -138,6 +138,8 @@ Add the following to the `servers` section:
     }
 }
 ```
+
+**Important**: Replace `/full/path/to/your/python` with the actual full path to your Python executable. You can find this by running `which python3` in your terminal. For example, if you're using a virtual environment, it might be something like `/Users/username/workspace/odoo18_mcp_project/.venv/bin/python3`.
 
 4. Restart Claude Desktop to apply the changes.
 
@@ -1022,6 +1024,11 @@ uv pip install -e .
 
 - **Issue**: The Odoo 18 Integration server doesn't appear in Claude Desktop
 - **Solution**: Verify that the MCP server is properly installed and enabled in the Claude Desktop configuration. Restart Claude Desktop after making changes to the configuration.
+
+#### "spawn python ENOENT" Error in Claude Desktop
+
+- **Issue**: Error message "spawn python ENOENT" in Claude Desktop logs
+- **Solution**: This error occurs when Claude Desktop can't find the Python executable. Update the Claude Desktop configuration to use the full path to your Python executable instead of just "python". For example, use "/Users/username/workspace/odoo18_mcp_project/.venv/bin/python3" instead of "python". You can find the full path by running `which python3` in your terminal.
 
 #### Model Not Found
 

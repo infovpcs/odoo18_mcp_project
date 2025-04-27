@@ -13,8 +13,9 @@ psycopg2-binary>=2.9.5
 
 # RAG tool dependencies
 sentence-transformers>=2.2.2
+torch>=2.2.0,<=2.2.2  # Specify a compatible PyTorch version
 faiss-cpu>=1.7.4
 beautifulsoup4>=4.12.2
 markdown>=3.4.3
 gitpython>=3.1.30
-numpy>=1.26.0,<2.0.0  # Using numpy 1.x for compatibility with other packages
+numpy>=1.26.0,<2.0.0  # Using numpy 1.x for compatibility with Python 3.12

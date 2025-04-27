@@ -7,7 +7,7 @@ name = "odoo18-mcp-integration"
 version = "0.1.0"
 description = "Dynamic Odoo 18 integration with MCP"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
     {name = "Veracious Perfect CS Pvt Ltd", email = "info@vperfectcs.com"}
@@ -17,8 +17,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -31,9 +29,11 @@ dependencies = [
     "requests>=2.31.0",
     "mcp>=0.1.0",
     "sqlparse>=0.4.4",
-    "pandas>=1.5.0",
+    "pandas>=2.0.0",  # Using pandas 2.x for compatibility with Python 3.12
+    "numpy>=1.26.0,<2.0.0",  # Using numpy 1.x for compatibility with Python 3.12
     "psycopg2-binary>=2.9.5",
     "sentence-transformers>=2.2.2",
+    "torch>=2.2.0,<=2.2.2",  # Specify a compatible PyTorch version
     "faiss-cpu>=1.7.4",
     "beautifulsoup4>=4.12.2",
     "markdown>=3.4.3",
@@ -58,7 +58,7 @@ cli = [
 
 [tool.black]
 line-length = 88
-target-version = ["py38", "py39", "py310", "py311", "py312"]
+target-version = ["py310", "py311", "py312"]
 include = '\.pyi?$'
 
 [tool.isort]
@@ -66,7 +66,7 @@ profile = "black"
 multi_line_output = 3
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

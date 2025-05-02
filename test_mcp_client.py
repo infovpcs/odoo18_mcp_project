@@ -1,159 +1,126 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Test MCP Client
 
-This script tests the MCP server by making requests to it.
+"""
+Test script for the MCP client.
 """
 
-import requests
-import json
 import sys
+import json
+import requests
+from typing import Dict, Any, List, Optional
 
 # MCP server URL
-MCP_URL = "http://localhost:8080"
-
-def make_request(endpoint, data=None):
-    """Make a request to the MCP server.
-    
-    Args:
-        endpoint: API endpoint
-        data: Request data
-        
-    Returns:
-        Response from the MCP server
-    """
-    url = f"{MCP_URL}{endpoint}"
-    
-    try:
-        if data:
-            response = requests.post(url, json=data)
-        else:
-            response = requests.get(url)
-        
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error making request: {str(e)}")
-        raise
-
-def test_list_resources():
-    """Test listing resources."""
-    print("\n=== Testing List Resources ===")
-    
-    try:
-        response = make_request("/resources")
-        
-        print(f"Found {len(response)} resources:")
-        for resource in response:
-            print(f"  - {resource['uri']}")
-    except Exception as e:
-        print(f"Error: {str(e)}")
-
-def test_read_resource(uri):
-    """Test reading a resource.
-    
-    Args:
-        uri: Resource URI
-    """
-    print(f"\n=== Testing Read Resource: {uri} ===")
-    
-    try:
-        response = make_request(f"/resources/read", {"uri": uri})
-        
-        print("Resource content:")
-        print(response.get("content", "No content"))
-    except Exception as e:
-        print(f"Error: {str(e)}")
+MCP_URL = "http://127.0.0.1:6274"  # This is the MCP Inspector URL from your logs
 
 def test_list_tools():
-    """Test listing tools."""
-    print("\n=== Testing List Tools ===")
-    
+    """Test listing all available tools."""
     try:
-        response = make_request("/tools")
-        
-        print(f"Found {len(response)} tools:")
-        for tool in response:
-            print(f"  - {tool['name']}: {tool['description']}")
+        response = requests.get(f"{MCP_URL}/api/tools")
+        if response.status_code == 200:
+            data = response.json()
+            print("Available tools:")
+            for tool in data:
+                print(f"- {tool['name']}: {tool['description']}")
+            return True
+        else:
+            print(f"Error: {response.status_code} - {response.text}")
+            return False
     except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"Error connecting to MCP server: {str(e)}")
+        return False
 
-def test_call_tool(name, params):
-    """Test calling a tool.
-    
-    Args:
-        name: Tool name
-        params: Tool parameters
-    """
-    print(f"\n=== Testing Call Tool: {name} ===")
-    
+def test_list_resources():
+    """Test listing all available resources."""
     try:
-        response = make_request("/tools/call", {
-            "name": name,
-            "params": params
-        })
-        
-        print("Tool response:")
-        print(response.get("content", "No content"))
+        response = requests.get(f"{MCP_URL}/api/resources")
+        if response.status_code == 200:
+            data = response.json()
+            print("Available resources:")
+            for resource in data:
+                print(f"- {resource['uri']}")
+            return True
+        else:
+            print(f"Error: {response.status_code} - {response.text}")
+            return False
     except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"Error connecting to MCP server: {str(e)}")
+        return False
 
-def test_list_prompts():
-    """Test listing prompts."""
-    print("\n=== Testing List Prompts ===")
-    
+def test_call_tool(tool_name: str, params: Dict[str, Any]):
+    """Test calling a specific tool."""
     try:
-        response = make_request("/prompts")
-        
-        print(f"Found {len(response)} prompts:")
-        for prompt in response:
-            print(f"  - {prompt['name']}: {prompt['description']}")
+        payload = {
+            "name": tool_name,
+            "parameters": params
+        }
+        response = requests.post(f"{MCP_URL}/api/tools/call", json=payload)
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Tool {tool_name} result:")
+            print(data.get("result", "No result"))
+            return True
+        else:
+            print(f"Error: {response.status_code} - {response.text}")
+            return False
     except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"Error calling tool: {str(e)}")
+        return False
 
-def test_get_prompt(name, params):
-    """Test getting a prompt.
-    
-    Args:
-        name: Prompt name
-        params: Prompt parameters
-    """
-    print(f"\n=== Testing Get Prompt: {name} ===")
-    
+def test_read_resource(resource_uri: str):
+    """Test reading a specific resource."""
     try:
-        response = make_request("/prompts/get", {
-            "name": name,
-            "params": params
-        })
+        # URL encode the resource URI
+        import urllib.parse
+        encoded_uri = urllib.parse.quote(resource_uri)
         
-        print("Prompt content:")
-        print(response.get("content", "No content"))
+        response = requests.get(f"{MCP_URL}/api/resources/{encoded_uri}")
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Resource {resource_uri} content:")
+            print(data.get("content", "No content"))
+            return True
+        else:
+            print(f"Error: {response.status_code} - {response.text}")
+            return False
     except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"Error reading resource: {str(e)}")
+        return False
 
 def main():
     """Main function."""
-    print("=== MCP Client Test ===")
-    
-    # Test listing resources
-    test_list_resources()
-    
-    # Test reading resources
-    test_read_resource("https://example.com/hello")
+    print("Testing MCP client...")
     
     # Test listing tools
+    print("\n=== Testing List Tools ===")
     test_list_tools()
     
-    # Test calling tools
-    test_call_tool("echo", {
-        "message": "Hello, MCP!"
+    # Test listing resources
+    print("\n=== Testing List Resources ===")
+    test_list_resources()
+    
+    # Test calling search_records tool
+    print("\n=== Testing search_records Tool ===")
+    test_call_tool("search_records", {
+        "model_name": "res.partner",
+        "query": "company"
     })
     
-    # Test listing prompts
-    test_list_prompts()
+    # Test calling advanced_search tool
+    print("\n=== Testing advanced_search Tool ===")
+    test_call_tool("advanced_search", {
+        "query": "List all customers"
+    })
     
-    print("\n=== Test completed successfully ===")
+    # Test reading models resource
+    print("\n=== Testing Read Models Resource ===")
+    test_read_resource("odoo://models/all")
+    
+    # Test reading model metadata resource
+    print("\n=== Testing Read Model Metadata Resource ===")
+    test_read_resource("odoo://model/res.partner/metadata")
+    
+    print("\nTests completed!")
 
 if __name__ == "__main__":
     main()

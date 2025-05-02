@@ -1048,6 +1048,42 @@ If you encounter issues not covered in this troubleshooting guide, please:
 2. Review the Odoo documentation for the specific model or operation
 3. Open an issue on the GitHub repository with detailed information about the problem
 
+## Export/Import CLI Tool
+
+Use `scripts/dynamic_data_tool.py` for dynamic, multi-model export and import:
+
+```bash
+# Export any model:
+python3 scripts/dynamic_data_tool.py export \
+  --model account.move \
+  --output /tmp/export.csv
+
+# Import any model:
+python3 scripts/dynamic_data_tool.py import \
+  --model account.move \
+  --input /tmp/import.csv \
+  --name-prefix IMPORTED
+
+# Export related models (e.g., invoices and lines):
+python3 scripts/dynamic_data_tool.py export-rel \
+  --parent-model account.move \
+  --child-model account.move.line \
+  --relation-field move_id \
+  --output /tmp/export-rel.csv
+
+# Import related models:
+python3 scripts/dynamic_data_tool.py import-rel \
+  --parent-model account.move \
+  --child-model account.move.line \
+  --relation-field move_id \
+  --parent-fields name,date,move_type,partner_id \
+  --child-fields account_id,product_id,quantity,price_unit \
+  --input /tmp/export-rel.csv \
+  --name-prefix IMPORTED
+```
+
+**Deprecated scripts**: `scripts/clean_import_csv.py`, `scripts/dynamic_export_import.py`, `direct_export_import.py`. Use `scripts/dynamic_data_tool.py` exclusively.
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.

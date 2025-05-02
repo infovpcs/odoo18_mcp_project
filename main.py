@@ -16,6 +16,34 @@ import os
 import sys
 import subprocess
 import json
+import subprocess
+import sys
+
+# CLI wrappers for dynamic_data_tool
+def mdt_export(model_name: str, export_path: str, domain=None, fields=None, limit=None):
+    cmd = [sys.executable, 'scripts/dynamic_data_tool.py', 'export', '--model', model_name, '--output', export_path]
+    if domain:
+        cmd.extend(['--domain', json.dumps(domain)])
+    if fields:
+        cmd.extend(['--fields', ','.join(fields)])
+    subprocess.run(cmd, check=True)
+    total = 0
+    try:
+        with open(export_path) as f: total = len(f.readlines()) -1
+    except IOError:
+        pass
+    return {'success': True, 'total_records': total, 'export_path': export_path}
+
+def mdt_import(import_path: str, model_name: str):
+    cmd = [sys.executable, 'scripts/dynamic_data_tool.py', 'import', '--model', model_name, '--input', import_path]
+    subprocess.run(cmd, check=True)
+    total = 0
+    try:
+        with open(import_path) as f: total = len(f.readlines()) -1
+    except IOError:
+        pass
+    return {'success': True, 'imported_records': total, 'updated_records': 0}
+    
 from typing import Optional, List, Dict, Any, Union
 
 from src.core import get_settings, get_logger

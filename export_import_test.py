@@ -22,9 +22,9 @@ ODOO_PASSWORD = os.environ.get('ODOO_PASSWORD', 'admin')
 def connect_to_odoo():
     """Connect to Odoo server."""
     try:
-        common = xmlrpc.client.ServerProxy(f'{ODOO_URL}/xmlrpc/2/common')
+        common = xmlrpc.client.ServerProxy(f'{ODOO_URL}/xmlrpc/2/common', allow_none=True)
         uid = common.authenticate(ODOO_DB, ODOO_USER, ODOO_PASSWORD, {})
-        models = xmlrpc.client.ServerProxy(f'{ODOO_URL}/xmlrpc/2/object')
+        models = xmlrpc.client.ServerProxy(f'{ODOO_URL}/xmlrpc/2/object', allow_none=True)
         return uid, models
     except Exception as e:
         logger.error(f"Error connecting to Odoo: {str(e)}")

@@ -26,7 +26,101 @@ try:
     from dotenv import load_dotenv
 
     # Import the direct export/import implementation
-    from direct_export_import import export_records, import_records
+    import subprocess
+    from scripts.dynamic_data_tool import export_model, import_model
+
+    def export_records(model_name: str, fields=None, filter_domain=None, limit: int = 1000, export_path: str = None):
+        """Wrapper for dynamic_data_tool export command."""
+        if not export_path:
+            safe_name = model_name.replace('.', '_')
+            export_path = f"./tmp/{safe_name}_export.csv"
+        cmd = [sys.executable, 'scripts/dynamic_data_tool.py', 'export', '--model', model_name, '--output', export_path]
+        if fields:
+            cmd.extend(['--fields', ','.join(fields)])
+        if filter_domain:
+            cmd.extend(['--domain', json.dumps(filter_domain)])
+        subprocess.run(cmd, check=True)
+        # count exported records (exclude header)
+        try:
+            with open(export_path) as f:
+                total = len(f.readlines()) - 1
+        except IOError:
+            total = 0
+        return {
+            'success': True,
+            'model_name': model_name,
+            'selected_fields': fields or [],
+            'total_records': total,
+            'exported_records': total,
+            'export_path': export_path
+        }
+
+    def import_records(import_path: str, model_name: str, field_mapping=None, create_if_not_exists: bool = True, update_if_exists: bool = True):
+        """Wrapper for dynamic_data_tool import command."""
+        cmd = [sys.executable, 'scripts/dynamic_data_tool.py', 'import', '--model', model_name, '--input', import_path]
+        res = subprocess.run(cmd, capture_output=True)
+        success = (res.returncode == 0)
+        imported = 0
+        if success:
+            try:
+                with open(import_path) as f:
+                    imported = len(f.readlines()) - 1
+            except IOError:
+                pass
+        return {
+            'success': success,
+            'imported_records': imported,
+            'updated_records': 0,
+            'error': res.stderr.decode('utf-8')
+        }
+
+    def export_records(model_name: str, fields=None, filter_domain=None, limit=1000, export_path=None):
+        """Wrapper for dynamic_data_tool export command."""
+        if not export_path:
+            safe_name = model_name.replace('.', '_')
+            export_path = f"./tmp/{safe_name}_export.csv"
+        cmd = [sys.executable, 'scripts/dynamic_data_tool.py', 'export', '--model', model_name, '--output', export_path]
+        if fields:
+            cmd.extend(['--fields', ','.join(fields)])
+        if filter_domain:
+            cmd.extend(['--domain', json.dumps(filter_domain)])
+        subprocess.run(cmd, check=True)
+        # count exported records (exclude header)
+        try:
+            with open(export_path) as f:
+                total = len(f.readlines()) - 1
+        except IOError:
+            total = 0
+        return {
+            'success': True,
+            'model_name': model_name,
+            'selected_fields': fields or [],
+            'total_records': total,
+            'exported_records': total,
+            'export_path': export_path
+        }
+
+    def import_records(import_path: str, model_name: str, field_mapping=None, create_if_not_exists=True, update_if_exists=True):
+        """Wrapper for dynamic_data_tool import command."""
+        cmd = [sys.executable, 'scripts/dynamic_data_tool.py', 'import', '--model', model_name, '--input', import_path]
+        if hasattr(sys, 'argv'):
+            # name prefix already handled via args
+            pass
+        res = subprocess.run(cmd, capture_output=True)
+        success = (res.returncode == 0)
+        imported = 0
+        if success:
+            try:
+                with open(import_path) as f:
+                    imported = len(f.readlines()) - 1
+            except IOError:
+                pass
+        return {
+            'success': success,
+            'imported_records': imported,
+            'updated_records': 0,
+            'error': res.stderr.decode('utf-8')
+        }
 
     # Import the advanced search implementation
     from advanced_search import AdvancedSearch

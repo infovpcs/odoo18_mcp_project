@@ -1,5 +1,7 @@
 # Odoo 18 MCP Integration (18.0 Branch)
 
+Last Updated: 2025-05-02
+
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Odoo 18.0](https://img.shields.io/badge/odoo-18.0-green.svg)](https://www.odoo.com/)
 [![MCP SDK](https://img.shields.io/badge/mcp-sdk-purple.svg)](https://github.com/modelcontextprotocol/python-sdk)
@@ -694,7 +696,26 @@ python dynamic_model_test.py      # Dynamic model test
 python test_mcp_functions.py      # Test MCP server functions directly
 python test_mcp_tools.py          # Test MCP server tools via HTTP
 python test_advanced_search.py    # Test advanced search functionality
+python comprehensive_test.py      # Comprehensive test of all MCP server tools
 ```
+
+#### Comprehensive Testing
+
+We've created a comprehensive test script (`comprehensive_test.py`) that tests all MCP server tools directly, without requiring the MCP server to be running. This script:
+
+1. Tests all MCP server tools directly by importing the functions from `mcp_server.py`
+2. Includes specific test cases for each tool with expected inputs and outputs
+3. Handles error cases and edge cases
+4. Tests export/import functionality using the `dynamic_data_tool.py` script
+5. Validates that all tools work correctly with Odoo 18
+
+To run the comprehensive test:
+
+```bash
+python comprehensive_test.py
+```
+
+This will test all MCP server tools and report any issues. The test script is designed to be robust and handle various error conditions, making it ideal for validating the MCP server functionality.
 
 ### Test Results
 
@@ -726,6 +747,9 @@ We've thoroughly tested all MCP server functionality to ensure it works correctl
 | `analyze_field_importance` | Analyze partner fields | Field importance table | Field importance table | ✅ Passed |
 | `get_field_groups` | Group product fields | Grouped fields | Grouped fields by purpose | ✅ Passed |
 | `advanced_search` | Natural language query | Formatted search results | Formatted search results | ✅ Passed |
+| `export_records_to_csv` | Export partners to CSV | CSV file created | CSV file created with records | ✅ Passed |
+| `import_records_from_csv` | Import partners from CSV | Records imported | Records imported successfully | ✅ Passed |
+| `retrieve_odoo_documentation` | Query Odoo documentation | Relevant documentation | Relevant documentation sections | ✅ Passed |
 
 #### Test Output Example
 
@@ -741,6 +765,37 @@ We've thoroughly tested all MCP server functionality to ensure it works correctl
   "success": true,
   "result": "{\n  \"product_tmpl_id\": false,\n  \"name\": \"\",\n  \"type\": \"consu\",\n  \"service_tracking\": \"no\",\n  \"categ_id\": false,\n  \"uom_id\": false,\n  \"uom_po_id\": false,\n  \"product_variant_ids\": false,\n  \"tracking\": \"serial\",\n  \"default_code\": \"\",\n  \"code\": \"\",\n  \"list_price\": 0.0\n}"
 }
+```
+
+#### Comprehensive Test Output
+
+The comprehensive test script (`comprehensive_test.py`) provides detailed output for each test case:
+
+```
+Running comprehensive tests for MCP server...
+
+=== Testing search_records ===
+Test case 1: {'model_name': 'res.partner', 'query': 'company'}
+Result: # Search Results for 'company' in res.partner
+
+| ID | Name | Email | Phone |
+|----| ---- | ---- | ---- |
+| 44 | IN Company | info@company.inexample.com | +91 81234 56789 |
+| 67 | Library Demo Company ...
+✅ Test passed!
+
+=== Testing create_record ===
+Test case: {'model_name': 'res.partner', 'values': {'name': 'Test Partner 1746188702', 'email': 'test@example.com', 'phone': '+1 555-123-4567'}}
+Result: Record created successfully with ID: 100
+✅ Test passed!
+
+=== Testing export_records_to_csv ===
+Running command: /Users/vinusoft85/workspace/odoo18_mcp_project/.venv/bin/python scripts/dynamic_data_tool.py export --model res.partner --output ./tmp/test_export.csv
+Return code: 0
+Output: Exported 61 records to ./tmp/test_export.csv
+✅ Test passed!
+
+All tests completed!
 ```
 
 ### Code Formatting
@@ -967,6 +1022,32 @@ We've made several improvements to the MCP server to ensure all tools work corre
 6. **Documentation updates**: Updated documentation with dependency management best practices.
 
 ## Troubleshooting
+
+### MCP Server Testing
+
+If you're having issues with the MCP server, you can use the comprehensive test script to diagnose problems:
+
+#### Testing MCP Server Functions Directly
+
+```bash
+python comprehensive_test.py
+```
+
+This will test all MCP server functions directly, without requiring the MCP server to be running. If any tests fail, the script will provide detailed error information.
+
+#### Common MCP Server Issues
+
+- **Issue**: MCP Inspector "Connect" button doesn't work
+- **Solution**: This is likely due to permission issues with the `uv` command. Instead of using the Connect button, start the MCP server directly with `mcp dev mcp_server.py` and test it using the provided test scripts.
+
+- **Issue**: Export/Import operations fail with field validation errors
+- **Solution**: Some fields like `peppol_eas` and `autopost_bills` have strict validation requirements. Use a simplified CSV format with only essential fields for import operations.
+
+- **Issue**: MCP server starts but tools don't work
+- **Solution**: Run the comprehensive test script to identify which tools are failing and why. The script provides detailed error information for each tool.
+
+- **Issue**: MCP server shows "Error in /stdio route: Error: spawn /usr/local/Cellar/uv EACCES"
+- **Solution**: This is a permission issue with the `uv` command. Make sure the `uv` command is executable and in your PATH. You can also try running the MCP server directly with `python mcp_server.py` instead of using the MCP Inspector.
 
 ### Dependency Management
 

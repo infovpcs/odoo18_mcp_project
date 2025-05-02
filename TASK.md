@@ -1,5 +1,7 @@
 # Odoo 18 Integration MCP Server - Tasks
 
+Last Updated: 2025-05-02
+
 ## Phase 1: Project Setup and Basic Infrastructure
 - [x] Initialize project structure (2023-12-20)
 - [x] Set up development environment
@@ -92,6 +94,18 @@
 - [x] Create prompt for documentation retrieval
 - [x] Add test script for documentation retrieval
 - [x] Update documentation with new functionality
+
+## Phase 11: MCP Server Testing and Fixes (2025-05-02)
+- [x] Create comprehensive test script for MCP server tools
+- [x] Fix update_record test case to handle different success messages
+- [x] Fix retrieve_odoo_documentation test for "Odoo 18 view inheritance"
+- [x] Create test for export_records_to_csv using dynamic_data_tool.py
+- [x] Create test for import_records_from_csv using dynamic_data_tool.py
+- [x] Fix import test to handle problematic fields like peppol_eas and autopost_bills
+- [x] Create simplified CSV format for import tests
+- [x] Add proper error handling for import/export tests
+- [x] Test MCP server with Claude Desktop integration
+- [x] Document MCP server testing process
 
 ## Discovered During Work
 - [x] Fix Python version compatibility issues (2025-04-27)
@@ -292,3 +306,13 @@
 - [x] Add support for different Odoo versions in query_parser.py (2025-05-03)
 - [x] Enhance date and state filter handling with field validation (2025-05-03)
 - [x] Update parse_complex_query to use dynamic model discovery (2025-05-03)
+- [x] Create comprehensive test script for MCP server tools (2025-05-02)
+- [x] Fix update_record test case to handle different success messages (2025-05-02)
+- [x] Fix retrieve_odoo_documentation test for "Odoo 18 view inheritance" (2025-05-02)
+- [x] Create test for export_records_to_csv using dynamic_data_tool.py (2025-05-02)
+- [x] Create test for import_records_from_csv using dynamic_data_tool.py (2025-05-02)
+- [x] Fix import test to handle problematic fields like peppol_eas and autopost_bills (2025-05-02)
+- [x] Create simplified CSV format for import tests (2025-05-02)
+- [x] Add proper error handling for import/export tests (2025-05-02)
+- [x] Test MCP server with Claude Desktop integration (2025-05-02)
+- [x] Document MCP server testing process (2025-05-02)

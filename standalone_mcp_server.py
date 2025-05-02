@@ -141,7 +141,7 @@ async def health_check():
 if __name__ == "__main__":
     # Get host and port from environment variables
     host = os.environ.get("MCP_HOST", "0.0.0.0")
-    port = int(os.environ.get("MCP_PORT", 8000))
+    port = 8001  # Explicitly set to 8001
 
     logger.info(f"Starting standalone MCP server at {host}:{port}")
     uvicorn.run(app, host=host, port=port)

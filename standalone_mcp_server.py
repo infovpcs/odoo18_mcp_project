@@ -69,7 +69,7 @@ tools = {}
 try:
     # Import the specific tools we want to test
     from mcp_server import retrieve_odoo_documentation, advanced_search, search_records, create_record, update_record, delete_record, execute_method, export_records_to_csv, import_records_from_csv, export_related_records_to_csv, import_related_records_from_csv, validate_field_value
-    
+
     # Add the tools to our dictionary
     tools['retrieve_odoo_documentation'] = retrieve_odoo_documentation
     tools['advanced_search'] = advanced_search
@@ -83,7 +83,7 @@ try:
     tools['export_related_records_to_csv'] = export_related_records_to_csv
     tools['import_related_records_from_csv'] = import_related_records_from_csv
     tools['validate_field_value'] = validate_field_value
-    
+
 except Exception as e:
     logger.error(f"Error getting tools from MCP server: {str(e)}")
     tools = {}
@@ -139,5 +139,9 @@ async def health_check():
     return {"status": "ok"}
 
 if __name__ == "__main__":
-    logger.info("Starting standalone MCP server...")
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    # Get host and port from environment variables
+    host = os.environ.get("MCP_HOST", "0.0.0.0")
+    port = int(os.environ.get("MCP_PORT", 8000))
+
+    logger.info(f"Starting standalone MCP server at {host}:{port}")
+    uvicorn.run(app, host=host, port=port)

@@ -7,9 +7,10 @@ Script to check available fields in Odoo models.
 
 import logging
 import sys
-from dotenv import load_dotenv
 import os
+import argparse
 import xmlrpc.client
+from dotenv import load_dotenv
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -19,6 +20,14 @@ def main():
     """Main function to check fields in Odoo models."""
     # Load environment variables
     load_dotenv()
+    
+    # Parse CLI args for model names
+    parser = argparse.ArgumentParser(description="Check Odoo model fields via XML-RPC")
+    parser.add_argument('--required', action='store_true', help='Only list required fields')
+    parser.add_argument('models', nargs='+', help='Odoo model technical names to inspect')
+    args = parser.parse_args()
+    required_only = args.required
+    model_names = args.models
     
     # Get Odoo connection details from environment variables
     ODOO_URL = os.getenv("ODOO_URL", "http://localhost:8069")
@@ -42,29 +51,24 @@ def main():
         # Connect to the models API
         models = xmlrpc.client.ServerProxy(f"{ODOO_URL}/xmlrpc/2/object")
         
-        # Models to check
-        model_names = ["project.project", "project.task"]
-        
+        # Inspect each requested model via ir.model.fields
         for model_name in model_names:
             logger.info(f"Checking fields for model: {model_name}")
-            
-            # Get fields for the model
-            fields_data = models.execute_kw(
+            # Fetch field definitions from ir.model.fields
+            fields = models.execute_kw(
                 ODOO_DB, uid, ODOO_PASSWORD,
-                model_name, 'fields_get',
-                [], {'attributes': ['string', 'help', 'type']}
+                'ir.model.fields', 'search_read',
+                [[('model', '=', model_name)]],
+                {'fields': ['name', 'ttype', 'field_description', 'required', 'help'], 'order': 'name'}
             )
-            
-            # Print field information
             print(f"\n{'='*80}")
             print(f"FIELDS FOR MODEL: {model_name}")
             print(f"{'='*80}")
-            
-            for field_name, field_info in sorted(fields_data.items()):
-                field_type = field_info.get('type', 'unknown')
-                field_string = field_info.get('string', 'No Label')
-                print(f"{field_name:<30} | {field_type:<15} | {field_string}")
-            
+            for f in fields:
+                # Skip non-required if filter enabled
+                if required_only and not f['required']:
+                    continue
+                print(f"{f['name']:<30} | {f['ttype']:<10} | {f['field_description']:<30} | Required: {f['required']} | Help: {f.get('help','')}")
             print(f"{'='*80}\n")
         
     except Exception as e:

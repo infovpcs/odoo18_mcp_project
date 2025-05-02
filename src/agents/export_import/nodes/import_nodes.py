@@ -10,8 +10,7 @@ import logging
 import xmlrpc.client
 from typing import Dict, List, Any, Tuple, Optional
 
-from langchain_core.messages import HumanMessage, AIMessage
-from langchain_core.output_parsers import StrOutputParser
+from langchain.schema import HumanMessage, AIMessage
 
 from src.agents.export_import.state import AgentState
 from src.agents.export_import.utils.csv_handler import import_from_csv, apply_field_mapping

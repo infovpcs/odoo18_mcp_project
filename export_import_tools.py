@@ -15,7 +15,9 @@ from typing import Dict, List, Any, Optional, Union, Tuple
 
 # Import our field converter
 from field_converter import FieldConverter
-from direct_export_import import export_records, import_records
+# Use direct XML-RPC export instead of dynamic_data_tool subprocess
+from direct_export_import import import_records
+from scripts.dynamic_data_tool import connect, fetch_fields
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -59,32 +61,33 @@ def run_export_flow(
         # Create exports directory if it doesn't exist
         os.makedirs(os.path.dirname(export_path), exist_ok=True)
 
-        # Call the export_records function from direct_export_import.py
-        # Set environment variables for Odoo connection
-        os.environ["ODOO_URL"] = odoo_url
-        os.environ["ODOO_DB"] = odoo_db
-        os.environ["ODOO_USERNAME"] = odoo_username
-        os.environ["ODOO_PASSWORD"] = odoo_password
+        # Connect to Odoo and fetch records via XML-RPC
+        models, db, uid, pwd = connect()
 
-        # Call the export_records function
-        result = export_records(
-            model_name=model_name,
-            fields=fields,
-            filter_domain=filter_domain,
-            limit=limit,
-            export_path=export_path
+        # Prepare domain and determine fields to export
+        domain = filter_domain or []
+        if not fields:
+            _, field_names = fetch_fields(models, db, uid, pwd, model_name)
+        else:
+            field_names = fields
+
+        # Retrieve records
+        records = models.execute_kw(db, uid, pwd,
+            model_name, 'search_read', [domain], {'fields': field_names, 'limit': limit}
         )
 
-        # Return the results
+        # Write results to CSV
+        df = pd.DataFrame(records)
+        df.to_csv(export_path, index=False, columns=field_names)
+        total = len(df)
+
         return {
-            "success": result["success"],
+            "success": True,
             "model_name": model_name,
-            "selected_fields": fields,
-            "filter_domain": filter_domain,
-            "total_records": result.get("total_records", 0),
-            "exported_records": result.get("exported_records", 0),
-            "export_path": result.get("export_path", export_path),
-            "error": result.get("error", None)
+            "selected_fields": field_names,
+            "total_records": total,
+            "exported_records": total,
+            "export_path": export_path
         }
     except Exception as e:
         logger.error(f"Error running export flow: {str(e)}")

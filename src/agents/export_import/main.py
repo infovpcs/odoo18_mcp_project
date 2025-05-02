@@ -9,10 +9,16 @@ import os
 import logging
 from typing import Dict, List, Any, Optional, Union, Tuple, Annotated, TypedDict
 
-from langchain_core.messages import HumanMessage, AIMessage
-from langchain_core.output_parsers import StrOutputParser
-from langgraph.graph import StateGraph, END
-from langgraph.prebuilt import ToolNode
+from langchain.schema import HumanMessage, AIMessage
+# StrOutputParser removed (unavailable in this langchain version)
+
+try:
+    from langgraph.graph import StateGraph, END
+    from langgraph.prebuilt import ToolNode
+except ImportError:
+    # langgraph not installed: disable graph-based agent
+    StateGraph = END = None
+    ToolNode = None
 
 from src.agents.export_import.state import AgentState, FlowMode
 from src.agents.export_import.nodes.export_nodes import (
@@ -31,6 +37,9 @@ from src.agents.export_import.nodes.import_nodes import (
 
 logger = logging.getLogger(__name__)
 
+# Delegate to direct implementation for stability
+import export_import_tools
+from export_import_tools import run_export_flow as run_export_flow_direct, run_import_flow as run_import_flow_direct
 
 def create_export_import_agent(
     odoo_url: str = "http://localhost:8069",
@@ -289,200 +298,5 @@ def handle_error(state: AgentState, message: Optional[str] = None) -> AgentState
 
     return state
 
-
-def run_export_flow(
-    model_name: str,
-    fields: Optional[List[str]] = None,
-    filter_domain: Optional[List[Any]] = None,
-    limit: int = 1000,
-    export_path: Optional[str] = None,
-    odoo_url: str = "http://localhost:8069",
-    odoo_db: str = "llmdb18",
-    odoo_username: str = "admin",
-    odoo_password: str = "admin"
-) -> Dict[str, Any]:
-    """
-    Run the export flow with the given parameters.
-
-    Args:
-        model_name: Name of the Odoo model to export
-        fields: List of fields to export (if None, all fields are exported)
-        filter_domain: Domain filter for the export
-        limit: Maximum number of records to export
-        export_path: Path to export the CSV file
-        odoo_url: URL of the Odoo server
-        odoo_db: Name of the Odoo database
-        odoo_username: Odoo username
-        odoo_password: Odoo password
-
-    Returns:
-        Dictionary with the export results
-    """
-    # Create initial state
-    state = AgentState(
-        mode=FlowMode.EXPORT,
-        odoo_url=odoo_url,
-        odoo_db=odoo_db,
-        odoo_username=odoo_username,
-        odoo_password=odoo_password
-    )
-
-    # Set export parameters
-    state.export_state.model_name = model_name
-
-    if fields:
-        state.export_state.selected_fields = fields
-
-    if filter_domain:
-        state.export_state.filter_domain = filter_domain
-
-    state.export_state.limit = limit
-
-    if export_path:
-        state.export_state.export_path = export_path
-    else:
-        model_name_safe = model_name.replace('.', '_')
-        state.export_state.export_path = f"exports/{model_name_safe}_export.csv"
-
-    # Create the graph
-    graph = create_export_import_agent(odoo_url, odoo_db, odoo_username, odoo_password)
-
-    # Run the flow with a higher recursion limit
-    try:
-        # Create a message to help the flow proceed without user input
-        initial_message = f"Export records from {model_name} with fields {fields}"
-
-        # Run the flow with a higher recursion limit
-        outputs = []
-        for output in graph.stream(state, config={"recursion_limit": 100}):
-            outputs.append(output)
-            if "error" in output:
-                logger.error(f"Error in export flow: {output['error']}")
-                return {
-                    "success": False,
-                    "error": output["error"]
-                }
-
-        # Get the final state from the last output
-        if outputs:
-            final_state = outputs[-1]["state"]
-        else:
-            logger.error("No outputs from graph.stream")
-            return {
-                "success": False,
-                "error": "No outputs from graph.stream"
-            }
-    except Exception as e:
-        logger.error(f"Error running export flow: {str(e)}")
-        return {
-            "success": False,
-            "error": str(e)
-        }
-
-    # Return the results
-    return {
-        "success": final_state.export_state.status == "completed",
-        "model_name": final_state.export_state.model_name,
-        "selected_fields": final_state.export_state.selected_fields,
-        "filter_domain": final_state.export_state.filter_domain,
-        "total_records": final_state.export_state.total_records,
-        "exported_records": final_state.export_state.exported_records,
-        "export_path": final_state.export_state.export_path,
-        "error": final_state.export_state.error
-    }
-
-
-def run_import_flow(
-    import_path: str,
-    model_name: str,
-    field_mapping: Optional[Dict[str, str]] = None,
-    create_if_not_exists: bool = True,
-    update_if_exists: bool = True,
-    odoo_url: str = "http://localhost:8069",
-    odoo_db: str = "llmdb18",
-    odoo_username: str = "admin",
-    odoo_password: str = "admin"
-) -> Dict[str, Any]:
-    """
-    Run the import flow with the given parameters.
-
-    Args:
-        import_path: Path to the CSV file to import
-        model_name: Name of the Odoo model to import into
-        field_mapping: Mapping from CSV field names to Odoo field names
-        create_if_not_exists: Whether to create new records if they don't exist
-        update_if_exists: Whether to update existing records
-        odoo_url: URL of the Odoo server
-        odoo_db: Name of the Odoo database
-        odoo_username: Odoo username
-        odoo_password: Odoo password
-
-    Returns:
-        Dictionary with the import results
-    """
-    # Create initial state
-    state = AgentState(
-        mode=FlowMode.IMPORT,
-        odoo_url=odoo_url,
-        odoo_db=odoo_db,
-        odoo_username=odoo_username,
-        odoo_password=odoo_password
-    )
-
-    # Set import parameters
-    state.import_state.import_path = import_path
-    state.import_state.model_name = model_name
-
-    if field_mapping:
-        state.import_state.field_mapping = field_mapping
-
-    state.import_state.create_if_not_exists = create_if_not_exists
-    state.import_state.update_if_exists = update_if_exists
-
-    # Create the graph
-    graph = create_export_import_agent(odoo_url, odoo_db, odoo_username, odoo_password)
-
-    # Run the flow with a higher recursion limit
-    try:
-        # Create a message to help the flow proceed without user input
-        initial_message = f"Import records into {model_name} from {import_path}"
-
-        # Run the flow with a higher recursion limit
-        outputs = []
-        for output in graph.stream(state, config={"recursion_limit": 100}):
-            outputs.append(output)
-            if "error" in output:
-                logger.error(f"Error in import flow: {output['error']}")
-                return {
-                    "success": False,
-                    "error": output["error"]
-                }
-
-        # Get the final state from the last output
-        if outputs:
-            final_state = outputs[-1]["state"]
-        else:
-            logger.error("No outputs from graph.stream")
-            return {
-                "success": False,
-                "error": "No outputs from graph.stream"
-            }
-    except Exception as e:
-        logger.error(f"Error running import flow: {str(e)}")
-        return {
-            "success": False,
-            "error": str(e)
-        }
-
-    # Return the results
-    return {
-        "success": final_state.import_state.status == "completed",
-        "model_name": final_state.import_state.model_name,
-        "import_path": final_state.import_state.import_path,
-        "field_mapping": final_state.import_state.field_mapping,
-        "total_records": final_state.import_state.total_records,
-        "imported_records": final_state.import_state.imported_records,
-        "updated_records": final_state.import_state.updated_records,
-        "failed_records": final_state.import_state.failed_records,
-        "error": final_state.import_state.error
-    }
+run_export_flow = run_export_flow_direct
+run_import_flow = run_import_flow_direct

@@ -1023,6 +1023,48 @@ We've made several improvements to the MCP server to ensure all tools work corre
 
 ## Troubleshooting
 
+### Docker Container Issues
+
+- **Issue**: Docker containers fail to start with error: `exec: "/app/entrypoint.sh": stat /app/entrypoint.sh: no such file or directory`
+- **Solution**: This is caused by a syntax issue in the entrypoint.sh script. The project includes a properly formatted entrypoint.sh file that should be copied to the container during the build process. If you encounter this issue, make sure the entrypoint.sh file exists in your project root and has the correct permissions:
+
+```bash
+# Check if entrypoint.sh exists
+ls -la entrypoint.sh
+
+# If it doesn't exist, create it with the correct content
+cat > entrypoint.sh << 'EOF'
+#!/bin/sh
+
+# Create required directories with proper permissions
+mkdir -p /app/logs /app/data /app/exports /app/tmp
+chown -R mcp:mcp /app/logs /app/data /app/exports /app/tmp
+
+# Switch to non-root user
+exec su -s /bin/sh mcp -c "if [ \"\$1\" = \"standalone\" ]; then exec python standalone_mcp_server.py; elif [ \"\$1\" = \"test\" ]; then if [ \"\$2\" = \"functions\" ]; then exec python test_mcp_functions.py; elif [ \"\$2\" = \"tools\" ]; then exec python test_mcp_tools.py; elif [ \"\$2\" = \"all\" ]; then python test_mcp_functions.py && python test_mcp_tools.py; else echo \"Unknown test type: \$2\"; exit 1; fi; else exec python main.py \$@; fi"
+EOF
+
+# Set the correct permissions
+chmod +x entrypoint.sh
+
+# Rebuild and restart the Docker containers
+docker-compose down
+docker-compose build
+docker-compose up -d
+```
+
+- **Issue**: ModuleNotFoundError: No module named 'src' in Docker container
+- **Solution**: This occurs when the src directory is not properly copied to the final stage in the Dockerfile. Make sure your Dockerfile includes the line `COPY src ./src` after copying the other application files:
+
+```dockerfile
+# Copy the rest of the application
+COPY main.py mcp_server.py standalone_mcp_server.py ./
+COPY test_mcp_functions.py test_mcp_tools.py ./
+COPY .env.example ./.env.example
+COPY entrypoint.sh /app/entrypoint.sh
+COPY src ./src
+```
+
 ### MCP Server Testing
 
 If you're having issues with the MCP server, you can use the comprehensive test script to diagnose problems:

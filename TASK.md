@@ -113,6 +113,8 @@ Last Updated: 2025-05-02
 - [x] Fix NumPy version compatibility issues (2025-04-27)
 - [x] Create standalone MCP server for testing tools (2025-04-27)
 - [x] Test Odoo documentation RAG functionality (2025-04-27)
+- [x] Fix Docker entrypoint.sh script syntax issue (2025-05-02)
+- [x] Update Dockerfile to properly copy src directory to final stage (2025-05-02)
 - [x] Add environment variable support (2023-12-20)
 - [x] Create .env.example file (2023-12-20)
 - [x] Update main.py to support command-line arguments (2023-12-20)

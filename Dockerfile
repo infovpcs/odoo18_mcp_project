@@ -39,6 +39,8 @@ RUN pip install --no-cache-dir /app/wheels/*.whl
 COPY main.py mcp_server.py standalone_mcp_server.py ./
 COPY test_mcp_functions.py test_mcp_tools.py ./
 COPY .env.example ./.env.example
+COPY entrypoint.sh /app/entrypoint.sh
+COPY src ./src
 
 # Create directories for logs and data
 RUN mkdir -p /app/logs /app/data /app/exports /app/tmp
@@ -60,31 +62,9 @@ USER mcp
 # Expose the port the app runs on
 EXPOSE 8000
 
-# Create entrypoint script
+# Set entrypoint script permissions
 USER root
-RUN echo '#!/bin/sh\n\
-# Create required directories with proper permissions\n\
-mkdir -p /app/logs /app/data /app/exports /app/tmp\n\
-chown -R mcp:mcp /app/logs /app/data /app/exports /app/tmp\n\
-\n\
-# Switch to non-root user\n\
-exec su -s /bin/sh mcp -c "\\\n\
-if [ \\"\\$1\\" = \\"standalone\\" ]; then\\\n\
-    exec python standalone_mcp_server.py\\\n\
-elif [ \\"\\$1\\" = \\"test\\" ]; then\\\n\
-    if [ \\"\\$2\\" = \\"functions\\" ]; then\\\n\
-        exec python test_mcp_functions.py\\\n\
-    elif [ \\"\\$2\\" = \\"tools\\" ]; then\\\n\
-        exec python test_mcp_tools.py\\\n\
-    elif [ \\"\\$2\\" = \\"all\\" ]; then\\\n\
-        python test_mcp_functions.py && python test_mcp_tools.py\\\n\
-    else\\\n\
-        echo \\"Unknown test type: \\$2\\"\\\n\
-        exit 1\\\n\
-    fi\\\n\
-else\\\n\
-    exec python main.py \\$@\\\n\
-fi"\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

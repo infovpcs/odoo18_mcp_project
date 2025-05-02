@@ -36,8 +36,19 @@ def fetch_fields(models, db, uid, pwd, model):
 def export_model(args):
     models, db, uid, pwd = connect()
     fields_meta, field_names = fetch_fields(models, db, uid, pwd, args.model)
+    # support optional domain filter
+    domain = []
+    if getattr(args, 'domain', None):
+        try:
+            # parse domain and convert to tuple of tuples for XML-RPC
+            parsed = ast.literal_eval(args.domain)
+            # ensure it's a sequence of tuples
+            domain = tuple(tuple(x) for x in parsed)
+        except Exception:
+            raise ValueError(f"Invalid domain: {args.domain}")
+    # perform search_read with optional domain
     recs = models.execute_kw(db, uid, pwd,
-        args.model, 'search_read', [], {'fields': field_names, 'limit': False})
+        args.model, 'search_read', [domain], {'fields': field_names, 'limit': False})
     with open(args.output, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(field_names)
@@ -225,6 +236,7 @@ def main():
     ex = sub.add_parser('export', help='Export model to CSV')
     ex.add_argument('--model', required=True)
     ex.add_argument('--output', default='/tmp/export.csv')
+    ex.add_argument('--domain', help='Optional domain filter as Python list, e.g. "[(\'date_deadline\',\'!=\', False)]"')
     im = sub.add_parser('import', help='Import model from CSV')
     im.add_argument('--model', required=True)
     im.add_argument('--input', default='/tmp/export.csv')

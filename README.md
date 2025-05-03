@@ -1,6 +1,6 @@
 # Odoo 18 MCP Integration (18.0 Branch)
 
-Last Updated: 2025-05-02
+Last Updated: 2025-05-15
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Odoo 18.0](https://img.shields.io/badge/odoo-18.0-green.svg)](https://www.odoo.com/)
@@ -381,7 +381,16 @@ We've created a standalone MCP server that can be used for testing the MCP tools
 python standalone_mcp_server.py
 ```
 
-This will start a FastAPI server on port 8001 that you can use to test the MCP tools. You can then use the `test_mcp_tools.py` script to test all the tools:
+This will start a FastAPI server on port 8001 that you can use to test the MCP tools. You can customize the host and port using environment variables:
+
+```bash
+# Set custom host and port
+export MCP_HOST=0.0.0.0
+export MCP_PORT=8001
+python standalone_mcp_server.py
+```
+
+You can then use the `test_mcp_tools.py` script to test all the tools:
 
 ```bash
 python test_mcp_tools.py
@@ -1065,6 +1074,25 @@ COPY entrypoint.sh /app/entrypoint.sh
 COPY src ./src
 ```
 
+- **Issue**: Standalone server not accessible on expected port
+- **Solution**: The standalone server now explicitly uses port 8001 by default. You can customize this using environment variables:
+
+```bash
+# Set custom host and port for standalone server
+export MCP_HOST=0.0.0.0
+export MCP_PORT=8001
+python standalone_mcp_server.py
+```
+
+- **Issue**: Docker container fails with permission issues when writing to export directory
+- **Solution**: Make sure the export directory exists and has the correct permissions:
+
+```bash
+# Create export directory with correct permissions
+mkdir -p ./exports ./tmp
+chmod 777 ./exports ./tmp
+```
+
 ### MCP Server Testing
 
 If you're having issues with the MCP server, you can use the comprehensive test script to diagnose problems:
@@ -1192,7 +1220,8 @@ python3 scripts/dynamic_data_tool.py export-rel \
   --parent-model account.move \
   --child-model account.move.line \
   --relation-field move_id \
-  --output /tmp/export-rel.csv
+  --output /tmp/export-rel.csv \
+  --move-type out_invoice
 
 # Import related models:
 python3 scripts/dynamic_data_tool.py import-rel \
@@ -1202,8 +1231,16 @@ python3 scripts/dynamic_data_tool.py import-rel \
   --parent-fields name,date,move_type,partner_id \
   --child-fields account_id,product_id,quantity,price_unit \
   --input /tmp/export-rel.csv \
-  --name-prefix IMPORTED
+  --name-prefix IMPORTED \
+  --reset-to-draft \
+  --skip-readonly-fields
 ```
+
+The tool now includes improved CSV handling with better error reporting and support for:
+- Move type filtering for invoices (`--move-type` parameter)
+- Reset to draft functionality for posted invoices (`--reset-to-draft` flag)
+- Skipping readonly fields for invoice updates (`--skip-readonly-fields` flag)
+- Improved error handling for field validation issues
 
 **Deprecated scripts**: `scripts/clean_import_csv.py`, `scripts/dynamic_export_import.py`, `direct_export_import.py`. Use `scripts/dynamic_data_tool.py` exclusively.
 

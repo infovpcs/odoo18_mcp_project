@@ -1,6 +1,6 @@
 # Odoo 18 Integration MCP Server - Project Planning
 
-Last Updated: 2025-05-02
+Last Updated: 2025-05-15
 
 ## Project Overview
 This project aims to create a robust integration server that connects MCP (Master Control Program) with Odoo 18.0 ERP system, focusing on efficient data synchronization, API management, and secure communications. The implementation provides a standardized interface for performing CRUD operations on Odoo 18 models through a simple API, with dynamic model discovery and field analysis capabilities. The project includes direct implementation for advanced operations like data export and import, with dynamic model and field discovery using ir.model and ir.model.fields.
@@ -298,6 +298,26 @@ odoo18-mcp-project/
 - Support for concurrent connections ✅
 - Efficient resource usage ✅
 - Connection pooling (planned)
+
+## Container Architecture
+
+The Docker setup includes three main services:
+
+1. **mcp-server**: The main MCP server for integration with Claude Desktop
+   - Exposes port 8000 for API access
+   - Connects to Odoo via XML-RPC
+   - Provides MCP tools for Claude Desktop
+
+2. **standalone-server**: A standalone server for testing MCP tools
+   - Exposes port 8001 for API access (configurable via environment variables)
+   - Provides HTTP endpoints for testing MCP tools
+   - Useful for development and testing without Claude Desktop
+   - Supports custom host and port configuration via MCP_HOST and MCP_PORT environment variables
+
+3. **test-runner**: A service for running automated tests
+   - Runs function tests and tool tests
+   - Validates the MCP server functionality
+   - Useful for CI/CD pipelines
 
 ## Documentation Requirements
 - API documentation ✅

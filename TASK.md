@@ -1,6 +1,6 @@
 # Odoo 18 Integration MCP Server - Tasks
 
-Last Updated: 2025-05-02
+Last Updated: 2025-05-15
 
 ## Phase 1: Project Setup and Basic Infrastructure
 - [x] Initialize project structure (2023-12-20)
@@ -106,6 +106,18 @@ Last Updated: 2025-05-02
 - [x] Add proper error handling for import/export tests
 - [x] Test MCP server with Claude Desktop integration
 - [x] Document MCP server testing process
+
+## Phase 12: Standalone Server and Docker Improvements (2025-05-15)
+- [x] Fix dynamic_data_tool.py for improved CSV export/import handling
+- [x] Update standalone_mcp_server.py to use port 8001 explicitly
+- [x] Add environment variable support for standalone server host and port
+- [x] Add MCP CLI dependency and update test scripts
+- [x] Fix Docker entrypoint.sh script and update documentation
+- [x] Update documentation with latest changes
+- [x] Add troubleshooting section for standalone server
+- [x] Improve error handling for export directory permissions
+- [x] Test standalone server with environment variables
+- [x] Update README, PLANNING, and TASK markdown files
 
 ## Discovered During Work
 - [x] Fix Python version compatibility issues (2025-04-27)
@@ -318,3 +330,13 @@ Last Updated: 2025-05-02
 - [x] Add proper error handling for import/export tests (2025-05-02)
 - [x] Test MCP server with Claude Desktop integration (2025-05-02)
 - [x] Document MCP server testing process (2025-05-02)
+- [x] Fix dynamic_data_tool.py for improved CSV export/import handling (2025-05-15)
+- [x] Update standalone_mcp_server.py to use port 8001 explicitly (2025-05-15)
+- [x] Add environment variable support for standalone server host and port (2025-05-15)
+- [x] Add MCP CLI dependency and update test scripts (2025-05-15)
+- [x] Fix Docker entrypoint.sh script and update documentation (2025-05-15)
+- [x] Update documentation with latest changes (2025-05-15)
+- [x] Add troubleshooting section for standalone server (2025-05-15)
+- [x] Improve error handling for export directory permissions (2025-05-15)
+- [x] Test standalone server with environment variables (2025-05-15)
+- [x] Update README, PLANNING, and TASK markdown files (2025-05-15)

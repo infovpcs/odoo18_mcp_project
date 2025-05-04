@@ -68,7 +68,7 @@ if not mcp:
 tools = {}
 try:
     # Import the specific tools we want to test
-    from mcp_server import retrieve_odoo_documentation, advanced_search, search_records, create_record, update_record, delete_record, execute_method, export_records_to_csv, import_records_from_csv, export_related_records_to_csv, import_related_records_from_csv, validate_field_value
+    from mcp_server import retrieve_odoo_documentation, advanced_search, search_records, create_record, update_record, delete_record, execute_method, export_records_to_csv, import_records_from_csv, export_related_records_to_csv, import_related_records_from_csv, validate_field_value, run_odoo_code_agent_tool
 
     # Add the tools to our dictionary
     tools['retrieve_odoo_documentation'] = retrieve_odoo_documentation
@@ -83,6 +83,7 @@ try:
     tools['export_related_records_to_csv'] = export_related_records_to_csv
     tools['import_related_records_from_csv'] = import_related_records_from_csv
     tools['validate_field_value'] = validate_field_value
+    tools['run_odoo_code_agent'] = run_odoo_code_agent_tool
 
 except Exception as e:
     logger.error(f"Error getting tools from MCP server: {str(e)}")

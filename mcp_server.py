@@ -138,6 +138,19 @@ try:
         logger.error(f"Error importing Odoo documentation retriever: {e}")
         odoo_docs_retriever_available = False
 
+    # Import the Odoo code agent
+    try:
+        from src.odoo_code_agent.main import run_odoo_code_agent
+        odoo_code_agent_available = True
+        logger.info("Odoo code agent imported successfully")
+    except ImportError as e:
+        logger.warning(f"Odoo code agent not available. Import error: {e}")
+        logger.warning("Make sure the odoo_code_agent module is properly installed")
+        odoo_code_agent_available = False
+    except Exception as e:
+        logger.error(f"Error importing Odoo code agent: {e}")
+        odoo_code_agent_available = False
+
     from mcp.server.fastmcp import FastMCP, Context, Image
 
     # Load environment variables
@@ -382,7 +395,7 @@ try:
         logger.error(f"Failed to initialize Odoo model discovery: {str(e)}")
         model_discovery = None
         advanced_search_instance = None
-        
+
     # Initialize Odoo documentation retriever
     odoo_docs_retriever_instance = None
     if odoo_docs_retriever_available:
@@ -390,13 +403,13 @@ try:
             # Use a directory in the project for storing the documentation
             docs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "odoo_docs")
             index_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "odoo_docs_index")
-            
+
             # Create directories if they don't exist
             os.makedirs(docs_dir, exist_ok=True)
             os.makedirs(index_dir, exist_ok=True)
-            
+
             logger.info(f"Initializing Odoo documentation retriever with docs_dir={docs_dir}, index_dir={index_dir}")
-            
+
             # Check if the required dependencies are available
             try:
                 import sentence_transformers
@@ -405,7 +418,7 @@ try:
                 import markdown
                 import git
                 logger.info("All required dependencies for Odoo documentation retriever are available")
-                
+
                 odoo_docs_retriever_instance = OdooDocsRetriever(
                     docs_dir=docs_dir,
                     index_dir=index_dir,
@@ -2162,6 +2175,230 @@ This approach is much more efficient than exporting and importing parent and chi
         except Exception as e:
             logger.error(f"Error validating field value: {str(e)}")
             return f"# Error validating field value\n\n{str(e)}"
+
+    # Tool for running the Odoo code agent
+    @mcp.tool()
+    def run_odoo_code_agent_tool(query: str, use_gemini: bool = False, use_ollama: bool = False, feedback: Optional[str] = None, save_to_files: bool = False, output_dir: Optional[str] = None) -> str:
+        """Generate Odoo 18 module code based on a natural language query.
+
+        This tool uses the Odoo Code Agent to analyze requirements, plan, and generate
+        code for Odoo 18 modules based on your query. It follows a structured workflow:
+        1. Analysis: Understand requirements and gather documentation
+        2. Planning: Create a plan and tasks for implementation
+        3. Coding: Generate module structure and code files
+
+        The agent can optionally use Google Gemini or Ollama as fallback models for improved code generation.
+        It can also save the generated files to disk if requested.
+
+        Args:
+            query: The natural language query describing the module to create
+            use_gemini: Whether to use Google Gemini as a fallback (requires GEMINI_API_KEY in .env)
+            use_ollama: Whether to use Ollama as a fallback (requires Ollama running locally)
+            feedback: Optional feedback to incorporate into the code generation
+            save_to_files: Whether to save the generated files to disk
+            output_dir: Directory to save the generated files to (defaults to ./generated_modules)
+
+        Returns:
+            A formatted string with the code generation results
+        """
+        # Check if the Odoo code agent is available
+        if not odoo_code_agent_available:
+            return "# Error: Odoo Code Agent\n\nThe Odoo Code Agent is not available. Please check that the module is properly installed."
+
+        # Validate input parameters
+        if not query or not isinstance(query, str) or len(query.strip()) == 0:
+            return "# Error: Invalid Query\n\nPlease provide a valid query describing the Odoo module you want to create."
+
+        # Check Odoo connection
+        if not model_discovery:
+            return "# Error: Odoo Connection\n\nCould not connect to Odoo server. Please check your connection settings."
+
+        # Check Gemini API key if using Gemini
+        if use_gemini:
+            gemini_api_key = os.getenv("GEMINI_API_KEY")
+            if not gemini_api_key:
+                logger.warning("Gemini API key not found in environment variables")
+                return "# Error: Gemini API Key\n\nGemini API key not found in environment variables. Please set the GEMINI_API_KEY environment variable to use Gemini."
+
+        # Check Ollama if using Ollama
+        if use_ollama:
+            # Simple check to see if Ollama might be available
+            try:
+                import requests
+                response = requests.get("http://localhost:11434/api/version", timeout=2)
+                if response.status_code != 200:
+                    logger.warning("Ollama server not available")
+                    return "# Error: Ollama Server\n\nOllama server not available. Please make sure Ollama is running on http://localhost:11434."
+            except Exception as e:
+                logger.warning(f"Error checking Ollama server: {str(e)}")
+                return f"# Error: Ollama Server\n\nError checking Ollama server: {str(e)}. Please make sure Ollama is running on http://localhost:11434."
+
+        try:
+            # Run the Odoo code agent
+            logger.info(f"Running Odoo code agent with query: {query}")
+            logger.info(f"Use Gemini: {use_gemini}, Use Ollama: {use_ollama}")
+            if feedback:
+                logger.info(f"Feedback provided: {feedback[:100]}...")
+            if save_to_files:
+                logger.info(f"Will save files to disk (output_dir: {output_dir or './generated_modules'})")
+
+            result = run_odoo_code_agent(
+                query=query,
+                odoo_url=ODOO_URL,
+                odoo_db=ODOO_DB,
+                odoo_username=ODOO_USERNAME,
+                odoo_password=ODOO_PASSWORD,
+                use_gemini=use_gemini,
+                use_ollama=use_ollama,
+                feedback=feedback,
+                save_to_files=save_to_files,
+                output_dir=output_dir
+            )
+
+            # Check if result is valid
+            if not isinstance(result, dict):
+                logger.error(f"Invalid result from Odoo code agent: {result}")
+                return f"# Error: Invalid Result\n\nThe Odoo code agent returned an invalid result. Please try again."
+
+            # Format the output
+            output = f"# Odoo Code Agent Results\n\n"
+
+            # Add query
+            query_value = result.get('query', 'No query provided')
+            output += f"## Query\n\n{query_value}\n\n"
+
+            # Add plan
+            plan_value = result.get('plan', '')
+            if plan_value:
+                output += f"## Plan\n\n{plan_value}\n\n"
+
+            # Add tasks
+            tasks_value = result.get('tasks', [])
+            if tasks_value:
+                output += f"## Tasks\n\n"
+                for i, task in enumerate(tasks_value, 1):
+                    output += f"{i}. {task}\n"
+                output += "\n"
+
+            # Add module information
+            module_name = result.get('module_name', '')
+            if module_name:
+                output += f"## Module Information\n\n"
+                output += f"- **Module Name**: {module_name}\n"
+
+                # Add module structure if available
+                module_structure = result.get('module_structure', {})
+                if module_structure:
+                    output += f"- **Module Structure**:\n"
+                    for path, info in module_structure.items():
+                        output += f"  - {path}\n"
+                output += "\n"
+
+            # Add files to create
+            files_to_create = result.get('files_to_create', [])
+            if files_to_create:
+                output += f"## Generated Files ({len(files_to_create)})\n\n"
+                for file_info in files_to_create[:5]:  # Limit to first 5 files to avoid too much text
+                    if not isinstance(file_info, dict):
+                        continue
+
+                    file_path = file_info.get('path', 'unknown')
+                    file_content = file_info.get('content', '')
+
+                    output += f"### {file_path}\n\n"
+
+                    # Determine the language for syntax highlighting based on file extension
+                    file_extension = os.path.splitext(file_path)[1].lower()
+                    language = "python"  # Default to Python
+                    if file_extension == ".xml":
+                        language = "xml"
+                    elif file_extension == ".csv":
+                        language = "csv"
+                    elif file_extension == ".js":
+                        language = "javascript"
+                    elif file_extension == ".css":
+                        language = "css"
+                    elif file_extension == ".html":
+                        language = "html"
+
+                    output += f"```{language}\n"
+                    # Limit content to first 20 lines to avoid too much text
+                    content_lines = file_content.split('\n')[:20]
+                    output += '\n'.join(content_lines)
+                    if len(content_lines) < len(file_content.split('\n')):
+                        output += "\n... (content truncated) ..."
+                    output += "\n```\n\n"
+
+                if len(files_to_create) > 5:
+                    output += f"*...and {len(files_to_create) - 5} more files*\n\n"
+
+            # Add error if any
+            error_value = result.get('error', '')
+            if error_value:
+                output += f"## Error\n\n{error_value}\n\n"
+
+            # Add feedback if any
+            feedback_value = result.get('feedback', '')
+            if feedback_value:
+                output += f"## Feedback\n\n{feedback_value}\n\n"
+
+            # Add information about saved files if applicable
+            save_result = result.get('save_result', {})
+            if save_result:
+                output += "## Files Saved to Disk\n\n"
+                if save_result.get('success', False):
+                    module_dir = save_result.get('module_dir', 'unknown')
+                    saved_count = save_result.get('saved_count', 0)
+                    output += f"✅ **Success**: {saved_count} files saved to directory:\n"
+                    output += f"`{module_dir}`\n\n"
+
+                    # List the first few saved files
+                    saved_files = save_result.get('saved_files', [])
+                    if saved_files:
+                        output += "**Files saved:**\n\n"
+                        for i, file_path in enumerate(saved_files[:5]):
+                            output += f"- `{file_path}`\n"
+                        if len(saved_files) > 5:
+                            output += f"- *...and {len(saved_files) - 5} more files*\n"
+                        output += "\n"
+                else:
+                    error = save_result.get('error', 'Unknown error')
+                    output += f"❌ **Error**: Failed to save files: {error}\n\n"
+
+            # Add instructions for using the generated code
+            output += "## Usage Instructions\n\n"
+
+            if save_result and save_result.get('success', False):
+                output += "To use the generated module:\n\n"
+                output += f"1. Copy the module directory from `{save_result.get('module_dir', 'generated_modules')}` to your Odoo addons path\n"
+                output += "2. Install the module in Odoo\n\n"
+            else:
+                output += "To use the generated module:\n\n"
+                output += "1. Create a new directory with the module name in your Odoo addons path\n"
+                output += "2. Create the files as shown above\n"
+                output += "3. Install the module in Odoo\n\n"
+
+            output += "You can also:\n\n"
+            output += "- Provide feedback to refine the generated code by calling this tool again with the feedback parameter\n"
+            output += "- Save the generated files to disk by setting `save_to_files=true` when calling this tool\n"
+
+            return output
+
+        except Exception as e:
+            logger.error(f"Error running Odoo code agent: {str(e)}")
+            error_message = str(e)
+
+            # Provide more helpful error messages for common issues
+            if "GEMINI_API_KEY" in error_message:
+                return "# Error: Gemini API Key\n\nGemini API key not found or invalid. Please set the GEMINI_API_KEY environment variable to use Gemini."
+            elif "Connection refused" in error_message:
+                return "# Error: Connection Issue\n\nCould not connect to a required service. This could be the Odoo server or Ollama server if you're using it."
+            elif "ImportError" in error_message:
+                return "# Error: Missing Dependencies\n\nSome required dependencies are missing. Please make sure all dependencies are installed."
+            elif "TimeoutError" in error_message:
+                return "# Error: Timeout\n\nThe operation timed out. This could be due to slow network connection or the complexity of the request."
+            else:
+                return f"# Error Running Odoo Code Agent\n\n{error_message}\n\nPlease check the logs for more details."
 
     # Main entry point
     if __name__ == "__main__":

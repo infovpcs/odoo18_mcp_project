@@ -1,6 +1,6 @@
 # Odoo 18 MCP Integration (18.0 Branch)
 
-Last Updated: 2025-05-15
+Last Updated: 2025-05-16
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Odoo 18.0](https://img.shields.io/badge/odoo-18.0-green.svg)](https://www.odoo.com/)
@@ -47,6 +47,10 @@ A robust integration server that connects MCP (Master Control Program) with Odoo
 - **Odoo Code Agent**: Generate Odoo 18 modules and code using a structured workflow
 - **LangGraph Workflow**: Analysis, planning, human feedback, coding, and finalization phases
 - **Fallback Models**: Integration with Google Gemini and Ollama for code generation
+- **Code Generator Utility**: Comprehensive utility for generating Odoo 18 model classes, views, and other components
+- **Odoo 18 Compliant Views**: Generate views following Odoo 18 guidelines (list view, single chatter tag)
+- **Mail Thread Integration**: Support for mail.thread and mail.activity.mixin in generated models
+- **Dynamic Model Discovery Integration**: Generate models based on existing Odoo models
 
 ## Installation
 
@@ -444,10 +448,14 @@ The project includes an Odoo code agent that helps with generating Odoo 18 modul
 - **Analysis Phase**: Analyzes requirements and gathers relevant Odoo documentation
 - **Planning Phase**: Creates a plan and tasks for implementing the requirements
 - **Human Feedback Loop**: Gets feedback from the user on the plan
-- **Coding Phase**: Generates the code for the Odoo module
+- **Coding Phase**: Generates the code for the Odoo module using the code generator utility
 - **Human Feedback Loop**: Gets feedback from the user on the code
 - **Finalization Phase**: Finalizes the code based on feedback
 - **Fallback Models**: Integration with Google Gemini and Ollama for code generation
+- **Code Generator Utility**: Comprehensive utility for generating Odoo 18 model classes, views, and other components
+- **Odoo 18 Compliant Views**: Generate views following Odoo 18 guidelines (list view, single chatter tag)
+- **Mail Thread Integration**: Support for mail.thread and mail.activity.mixin in generated models
+- **Dynamic Model Discovery**: Generate models based on existing Odoo models
 
 #### Using the Odoo Code Agent
 
@@ -473,6 +481,7 @@ python test_odoo_code_agent.py --ollama
 2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Module name: odoo_custom_module
 2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Module structure: {'__init__.py': '', '__manifest__.py': '', 'models': {'__init__.py': '', 'models.py': ''}, 'views': {'views.xml': ''}, 'security': {'ir.model.access.csv': ''}, 'static': {'description': {'icon.png': ''}}}
 2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Files to create: 6
+2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Generated using code generator utility
 2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Feedback:
 ```
 
@@ -952,6 +961,33 @@ odoo_docs_retriever_instance = OdooDocsRetriever(
 ```
 
 ## Recent Improvements and Fixes
+
+### Code Generator Utility
+
+We've implemented a comprehensive code generator utility for the Odoo code agent:
+
+1. **Model Class Generation**: The utility can generate Odoo model classes with proper field definitions, inheritance, and support for mail.thread and mail.activity.mixin.
+
+2. **Odoo 18 Compliant Views**: The utility generates views following Odoo 18 guidelines, including:
+   - Using list view instead of tree view
+   - Implementing the single `<chatter/>` tag instead of separate message and activity fields
+   - Removing deprecated attributes like string in form view
+
+3. **Complete Module Generation**: The utility can generate all files needed for an Odoo module, including:
+   - Model classes
+   - Views (form, list, search)
+   - Security access rights
+   - Action windows and menu items
+   - Controllers with routes
+   - Manifest file
+
+4. **Integration with Fallback Models**: The utility integrates with the fallback models system to use AI for generating more intelligent and context-aware code when available.
+
+5. **Dynamic Model Discovery**: The utility can generate models based on existing Odoo models, using the model discovery system to get field information and other metadata.
+
+6. **Test Suite**: A comprehensive test suite ensures the code generator works correctly and produces valid Odoo 18 code.
+
+7. **Integration with Odoo Code Agent**: The code generator is fully integrated with the Odoo code agent, allowing it to generate code based on natural language descriptions.
 
 ### Advanced Natural Language Search
 

@@ -465,6 +465,36 @@ The project includes an Odoo code agent that helps with generating Odoo 18 modul
 
 #### Using the Odoo Code Agent
 
+The Odoo Code Agent can be used in multiple ways:
+
+#### 1. Using the MCP Tool in Claude Desktop
+
+The easiest way to use the Odoo Code Agent is through the MCP tool in Claude Desktop:
+
+```
+/tool run_odoo_code_agent query="Create a customer feedback module for Odoo 18" use_gemini=true
+```
+
+This will generate an Odoo 18 module based on your query and return the results directly in Claude Desktop.
+
+#### 2. Using the Standalone MCP Server
+
+You can also use the Odoo Code Agent through the standalone MCP server:
+
+```bash
+# Start the standalone MCP server
+python standalone_mcp_server.py
+
+# In another terminal, call the tool using curl
+curl -X POST "http://127.0.0.1:8001/call_tool" \
+  -H "Content-Type: application/json" \
+  -d '{"tool": "run_odoo_code_agent", "params": {"query": "Create a customer feedback module for Odoo 18", "use_gemini": true}}'
+```
+
+#### 3. Using the Test Script
+
+For testing and development purposes, you can use the test script:
+
 ```bash
 # Run the Odoo code agent with a query
 python test_odoo_code_agent.py
@@ -476,20 +506,141 @@ python test_odoo_code_agent.py --gemini
 python test_odoo_code_agent.py --ollama
 ```
 
+#### 4. Using the Python API Directly
+
+You can also use the Odoo Code Agent directly from your Python code:
+
+```python
+from src.odoo_code_agent.main import run_odoo_code_agent
+
+# Use with Gemini integration
+result = run_odoo_code_agent(
+    query="Create an Odoo 18 module for customer feedback with ratings and comments",
+    odoo_url="http://localhost:8069",
+    odoo_db="llmdb18",
+    odoo_username="admin",
+    odoo_password="admin",
+    use_gemini=True,  # Enable Gemini integration
+    use_ollama=False
+)
+
+print(result)
+```
+
+#### Parameters
+
+The Odoo Code Agent accepts the following parameters:
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| `query` | string | The natural language query describing the module to create | (required) |
+| `use_gemini` | boolean | Whether to use Google Gemini as a fallback | `false` |
+| `use_ollama` | boolean | Whether to use Ollama as a fallback | `false` |
+| `feedback` | string | Optional feedback to incorporate into the code generation | `null` |
+
 #### Example Output
 
 ```
-2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Testing Odoo Code Agent
-2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Odoo Code Agent result:
-2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Query: Create an Odoo 18 module for customer feedback with ratings and comments
-2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Plan: Plan for implementing the requested Odoo 18 functionality
-2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Tasks: ['Task 1: Set up module structure', 'Task 2: Implement models', 'Task 3: Create views', 'Task 4: Add security', 'Task 5: Write tests']
-2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Module name: odoo_custom_module
-2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Module structure: {'__init__.py': '', '__manifest__.py': '', 'models': {'__init__.py': '', 'models.py': ''}, 'views': {'views.xml': ''}, 'security': {'ir.model.access.csv': ''}, 'static': {'description': {'icon.png': ''}}}
-2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Files to create: 6
-2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Generated using code generator utility
-2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Feedback:
+# Odoo Code Agent Results
+
+## Query
+
+Create a simple Odoo 18 module for managing customer feedback with ratings and comments
+
+## Plan
+
+This plan outlines the steps required to develop the 'customer_feedback' module in Odoo 18. It covers module structure creation, model definition, view implementation, security setup, and optional demo data addition.
+
+## Tasks
+
+1. Task 1: Create module structure
+2. Task 2: Implement models
+3. Task 3: Create views for the models
+4. Task 4: Set up security and access rights
+5. Task 5: Add demo data for testing
+
+## Module Information
+
+- **Module Name**: customer_feedback
+- **Module Structure**:
+  - __init__.py
+  - __manifest__.py
+  - models
+  - views
+  - security
+  - static
+
+## Generated Files (6)
+
+### customer_feedback/__init__.py
+
+```python
+from . import models
+
 ```
+
+### customer_feedback/__manifest__.py
+
+```python
+{
+    'name': 'Customer Feedback',
+    'version': '1.0',
+    'category': 'Custom',
+    'summary': 'Custom Odoo Module',
+    'description': """
+Customer Feedback
+=============
+This module provides custom functionality for Odoo 18.
+""",
+    'author': 'Your Company',
+    'website': 'https://www.example.com',
+    'depends': ['base'],
+    'data': [
+        'security/ir.model.access.csv',
+        'views/views.xml',
+    ],
+    'installable': True,
+    'application': True,
+    'auto_install': False,
+}
+```
+
+*...and 4 more files*
+
+## Usage Instructions
+
+To use the generated module:
+
+1. Create a new directory with the module name in your Odoo addons path
+2. Create the files as shown above
+3. Install the module in Odoo
+
+You can also provide feedback to refine the generated code by calling this tool again with the feedback parameter.
+```
+
+#### Iterative Development with Feedback
+
+The Odoo Code Agent supports an iterative development process through the feedback parameter. After reviewing the initial code generation, you can provide feedback to refine the code:
+
+```
+/tool run_odoo_code_agent query="Create a customer feedback module" feedback="Please add a rating field with stars from 1 to 5 and make it required"
+```
+
+This allows you to iteratively improve the generated code based on your specific requirements.
+
+#### Using Google Gemini for Enhanced Code Generation
+
+For the best results, we recommend using Google Gemini as a fallback model. To enable this:
+
+1. Get a Google Gemini API key from https://ai.google.dev/
+2. Add your API key to the `.env` file:
+   ```
+   GEMINI_API_KEY=your_gemini_api_key_here
+   GEMINI_MODEL=gemini-2.0-flash
+   ```
+3. Use the `use_gemini=true` parameter when calling the Odoo Code Agent
+
+With Gemini enabled, the Odoo Code Agent can generate more sophisticated and context-aware code, with better analysis of requirements and more detailed implementation plans.
 
 ### Using the Direct Export/Import Implementation
 

@@ -12,7 +12,11 @@ import logging
 import argparse
 from dotenv import load_dotenv
 
-from src.agents.odoo_code_agent.main import run_odoo_code_agent
+# Add the project root directory to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
+
+from src.odoo_code_agent.main import run_odoo_code_agent
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -55,11 +59,11 @@ def test_odoo_code_agent():
     logger.info(f"Module structure: {result['module_structure']}")
     logger.info(f"Files to create: {len(result['files_to_create'])}")
     logger.info(f"Feedback: {result['feedback']}")
-    
+
     if result['error']:
         logger.error(f"Error: {result['error']}")
         return False
-    
+
     return True
 
 
@@ -90,11 +94,11 @@ def test_odoo_code_agent_with_gemini():
     logger.info(f"Module structure: {result['module_structure']}")
     logger.info(f"Files to create: {len(result['files_to_create'])}")
     logger.info(f"Feedback: {result['feedback']}")
-    
+
     if result['error']:
         logger.error(f"Error: {result['error']}")
         return False
-    
+
     return True
 
 
@@ -125,11 +129,11 @@ def test_odoo_code_agent_with_ollama():
     logger.info(f"Module structure: {result['module_structure']}")
     logger.info(f"Files to create: {len(result['files_to_create'])}")
     logger.info(f"Feedback: {result['feedback']}")
-    
+
     if result['error']:
         logger.error(f"Error: {result['error']}")
         return False
-    
+
     return True
 
 

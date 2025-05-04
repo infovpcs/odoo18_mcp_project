@@ -1,8 +1,19 @@
-# src/agents/odoo_code_agent/utils/fallback_models.py
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Fallback models for the Odoo Code Agent.
+
+This module provides fallback models for generating code when the primary models are not available.
+"""
+
 import logging
 import os
 import subprocess
 from typing import Optional, Dict, Any
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +30,7 @@ def initialize_gemini() -> bool:
         True if initialization was successful, False otherwise
     """
     global gemini_initialized
-    
+
     try:
         # Check if the required packages are installed
         try:
@@ -30,20 +41,23 @@ def initialize_gemini() -> bool:
             subprocess.check_call(["pip", "install", "google-generativeai"])
             import google.generativeai as genai
             from google.generativeai.types import HarmCategory, HarmBlockThreshold
-        
+
         # Check if API key is available
-        api_key = os.environ.get("GOOGLE_API_KEY")
+        api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
-            logger.error("Google API key not found in environment variables")
+            logger.error("Gemini API key not found in environment variables")
             return False
-        
+
         # Configure the API
         genai.configure(api_key=api_key)
-        
+
+        # Get the model name from environment variables or use default
+        model_name = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+
         # Test the model
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        model = genai.GenerativeModel(model_name)
         response = model.generate_content("Hello, world!")
-        
+
         if response:
             logger.info("Google Gemini model initialized successfully")
             gemini_initialized = True
@@ -51,7 +65,7 @@ def initialize_gemini() -> bool:
         else:
             logger.error("Failed to get response from Google Gemini model")
             return False
-        
+
     except Exception as e:
         logger.error(f"Error initializing Google Gemini model: {str(e)}")
         return False
@@ -65,7 +79,7 @@ def initialize_ollama() -> bool:
         True if initialization was successful, False otherwise
     """
     global ollama_initialized
-    
+
     try:
         # Check if the required packages are installed
         try:
@@ -74,7 +88,7 @@ def initialize_ollama() -> bool:
             logger.warning("Ollama package not found. Installing...")
             subprocess.check_call(["pip", "install", "ollama"])
             import ollama
-        
+
         # Test the model
         try:
             response = ollama.chat(model='deepseek-r1:latest', messages=[
@@ -83,7 +97,7 @@ def initialize_ollama() -> bool:
                     'content': 'Hello, world!'
                 }
             ])
-            
+
             if response:
                 logger.info("Ollama model initialized successfully")
                 ollama_initialized = True
@@ -94,7 +108,7 @@ def initialize_ollama() -> bool:
         except Exception as e:
             logger.error(f"Error communicating with Ollama: {str(e)}")
             return False
-        
+
     except Exception as e:
         logger.error(f"Error initializing Ollama model: {str(e)}")
         return False
@@ -111,24 +125,27 @@ def generate_with_gemini(prompt: str) -> Optional[str]:
         The generated text, or None if generation failed
     """
     global gemini_initialized
-    
+
     if not gemini_initialized:
         if not initialize_gemini():
             logger.error("Failed to initialize Google Gemini model")
             return None
-    
+
     try:
         import google.generativeai as genai
-        
-        model = genai.GenerativeModel('gemini-2.0-flash')
+
+        # Get the model name from environment variables or use default
+        model_name = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+
+        model = genai.GenerativeModel(model_name)
         response = model.generate_content(prompt)
-        
+
         if response:
             return response.text
         else:
             logger.error("Failed to get response from Google Gemini model")
             return None
-        
+
     except Exception as e:
         logger.error(f"Error generating text with Google Gemini model: {str(e)}")
         return None
@@ -145,28 +162,28 @@ def generate_with_ollama(prompt: str) -> Optional[str]:
         The generated text, or None if generation failed
     """
     global ollama_initialized
-    
+
     if not ollama_initialized:
         if not initialize_ollama():
             logger.error("Failed to initialize Ollama model")
             return None
-    
+
     try:
         import ollama
-        
+
         response = ollama.chat(model='deepseek-r1:latest', messages=[
             {
                 'role': 'user',
                 'content': prompt
             }
         ])
-        
+
         if response and 'message' in response and 'content' in response['message']:
             return response['message']['content']
         else:
             logger.error("Failed to get response from Ollama model")
             return None
-        
+
     except Exception as e:
         logger.error(f"Error generating text with Ollama model: {str(e)}")
         return None
@@ -189,13 +206,13 @@ def generate_with_fallback(prompt: str, use_gemini: bool = True, use_ollama: boo
         result = generate_with_gemini(prompt)
         if result:
             return result
-    
+
     # Try Ollama if enabled and Gemini failed or is disabled
     if use_ollama:
         result = generate_with_ollama(prompt)
         if result:
             return result
-    
+
     # All fallbacks failed
     logger.error("All fallback models failed to generate text")
     return None

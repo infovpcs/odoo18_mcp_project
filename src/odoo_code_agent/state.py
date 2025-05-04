@@ -29,6 +29,7 @@ class PlanningState(BaseModel):
     plan: str = ""
     tasks: List[str] = Field(default_factory=list)
     planning_complete: bool = False
+    context: Dict[str, Any] = Field(default_factory=dict)
     error: Optional[str] = None
 
 
@@ -63,7 +64,9 @@ class OdooCodeAgentState(BaseModel):
     odoo_db: str = "llmdb18"
     odoo_username: str = "admin"
     odoo_password: str = "admin"
-    
+    use_gemini: bool = False
+    use_ollama: bool = False
+
     def get_current_state(self) -> Union[AnalysisState, PlanningState, CodingState, FeedbackState]:
         """Get the current state based on the phase."""
         if self.phase == AgentPhase.ANALYSIS:

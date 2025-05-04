@@ -167,6 +167,23 @@ Last Updated: 2025-05-04
 - [x] Test Odoo code agent with Gemini integration
 - [x] Update documentation with Gemini integration information
 
+## Phase 16: Odoo Code Agent MCP Tool Integration (2025-05-04)
+- [x] Add Odoo code agent as MCP tool in mcp_server.py
+- [x] Implement parameter validation and error handling
+- [x] Add Odoo connection validation
+- [x] Add Gemini API key validation
+- [x] Add Ollama server validation
+- [x] Implement formatted output with syntax highlighting
+- [x] Add file saving functionality to Odoo code agent
+- [x] Create file saver utility for generated modules
+- [x] Update Odoo code agent to support file saving
+- [x] Add file saving integration to MCP tool
+- [x] Update standalone_mcp_server.py to include the new tool
+- [x] Create test script for the Odoo code agent MCP tool
+- [x] Test the MCP tool with various queries
+- [x] Test the file saving functionality
+- [x] Update documentation with MCP tool usage information
+
 ## Discovered During Work
 - [x] Fix Python version compatibility issues (2025-04-27)
 - [x] Update PyTorch version constraints for macOS compatibility (2025-04-27)
@@ -444,3 +461,18 @@ Last Updated: 2025-05-04
 - [x] Improve module name extraction from user queries (2025-05-04)
 - [x] Enhance model field generation for customer feedback module (2025-05-04)
 - [x] Test Odoo code agent with Gemini integration (2025-05-04)
+- [x] Add Odoo code agent as MCP tool in mcp_server.py (2025-05-04)
+- [x] Implement parameter validation and error handling (2025-05-04)
+- [x] Add Odoo connection validation (2025-05-04)
+- [x] Add Gemini API key validation (2025-05-04)
+- [x] Add Ollama server validation (2025-05-04)
+- [x] Implement formatted output with syntax highlighting (2025-05-04)
+- [x] Add file saving functionality to Odoo code agent (2025-05-04)
+- [x] Create file saver utility for generated modules (2025-05-04)
+- [x] Update Odoo code agent to support file saving (2025-05-04)
+- [x] Add file saving integration to MCP tool (2025-05-04)
+- [x] Update standalone_mcp_server.py to include the new tool (2025-05-04)
+- [x] Create test script for the Odoo code agent MCP tool (2025-05-04)
+- [x] Test the MCP tool with various queries (2025-05-04)
+- [x] Test the file saving functionality (2025-05-04)
+- [x] Update documentation with MCP tool usage information (2025-05-04)

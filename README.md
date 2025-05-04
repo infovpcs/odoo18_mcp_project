@@ -1,6 +1,6 @@
 # Odoo 18 MCP Integration (18.0 Branch)
 
-Last Updated: 2025-05-15
+Last Updated: 2025-05-04
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Odoo 18.0](https://img.shields.io/badge/odoo-18.0-green.svg)](https://www.odoo.com/)
@@ -8,7 +8,7 @@ Last Updated: 2025-05-15
 [![Status](https://img.shields.io/badge/status-stable-brightgreen.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A robust integration server that connects MCP (Master Control Program) with Odoo 18.0 ERP system, focusing on efficient data synchronization, API management, and secure communications. This implementation provides a standardized interface for performing CRUD operations on Odoo 18 models through a simple API, with dynamic model discovery and field analysis capabilities.
+A robust integration server that connects MCP (Master Control Program) with Odoo 18.0 ERP system, focusing on efficient data synchronization, API management, and secure communications. This implementation provides a standardized interface for performing CRUD operations on Odoo 18 models through a simple API, with dynamic model discovery and field analysis capabilities. The project also includes an Odoo code agent that helps with generating Odoo 18 modules and code using a structured workflow with analysis, planning, human feedback, coding, and finalization phases.
 
 ## Features
 
@@ -44,6 +44,9 @@ A robust integration server that connects MCP (Master Control Program) with Odoo
 - **Monitoring**: Built-in monitoring capabilities for tracking performance
 - **Comprehensive Documentation**: API docs, setup guides, and troubleshooting information
 - **Odoo Documentation Retrieval**: RAG-based retrieval of information from the official Odoo 18 documentation
+- **Odoo Code Agent**: Generate Odoo 18 modules and code using a structured workflow
+- **LangGraph Workflow**: Analysis, planning, human feedback, coding, and finalization phases
+- **Fallback Models**: Integration with Google Gemini and Ollama for code generation
 
 ## Installation
 
@@ -337,6 +340,7 @@ Once you've configured Claude Desktop, you can use the Odoo 18 MCP integration:
 | **advanced_search** | Perform advanced natural language search | `/tool advanced_search query="List all unpaid bills with respect of vendor details" limit=10` | ✅ Working |
 | **retrieve_odoo_documentation** | Retrieve information from Odoo 18 documentation | `/tool retrieve_odoo_documentation query="How to create a custom module in Odoo 18" max_results=5` | ✅ Working |
 | **validate_field_value** | Validate a field value for a model | `/tool validate_field_value model_name=res.partner field_name=email value="test@example.com"` | ✅ Working |
+| **run_odoo_code_agent** | Generate Odoo 18 module code | `/tool run_odoo_code_agent query="Create a customer feedback module" use_gemini=false use_ollama=false` | ✅ Working |
 
 #### Available Prompts
 
@@ -352,6 +356,7 @@ Once you've configured Claude Desktop, you can use the Odoo 18 MCP integration:
 | **invoice_export_import_prompt** | Get guidance for invoice export/import | `/prompt invoice_export_import_prompt` |
 | **related_records_export_import_prompt** | Get guidance for related records export/import | `/prompt related_records_export_import_prompt` |
 | **odoo_documentation_prompt** | Get guidance for retrieving Odoo documentation | `/prompt odoo_documentation_prompt` |
+| **odoo_code_agent_prompt** | Get guidance for using the Odoo code agent | `/prompt odoo_code_agent_prompt` |
 
 ## Usage
 
@@ -428,6 +433,47 @@ You can check if the server is running using the `/health` endpoint:
 
 ```bash
 curl -X GET "http://127.0.0.1:8001/health"
+```
+
+### Using the Odoo Code Agent
+
+The project includes an Odoo code agent that helps with generating Odoo 18 modules and code using a structured workflow with analysis, planning, human feedback, coding, and finalization phases.
+
+#### Odoo Code Agent Features
+
+- **Analysis Phase**: Analyzes requirements and gathers relevant Odoo documentation
+- **Planning Phase**: Creates a plan and tasks for implementing the requirements
+- **Human Feedback Loop**: Gets feedback from the user on the plan
+- **Coding Phase**: Generates the code for the Odoo module
+- **Human Feedback Loop**: Gets feedback from the user on the code
+- **Finalization Phase**: Finalizes the code based on feedback
+- **Fallback Models**: Integration with Google Gemini and Ollama for code generation
+
+#### Using the Odoo Code Agent
+
+```bash
+# Run the Odoo code agent with a query
+python test_odoo_code_agent.py
+
+# Run with Google Gemini as a fallback
+python test_odoo_code_agent.py --gemini
+
+# Run with Ollama as a fallback
+python test_odoo_code_agent.py --ollama
+```
+
+#### Example Output
+
+```
+2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Testing Odoo Code Agent
+2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Odoo Code Agent result:
+2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Query: Create an Odoo 18 module for customer feedback with ratings and comments
+2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Plan: Plan for implementing the requested Odoo 18 functionality
+2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Tasks: ['Task 1: Set up module structure', 'Task 2: Implement models', 'Task 3: Create views', 'Task 4: Add security', 'Task 5: Write tests']
+2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Module name: odoo_custom_module
+2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Module structure: {'__init__.py': '', '__manifest__.py': '', 'models': {'__init__.py': '', 'models.py': ''}, 'views': {'views.xml': ''}, 'security': {'ir.model.access.csv': ''}, 'static': {'description': {'icon.png': ''}}}
+2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Files to create: 6
+2025-05-04 12:34:56,789 - test_odoo_code_agent - INFO - Feedback:
 ```
 
 ### Using the Direct Export/Import Implementation
@@ -1253,3 +1299,34 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Odoo Community
 - Python Community
 - MCP SDK Team
+
+## Odoo 18 Code Agent
+
+The Odoo 18 Code Agent is a specialized agent that helps with generating Odoo 18 modules and code. It follows a structured workflow:
+
+1. **Analysis Phase**: Analyzes the requirements and gathers relevant Odoo documentation
+2. **Planning Phase**: Creates a plan and tasks for implementing the requirements
+3. **Human Feedback Loop**: Gets feedback from the user on the plan
+4. **Coding Phase**: Generates the code for the Odoo module
+5. **Human Feedback Loop**: Gets feedback from the user on the code
+6. **Finalization Phase**: Finalizes the code based on feedback
+
+The agent can use Google Gemini or Ollama as fallback models if needed.
+
+### Usage
+
+```python
+from src.agents.odoo_code_agent.main import run_odoo_code_agent
+
+result = run_odoo_code_agent(
+    query="Create an Odoo 18 module for customer feedback",
+    odoo_url="http://localhost:8069",
+    odoo_db="llmdb18",
+    odoo_username="admin",
+    odoo_password="admin",
+    use_gemini=False,
+    use_ollama=False
+)
+
+print(result)
+```

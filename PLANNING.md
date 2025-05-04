@@ -3,7 +3,7 @@
 Last Updated: 2025-05-15
 
 ## Project Overview
-This project aims to create a robust integration server that connects MCP (Master Control Program) with Odoo 18.0 ERP system, focusing on efficient data synchronization, API management, and secure communications. The implementation provides a standardized interface for performing CRUD operations on Odoo 18 models through a simple API, with dynamic model discovery and field analysis capabilities. The project includes direct implementation for advanced operations like data export and import, with dynamic model and field discovery using ir.model and ir.model.fields.
+This project aims to create a robust integration server that connects MCP (Master Control Program) with Odoo 18.0 ERP system, focusing on efficient data synchronization, API management, and secure communications. The implementation provides a standardized interface for performing CRUD operations on Odoo 18 models through a simple API, with dynamic model discovery and field analysis capabilities. The project includes direct implementation for advanced operations like data export and import, with dynamic model and field discovery using ir.model and ir.model.fields. Additionally, the project includes an Odoo code agent that helps with generating Odoo 18 modules and code using a structured workflow with analysis, planning, human feedback, coding, and finalization phases.
 
 ## Architecture
 
@@ -25,7 +25,20 @@ This project aims to create a robust integration server that connects MCP (Maste
    - CSV handling and processing ✅
    - Odoo documentation retrieval (RAG) ✅
 
-2. **Odoo 18 Connector**
+2. **Odoo Code Agent**
+   - Analysis phase ✅
+   - Planning phase ✅
+   - Human feedback loops ✅
+   - Coding phase ✅
+   - Finalization phase ✅
+   - Module structure generation ✅
+   - Documentation integration ✅
+   - Odoo connector integration ✅
+   - Fallback model support (Gemini, Ollama) ✅
+   - State management ✅
+   - LangGraph workflow ✅
+
+3. **Odoo 18 Connector**
    - XML-RPC client implementation ✅
    - Session management ✅
    - Model operations (CRUD) ✅
@@ -40,14 +53,14 @@ This project aims to create a robust integration server that connects MCP (Maste
    - Record templates ✅
    - Advanced natural language search ✅
 
-3. **Data Models**
+4. **Data Models**
    - Pydantic models for validation ✅
    - Data transformation utilities ✅
    - Schema versioning ✅
    - Type safety ✅
    - Serialization utilities ✅
 
-4. **Security Layer**
+5. **Security Layer**
    - Authentication ✅
    - Authorization ✅
    - API key management ✅
@@ -81,6 +94,15 @@ odoo18-mcp-project/
 │   │   ├── docs_processor.py      # Documentation processing
 │   │   ├── embedding_engine.py    # Embedding and vector storage
 │   │   └── utils.py               # Utility functions
+│   ├── odoo_code_agent/     # Odoo code generation agent
+│   │   ├── __init__.py
+│   │   ├── main.py          # Main agent flow
+│   │   ├── state.py         # State management
+│   │   ├── utils/           # Utility functions
+│   │   │   ├── __init__.py
+│   │   │   ├── documentation_helper.py  # Documentation integration
+│   │   │   ├── odoo_connector.py        # Odoo connector integration
+│   │   │   └── fallback_models.py       # Fallback model support
 │   └── core/
 │       ├── __init__.py
 │       ├── config.py        # Configuration management
@@ -89,12 +111,14 @@ odoo18-mcp-project/
 │   ├── __init__.py
 │   ├── test_mcp/
 │   ├── test_odoo/
+│   ├── test_odoo_code_agent/
 │   └── test_core/
 ├── main.py                  # Main entry point
 ├── mcp_server.py            # MCP SDK server implementation
 ├── client_test.py           # Basic client test
 ├── advanced_client_test.py  # Advanced client test
 ├── dynamic_model_test.py    # Dynamic model test
+├── test_odoo_code_agent.py  # Odoo code agent test
 ├── .env.example             # Environment variables example
 └── pyproject.toml           # Project configuration
 ```
@@ -292,6 +316,44 @@ odoo18-mcp-project/
    - Integrate with MCP server as a tool ✅
    - Provide prompt for documentation queries ✅
    - Handle error cases and fallbacks ✅
+
+### Odoo Code Agent
+1. **Agent Workflow**
+   - Analysis phase for understanding requirements ✅
+   - Planning phase for creating implementation plan ✅
+   - Human feedback loop for plan refinement ✅
+   - Coding phase for generating Odoo module code ✅
+   - Second human feedback loop for code refinement ✅
+   - Finalization phase for completing the module ✅
+
+2. **State Management**
+   - Pydantic models for state representation ✅
+   - Phase-specific state models ✅
+   - State transitions between phases ✅
+   - Error handling and recovery ✅
+   - History tracking ✅
+
+3. **LangGraph Integration**
+   - StateGraph for workflow definition ✅
+   - Node functions for each workflow step ✅
+   - Conditional edges for dynamic flow ✅
+   - Error handling nodes ✅
+   - Compilation and execution ✅
+
+4. **Module Generation**
+   - Dynamic module name extraction ✅
+   - Standard Odoo module structure creation ✅
+   - Model definition generation ✅
+   - View definition generation ✅
+   - Security configuration ✅
+   - Manifest file creation ✅
+
+5. **Fallback Models**
+   - Google Gemini integration ✅
+   - Ollama integration ✅
+   - Fallback model selection ✅
+   - Error handling and recovery ✅
+   - API key management ✅
 
 ## Performance Goals
 - Response time < 200ms ✅

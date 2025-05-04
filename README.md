@@ -1,6 +1,6 @@
 # Odoo 18 MCP Integration (18.0 Branch)
 
-Last Updated: 2025-05-16
+Last Updated: 2025-05-04
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Odoo 18.0](https://img.shields.io/badge/odoo-18.0-green.svg)](https://www.odoo.com/)
@@ -46,7 +46,11 @@ A robust integration server that connects MCP (Master Control Program) with Odoo
 - **Odoo Documentation Retrieval**: RAG-based retrieval of information from the official Odoo 18 documentation
 - **Odoo Code Agent**: Generate Odoo 18 modules and code using a structured workflow
 - **LangGraph Workflow**: Analysis, planning, human feedback, coding, and finalization phases
+- **Google Gemini Integration**: Direct integration with Google Gemini API for code generation
+- **Environment Variable Configuration**: Use GEMINI_API_KEY and GEMINI_MODEL environment variables
 - **Fallback Models**: Integration with Google Gemini and Ollama for code generation
+- **Improved Module Name Extraction**: Better module name extraction from user queries
+- **Enhanced Model Field Generation**: Specialized field generation for different module types
 - **Code Generator Utility**: Comprehensive utility for generating Odoo 18 model classes, views, and other components
 - **Odoo 18 Compliant Views**: Generate views following Odoo 18 guidelines (list view, single chatter tag)
 - **Mail Thread Integration**: Support for mail.thread and mail.activity.mixin in generated models
@@ -100,13 +104,15 @@ pip install -e .
 cp .env.example .env
 ```
 
-5. Edit the `.env` file with your Odoo connection details:
+5. Edit the `.env` file with your Odoo connection details and optional Gemini API key:
 
 ```
 ODOO_URL=http://localhost:8069
 ODOO_DB=llmdb18
 ODOO_USERNAME=admin
 ODOO_PASSWORD=admin
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-2.0-flash
 ```
 
 ### Claude Desktop Integration
@@ -344,7 +350,7 @@ Once you've configured Claude Desktop, you can use the Odoo 18 MCP integration:
 | **advanced_search** | Perform advanced natural language search | `/tool advanced_search query="List all unpaid bills with respect of vendor details" limit=10` | ✅ Working |
 | **retrieve_odoo_documentation** | Retrieve information from Odoo 18 documentation | `/tool retrieve_odoo_documentation query="How to create a custom module in Odoo 18" max_results=5` | ✅ Working |
 | **validate_field_value** | Validate a field value for a model | `/tool validate_field_value model_name=res.partner field_name=email value="test@example.com"` | ✅ Working |
-| **run_odoo_code_agent** | Generate Odoo 18 module code | `/tool run_odoo_code_agent query="Create a customer feedback module" use_gemini=false use_ollama=false` | ✅ Working |
+| **run_odoo_code_agent** | Generate Odoo 18 module code | `/tool run_odoo_code_agent query="Create a customer feedback module" use_gemini=true use_ollama=false` | ✅ Working |
 
 #### Available Prompts
 
@@ -1349,18 +1355,41 @@ The Odoo 18 Code Agent is a specialized agent that helps with generating Odoo 18
 
 The agent can use Google Gemini or Ollama as fallback models if needed.
 
+### Google Gemini Integration
+
+The Odoo Code Agent now includes direct integration with Google's Gemini API for improved code generation:
+
+1. **Environment Variables**: Set up your Gemini API key and model in the `.env` file:
+   ```
+   GEMINI_API_KEY=your_gemini_api_key_here
+   GEMINI_MODEL=gemini-2.0-flash
+   ```
+
+2. **Gemini Client**: The agent uses a dedicated Gemini client module for API calls
+
+3. **Enhanced Analysis**: Gemini provides more detailed analysis of requirements
+
+4. **Better Planning**: Gemini creates more comprehensive implementation plans
+
+5. **Improved Code Generation**: Gemini generates higher quality Odoo module code
+
+6. **Feedback Processing**: Gemini can process user feedback to improve the generated code
+
+7. **Fallback Mechanisms**: The agent includes robust fallback mechanisms for when Gemini is not available
+
 ### Usage
 
 ```python
-from src.agents.odoo_code_agent.main import run_odoo_code_agent
+from src.odoo_code_agent.main import run_odoo_code_agent
 
+# Use with Gemini integration
 result = run_odoo_code_agent(
-    query="Create an Odoo 18 module for customer feedback",
+    query="Create an Odoo 18 module for customer feedback with ratings and comments",
     odoo_url="http://localhost:8069",
     odoo_db="llmdb18",
     odoo_username="admin",
     odoo_password="admin",
-    use_gemini=False,
+    use_gemini=True,  # Enable Gemini integration
     use_ollama=False
 )
 

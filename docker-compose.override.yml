@@ -11,6 +11,7 @@ services:
       - ./logs:/app/logs
       - ./exports:/app/exports
       - ./tmp:/app/tmp
+      - ./generated_modules:/app/generated_modules
     environment:
       - MCP_DEBUG=true
       - MCP_LOG_LEVEL=DEBUG
@@ -29,6 +30,7 @@ services:
       - ./logs:/app/logs
       - ./exports:/app/exports
       - ./tmp:/app/tmp
+      - ./generated_modules:/app/generated_modules
     environment:
       - MCP_DEBUG=true
       - MCP_LOG_LEVEL=DEBUG

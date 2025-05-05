@@ -59,5 +59,5 @@ prod:
 
 # Create required directories
 setup:
-	mkdir -p logs exports tmp data
-	chmod -R 777 logs exports tmp data
+	mkdir -p logs exports tmp data generated_modules
+	chmod -R 777 logs exports tmp data generated_modules

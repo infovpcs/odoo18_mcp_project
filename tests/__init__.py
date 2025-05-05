@@ -1,1 +1,3 @@
-"""Test package for the Odoo 18 MCP Integration project."""
+# -*- coding: utf-8 -*-
+# Import test modules
+from . import test_module_structure

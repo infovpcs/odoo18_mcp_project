@@ -99,6 +99,8 @@ Our Odoo 18 MCP Integration is a custom MCP Server that connects Claude and othe
    - NLP-based field importance analysis
    - Record templates for creating new records
    - Validation of field values
+   - Odoo documentation retrieval using RAG
+   - Odoo code generation with the Odoo Code Agent
 
 ### Dual Implementation Approach
 
@@ -117,14 +119,48 @@ Our Odoo 18 MCP Integration uses two different approaches for handling export/im
    - More straightforward for simple operations
    - Better for batch processing and automation scripts
 
+### Odoo Code Agent
+
+The Odoo 18 MCP Integration includes a powerful Odoo Code Agent that helps with generating Odoo 18 modules and code:
+
+1. **Structured Workflow**
+   - Analysis Phase: Understand requirements and gather documentation
+   - Planning Phase: Create a plan and tasks for implementation
+   - Human Feedback Loop: Get feedback on the plan
+   - Coding Phase: Generate module structure and code files
+   - Human Feedback Loop: Get feedback on the code
+   - Finalization Phase: Finalize the code based on feedback
+
+2. **Fallback Models Integration**
+   - Google Gemini API integration for enhanced code generation
+   - Ollama integration for local model support
+   - Graceful fallbacks when models are unavailable
+
+3. **Code Generation Features**
+   - Complete module structure generation
+   - Model class generation with proper field definitions
+   - View generation (form, list, search) following Odoo 18 guidelines
+   - Security access rights configuration
+   - Action windows and menu items
+   - Controllers with routes
+   - Manifest file generation
+
+4. **Odoo 18 Compliance**
+   - Uses list view instead of tree view
+   - Implements the single `<chatter/>` tag
+   - Removes deprecated attributes
+   - Follows Odoo 18 coding standards
+
 ## Using the MCP Server
 
 ### With Claude Desktop
 
 1. Install the MCP server in Claude Desktop:
    ```bash
-   mcp install mcp_server.py --name "Odoo 18 Integration" -v ODOO_URL=http://localhost:8069 -v ODOO_DB=llmdb18 -v ODOO_USERNAME=admin -v ODOO_PASSWORD=admin
+   mcp install mcp_server.py --name "Odoo 18 Integration" -v ODOO_URL=http://localhost:8069 -v ODOO_DB=llmdb18 -v ODOO_USERNAME=admin -v ODOO_PASSWORD=admin -v GEMINI_API_KEY=your_gemini_api_key -v GEMINI_MODEL=gemini-2.0-flash
    ```
+
+   If you don't want to use the Odoo Code Agent with Gemini integration, you can omit the GEMINI_API_KEY and GEMINI_MODEL variables.
 
 2. Select "Odoo 18 Integration" from the server dropdown in Claude Desktop
 
@@ -132,6 +168,8 @@ Our Odoo 18 MCP Integration uses two different approaches for handling export/im
    ```
    /resource odoo://models/all
    /tool search_records model_name=res.partner query=company
+   /tool run_odoo_code_agent query="Create a customer feedback module for Odoo 18" use_gemini=true
+   /tool retrieve_odoo_documentation query="How to create a custom module in Odoo 18"
    ```
 
 ### With the Standalone Server
@@ -143,7 +181,20 @@ Our Odoo 18 MCP Integration uses two different approaches for handling export/im
 
 2. Use the HTTP API to access tools and resources:
    ```bash
-   curl -X POST http://localhost:8000/tools/search_records -d '{"model_name": "res.partner", "query": "company"}'
+   # Search for records
+   curl -X POST "http://localhost:8001/call_tool" \
+     -H "Content-Type: application/json" \
+     -d '{"tool": "search_records", "params": {"model_name": "res.partner", "query": "company"}}'
+
+   # Generate Odoo module code
+   curl -X POST "http://localhost:8001/call_tool" \
+     -H "Content-Type: application/json" \
+     -d '{"tool": "run_odoo_code_agent", "params": {"query": "Create a customer feedback module", "use_gemini": true}}'
+
+   # Retrieve Odoo documentation
+   curl -X POST "http://localhost:8001/call_tool" \
+     -H "Content-Type: application/json" \
+     -d '{"tool": "retrieve_odoo_documentation", "params": {"query": "How to create a custom module in Odoo 18"}}'
    ```
 
 ## Benefits of MCP

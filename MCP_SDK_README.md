@@ -35,8 +35,10 @@ pip install "mcp[cli]"
 2. Install the MCP server in Claude Desktop:
 
 ```bash
-mcp install mcp_server.py --name "Odoo 18 Integration" -v ODOO_URL=http://your-odoo-server:8069 -v ODOO_DB=your_database_name -v ODOO_USERNAME=your_username -v ODOO_PASSWORD=your_password
+mcp install mcp_server.py --name "Odoo 18 Integration" -v ODOO_URL=http://your-odoo-server:8069 -v ODOO_DB=your_database_name -v ODOO_USERNAME=your_username -v ODOO_PASSWORD=your_password -v GEMINI_API_KEY=your_gemini_api_key -v GEMINI_MODEL=gemini-2.0-flash
 ```
+
+If you don't want to use the Odoo Code Agent with Gemini integration, you can omit the GEMINI_API_KEY and GEMINI_MODEL variables.
 
 3. Alternatively, manually update the Claude Desktop configuration file:
 
@@ -57,11 +59,15 @@ Add the following to the `servers` section:
                 "ODOO_URL": "http://localhost:8069",
                 "ODOO_DB": "llmdb18",
                 "ODOO_USERNAME": "admin",
-                "ODOO_PASSWORD": "admin"
+                "ODOO_PASSWORD": "admin",
+                "GEMINI_API_KEY": "your_gemini_api_key_here",
+                "GEMINI_MODEL": "gemini-2.0-flash"
             }
     }
 }
 ```
+
+If you don't want to use the Odoo Code Agent with Gemini integration, you can omit the GEMINI_API_KEY and GEMINI_MODEL variables.
 
 4. Restart Claude Desktop to apply the changes.
 
@@ -129,6 +135,14 @@ The MCP server provides the following tools:
 | **execute_method** | Execute a custom method | ✅ Working | `/tool execute_method model_name=res.partner method=name_search args=["Test"]` |
 | **analyze_field_importance** | Analyze field importance | ✅ Working | `/tool analyze_field_importance model_name=res.partner use_nlp=true` |
 | **get_field_groups** | Group fields by purpose | ✅ Working | `/tool get_field_groups model_name=product.product` |
+| **export_records_to_csv** | Export records to CSV | ✅ Working | `/tool export_records_to_csv model_name=res.partner fields=["id","name","email"]` |
+| **import_records_from_csv** | Import records from CSV | ✅ Working | `/tool import_records_from_csv model_name=res.partner import_path="exports/partners.csv"` |
+| **export_related_records_to_csv** | Export parent-child records | ✅ Working | `/tool export_related_records_to_csv parent_model=account.move child_model=account.move.line relation_field=move_id` |
+| **import_related_records_from_csv** | Import parent-child records | ✅ Working | `/tool import_related_records_from_csv parent_model=account.move child_model=account.move.line relation_field=move_id import_path="./tmp/invoices.csv"` |
+| **advanced_search** | Natural language search | ✅ Working | `/tool advanced_search query="List all unpaid bills with vendor details" limit=10` |
+| **retrieve_odoo_documentation** | Get Odoo 18 documentation | ✅ Working | `/tool retrieve_odoo_documentation query="How to create a custom module" max_results=5` |
+| **validate_field_value** | Validate a field value | ✅ Working | `/tool validate_field_value model_name=res.partner field_name=email value="test@example.com"` |
+| **run_odoo_code_agent** | Generate Odoo 18 module code | ✅ Working | `/tool run_odoo_code_agent query="Create a customer feedback module" use_gemini=true` |
 
 #### Search Records
 
@@ -234,6 +248,29 @@ Example:
 /tool get_record_template model_name=product.product
 ```
 
+#### Run Odoo Code Agent
+
+```
+/tool run_odoo_code_agent query={query} use_gemini={use_gemini} use_ollama={use_ollama} feedback={feedback} save_to_files={save_to_files} output_dir={output_dir}
+```
+
+This tool generates Odoo 18 module code based on a natural language query. It follows a structured workflow with analysis, planning, human feedback, coding, and finalization phases.
+
+Parameters:
+- `query`: The natural language query describing the module to create (required)
+- `use_gemini`: Whether to use Google Gemini as a fallback (default: false)
+- `use_ollama`: Whether to use Ollama as a fallback (default: false)
+- `feedback`: Optional feedback to incorporate into the code generation
+- `save_to_files`: Whether to save the generated files to disk (default: false)
+- `output_dir`: Directory to save the generated files to (defaults to ./generated_modules)
+
+Example:
+```
+/tool run_odoo_code_agent query="Create a customer feedback module for Odoo 18" use_gemini=true
+```
+
+For the best results, we recommend using Google Gemini as a fallback model by setting `use_gemini=true`. This requires setting up the GEMINI_API_KEY environment variable in your .env file or when installing the MCP server.
+
 ### Prompts
 
 The MCP server provides the following prompts:
@@ -242,6 +279,11 @@ The MCP server provides the following prompts:
 |--------|-------------|--------------|
 | **create_record_prompt** | Guidance for creating a record | `/prompt create_record_prompt model_name=res.partner` |
 | **search_records_prompt** | Guidance for searching records | `/prompt search_records_prompt model_name=product.product` |
+| **export_records_prompt** | Guidance for exporting records | `/prompt export_records_prompt model_name=res.partner` |
+| **import_records_prompt** | Guidance for importing records | `/prompt import_records_prompt model_name=res.partner` |
+| **advanced_search_prompt** | Guidance for advanced search | `/prompt advanced_search_prompt` |
+| **odoo_documentation_prompt** | Guidance for retrieving Odoo docs | `/prompt odoo_documentation_prompt` |
+| **odoo_code_agent_prompt** | Guidance for using the Odoo code agent | `/prompt odoo_code_agent_prompt` |
 
 #### Create Record Prompt
 
@@ -267,6 +309,24 @@ This prompt helps you search for records in an Odoo model.
 Example:
 ```
 /prompt search_records_prompt model_name=product.product
+```
+
+#### Odoo Code Agent Prompt
+
+```
+/prompt odoo_code_agent_prompt
+```
+
+This prompt helps you use the Odoo Code Agent to generate Odoo 18 module code. It provides guidance on:
+- How to formulate effective queries
+- How to use the Gemini integration
+- How to provide feedback to improve the generated code
+- How to save the generated files to disk
+- Best practices for module development
+
+Example:
+```
+/prompt odoo_code_agent_prompt
 ```
 
 ## Development

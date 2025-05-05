@@ -35,6 +35,7 @@ This project aims to create a robust integration server that connects MCP (Maste
    - Documentation integration ✅
    - Odoo connector integration ✅
    - Fallback model support (Gemini, Ollama) ✅
+   - Improved Ollama integration with HTTP API ✅
    - State management ✅
    - LangGraph workflow ✅
    - Code generator utility ✅
@@ -366,6 +367,10 @@ odoo18-mcp-project/
 5. **Fallback Models**
    - Google Gemini integration ✅
    - Ollama integration ✅
+   - Direct HTTP API integration for Ollama ✅
+   - Improved error handling for Ollama timeouts ✅
+   - Enhanced code parsing from Ollama responses ✅
+   - Simplified prompts for Ollama code generation ✅
    - Fallback model selection ✅
    - Error handling and recovery ✅
    - API key management ✅

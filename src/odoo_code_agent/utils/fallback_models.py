@@ -8,6 +8,7 @@ This module provides fallback models for generating code when the primary models
 
 import logging
 import os
+import json
 import subprocess
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
@@ -73,7 +74,7 @@ def initialize_gemini() -> bool:
 
 def initialize_ollama() -> bool:
     """
-    Initialize the Ollama model.
+    Initialize the Ollama model using direct HTTP API calls.
 
     Returns:
         True if initialization was successful, False otherwise
@@ -83,27 +84,45 @@ def initialize_ollama() -> bool:
     try:
         # Check if the required packages are installed
         try:
-            import ollama
+            import requests
         except ImportError:
-            logger.warning("Ollama package not found. Installing...")
-            subprocess.check_call(["pip", "install", "ollama"])
-            import ollama
+            logger.warning("Requests package not found. Installing...")
+            subprocess.check_call(["pip", "install", "requests"])
+            import requests
 
-        # Test the model
+        # Test the Ollama API
         try:
-            response = ollama.chat(model='deepseek-r1:latest', messages=[
-                {
-                    'role': 'user',
-                    'content': 'Hello, world!'
-                }
-            ])
+            # First check if the Ollama server is running
+            version_response = requests.get("http://localhost:11434/api/version", timeout=10)
+            if version_response.status_code != 200:
+                logger.error(f"Ollama server returned status code {version_response.status_code}")
+                return False
 
-            if response:
+            logger.info(f"Ollama server version: {version_response.json()}")
+
+            # Test with a simple chat request
+            response = requests.post(
+                "http://localhost:11434/api/chat",
+                json={
+                    "model": "deepseek-r1",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": "Hello, world!"
+                        }
+                    ],
+                    "stream": False  # Request a complete response instead of streaming
+                },
+                timeout=60
+            )
+
+            if response.status_code == 200:
                 logger.info("Ollama model initialized successfully")
                 ollama_initialized = True
                 return True
             else:
-                logger.error("Failed to get response from Ollama model")
+                logger.error(f"Failed to get response from Ollama model. Status code: {response.status_code}")
+                logger.error(f"Response: {response.text}")
                 return False
         except Exception as e:
             logger.error(f"Error communicating with Ollama: {str(e)}")
@@ -153,7 +172,7 @@ def generate_with_gemini(prompt: str) -> Optional[str]:
 
 def generate_with_ollama(prompt: str) -> Optional[str]:
     """
-    Generate text using Ollama model.
+    Generate text using Ollama model via direct HTTP API calls.
 
     Args:
         prompt: The prompt to send to the model
@@ -169,19 +188,66 @@ def generate_with_ollama(prompt: str) -> Optional[str]:
             return None
 
     try:
-        import ollama
+        import requests
 
-        response = ollama.chat(model='deepseek-r1:latest', messages=[
-            {
-                'role': 'user',
-                'content': prompt
-            }
-        ])
+        # Log the prompt for debugging
+        logger.info(f"Sending prompt to Ollama (first 100 chars): {prompt[:100]}...")
 
-        if response and 'message' in response and 'content' in response['message']:
-            return response['message']['content']
+        # Make the API request with stream=false to get a complete response
+        response = requests.post(
+            "http://localhost:11434/api/chat",
+            json={
+                "model": "deepseek-r1",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                "stream": False  # Request a complete response instead of streaming
+            },
+            timeout=600  # 10 minutes timeout for code generation
+        )
+
+        # Check if the request was successful
+        if response.status_code == 200:
+            try:
+                # Try to parse the JSON response
+                result = response.json()
+                if result and 'message' in result and 'content' in result['message']:
+                    content = result['message']['content']
+                    logger.info(f"Received response from Ollama (first 100 chars): {content[:100]}...")
+                    return content
+                else:
+                    logger.error(f"Unexpected response format from Ollama: {result}")
+                    return None
+            except json.JSONDecodeError as e:
+                # If JSON parsing fails, try to extract the content directly from the response text
+                logger.warning(f"Failed to parse JSON response: {e}")
+                logger.warning(f"Attempting to extract content from raw response")
+
+                # The response might be a streaming response with multiple JSON objects
+                try:
+                    # Try to extract the first JSON object
+                    import re
+                    json_match = re.search(r'(\{.*?\})', response.text, re.DOTALL)
+                    if json_match:
+                        first_json = json.loads(json_match.group(1))
+                        if 'message' in first_json and 'content' in first_json['message']:
+                            content = first_json['message']['content']
+                            logger.info(f"Extracted content from raw response (first 100 chars): {content[:100]}...")
+                            return content
+
+                    # If that fails, just return the raw text
+                    logger.warning("Returning raw response text")
+                    return response.text
+                except Exception as inner_e:
+                    logger.error(f"Error extracting content from raw response: {inner_e}")
+                    logger.error(f"Raw response: {response.text[:500]}...")
+                    return None
         else:
-            logger.error("Failed to get response from Ollama model")
+            logger.error(f"Failed to get response from Ollama model. Status code: {response.status_code}")
+            logger.error(f"Response: {response.text}")
             return None
 
     except Exception as e:

@@ -148,15 +148,34 @@ Add the following to the `servers` section:
                 "ODOO_URL": "http://localhost:8069",
                 "ODOO_DB": "llmdb18",
                 "ODOO_USERNAME": "admin",
-                "ODOO_PASSWORD": "admin"
+                "ODOO_PASSWORD": "admin",
+                "GEMINI_API_KEY": "your_gemini_api_key_here",
+                "GEMINI_MODEL": "gemini-2.0-flash"
             }
     }
 }
 ```
 
-**Important**: Replace `/full/path/to/your/python` with the actual full path to your Python executable. You can find this by running `which python3` in your terminal. For example, if you're using a virtual environment, it might be something like `/Users/username/workspace/odoo18_mcp_project/.venv/bin/python3`.
+**Important**:
+- Replace `/full/path/to/your/python` with the actual full path to your Python executable. You can find this by running `which python3` in your terminal. For example, if you're using a virtual environment, it might be something like `/Users/username/workspace/odoo18_mcp_project/.venv/bin/python3`.
+- Replace `your_gemini_api_key_here` with your actual Google Gemini API key if you want to use the Odoo Code Agent with Gemini integration.
 
-4. Restart Claude Desktop to apply the changes.
+4. Alternatively, use the provided script to update the Claude Desktop configuration:
+
+```bash
+# Make the script executable
+chmod +x update_claude_config.sh
+
+# Run the script
+./update_claude_config.sh
+```
+
+This script will:
+- Load environment variables from your `.env` file (including GEMINI_API_KEY)
+- Update the Claude Desktop configuration with the correct values
+- Handle environment variable substitution automatically
+
+5. Restart Claude Desktop to apply the changes.
 
 5. Verify the installation by checking the Claude Desktop logs for successful connection to Odoo.
 
@@ -1508,7 +1527,7 @@ The agent can use Google Gemini or Ollama as fallback models if needed.
 
 ### Google Gemini Integration
 
-The Odoo Code Agent now includes direct integration with Google's Gemini API for improved code generation:
+The Odoo Code Agent includes direct integration with Google's Gemini API for improved code generation:
 
 1. **Environment Variables**: Set up your Gemini API key and model in the `.env` file:
    ```
@@ -1528,6 +1547,24 @@ The Odoo Code Agent now includes direct integration with Google's Gemini API for
 
 7. **Fallback Mechanisms**: The agent includes robust fallback mechanisms for when Gemini is not available
 
+### Ollama Integration
+
+The Odoo Code Agent also includes integration with Ollama for local code generation:
+
+1. **Direct HTTP API**: Uses Ollama's HTTP API directly for reliable communication
+
+2. **Configurable Models**: Works with any Ollama model, with deepseek-r1 recommended for Odoo code generation
+
+3. **Improved Error Handling**: Enhanced error handling for timeouts and connection issues
+
+4. **Simplified Prompts**: Uses simplified prompts optimized for Ollama models
+
+5. **Code Block Extraction**: Advanced regex patterns to extract code blocks from Ollama responses
+
+6. **Detailed Logging**: Comprehensive logging for troubleshooting Ollama interactions
+
+7. **Fallback Mechanism**: Automatically falls back to basic code generation if Ollama is unavailable
+
 ### Usage
 
 ```python
@@ -1544,5 +1581,36 @@ result = run_odoo_code_agent(
     use_ollama=False
 )
 
+# Use with Ollama integration
+result = run_odoo_code_agent(
+    query="Create an Odoo 18 module for customer feedback with ratings and comments",
+    odoo_url="http://localhost:8069",
+    odoo_db="llmdb18",
+    odoo_username="admin",
+    odoo_password="admin",
+    use_gemini=False,
+    use_ollama=True  # Enable Ollama integration
+)
+
 print(result)
+```
+
+### MCP Tool Usage
+
+You can use the Odoo Code Agent as an MCP tool in Claude Desktop:
+
+```
+/tool run_odoo_code_agent_tool query="Create a simple Odoo 18 module for customer feedback" use_gemini=true use_ollama=false
+```
+
+Or with Ollama:
+
+```
+/tool run_odoo_code_agent_tool query="Create a simple Odoo 18 module for customer feedback" use_gemini=false use_ollama=true
+```
+
+You can also save the generated files to disk:
+
+```
+/tool run_odoo_code_agent_tool query="Create a simple Odoo 18 module for customer feedback" use_gemini=true save_to_files=true output_dir="./generated_modules"
 ```

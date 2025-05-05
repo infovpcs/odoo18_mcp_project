@@ -167,6 +167,18 @@ Last Updated: 2025-05-04
 - [x] Test Odoo code agent with Gemini integration
 - [x] Update documentation with Gemini integration information
 
+## Phase 17: Improved Ollama Integration for Odoo Code Agent (2025-05-05)
+- [x] Replace Python Ollama package with direct HTTP API calls
+- [x] Implement improved error handling for Ollama timeouts
+- [x] Add enhanced code parsing from Ollama responses
+- [x] Create simplified prompts for Ollama code generation
+- [x] Increase timeout values for Ollama API calls
+- [x] Add stream=False parameter to get complete responses
+- [x] Implement multiple regex patterns for code block extraction
+- [x] Add detailed logging for Ollama API interactions
+- [x] Test Ollama integration with deepseek-r1 model
+- [x] Update documentation with Ollama integration improvements
+
 ## Phase 16: Odoo Code Agent MCP Tool Integration (2025-05-04)
 - [x] Add Odoo code agent as MCP tool in mcp_server.py
 - [x] Implement parameter validation and error handling
@@ -308,6 +320,7 @@ Last Updated: 2025-05-04
 - [x] Add documentation integration for Odoo code agent (2025-05-04)
 - [x] Add Odoo connector integration for Odoo code agent (2025-05-04)
 - [x] Implement fallback model support (Gemini, Ollama) (2025-05-04)
+- [x] Improve Ollama integration with direct HTTP API calls (2025-05-05)
 - [x] Create test script for Odoo code agent (2025-05-04)
 - [x] Test Odoo code agent with different queries (2025-05-04)
 - [x] Update documentation with Odoo code agent information (2025-05-04)

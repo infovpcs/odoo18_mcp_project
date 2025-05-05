@@ -117,7 +117,13 @@ GEMINI_MODEL=gemini-2.0-flash
 
 ### Claude Desktop Integration
 
-1. Install the MCP SDK:
+The project includes comprehensive integration with Claude Desktop, allowing you to use all the Odoo 18 MCP tools directly within the Claude AI assistant interface.
+
+#### Installation Options
+
+##### Option 1: Using the MCP CLI (Recommended)
+
+1. Install the MCP SDK with CLI support:
 
 ```bash
 pip install "mcp[cli]"
@@ -126,41 +132,23 @@ pip install "mcp[cli]"
 2. Install the MCP server in Claude Desktop:
 
 ```bash
-mcp install mcp_server.py --name "Odoo 18 Integration" -v ODOO_URL=http://localhost:8069 -v ODOO_DB=llmdb18 -v ODOO_USERNAME=admin -v ODOO_PASSWORD=admin
+mcp install mcp_server.py --name "Odoo 18 Integration" \
+  -v ODOO_URL=http://localhost:8069 \
+  -v ODOO_DB=llmdb18 \
+  -v ODOO_USERNAME=admin \
+  -v ODOO_PASSWORD=admin \
+  -v GEMINI_API_KEY=your_gemini_api_key_here \
+  -v GEMINI_MODEL=gemini-2.0-flash
 ```
 
-3. Alternatively, manually update the Claude Desktop configuration file:
+This command will:
+- Register the MCP server with Claude Desktop
+- Configure the necessary environment variables
+- Set up the server with the correct name and description
 
-- **macOS**: `~/Library/Application Support/Claude/config.json`
-- **Windows**: `%APPDATA%\Claude\config.json`
-- **Linux**: `~/.config/Claude/config.json`
+##### Option 2: Using the Automated Script
 
-Add the following to the `servers` section:
-
-```json
-{
-    "odoo18-mcp":{
-        "name": "Odoo 18 Integration",
-        "description": "Dynamic Odoo 18 integration with MCP",
-        "command": "/full/path/to/your/python",
-        "args": ["/Users/vinusoft85/workspace/odoo18_mcp_project/mcp_server.py"],
-        "env": {
-                "ODOO_URL": "http://localhost:8069",
-                "ODOO_DB": "llmdb18",
-                "ODOO_USERNAME": "admin",
-                "ODOO_PASSWORD": "admin",
-                "GEMINI_API_KEY": "your_gemini_api_key_here",
-                "GEMINI_MODEL": "gemini-2.0-flash"
-            }
-    }
-}
-```
-
-**Important**:
-- Replace `/full/path/to/your/python` with the actual full path to your Python executable. You can find this by running `which python3` in your terminal. For example, if you're using a virtual environment, it might be something like `/Users/username/workspace/odoo18_mcp_project/.venv/bin/python3`.
-- Replace `your_gemini_api_key_here` with your actual Google Gemini API key if you want to use the Odoo Code Agent with Gemini integration.
-
-4. Alternatively, use the provided script to update the Claude Desktop configuration:
+We provide a convenient script that automatically updates the Claude Desktop configuration:
 
 ```bash
 # Make the script executable
@@ -171,13 +159,110 @@ chmod +x update_claude_config.sh
 ```
 
 This script will:
+- Detect your Claude Desktop configuration location based on your OS
 - Load environment variables from your `.env` file (including GEMINI_API_KEY)
 - Update the Claude Desktop configuration with the correct values
 - Handle environment variable substitution automatically
+- Create a backup of your existing configuration
+- Validate the updated configuration
 
-5. Restart Claude Desktop to apply the changes.
+##### Option 3: Manual Configuration
 
-5. Verify the installation by checking the Claude Desktop logs for successful connection to Odoo.
+You can also manually update the Claude Desktop configuration file:
+
+1. Locate your Claude Desktop configuration file:
+   - **macOS**: `~/Library/Application Support/Claude/config.json`
+   - **Windows**: `%APPDATA%\Claude\config.json`
+   - **Linux**: `~/.config/Claude/config.json`
+
+2. Open the file in a text editor and add the following to the `servers` section:
+
+```json
+{
+    "odoo18-mcp": {
+        "name": "Odoo 18 Integration",
+        "description": "Dynamic Odoo 18 integration with MCP",
+        "command": "/full/path/to/your/python",
+        "args": ["/Users/vinusoft85/workspace/odoo18_mcp_project/mcp_server.py"],
+        "env": {
+            "ODOO_URL": "http://localhost:8069",
+            "ODOO_DB": "llmdb18",
+            "ODOO_USERNAME": "admin",
+            "ODOO_PASSWORD": "admin",
+            "GEMINI_API_KEY": "your_gemini_api_key_here",
+            "GEMINI_MODEL": "gemini-2.0-flash"
+        }
+    }
+}
+```
+
+**Important Configuration Notes**:
+- Replace `/full/path/to/your/python` with the actual full path to your Python executable. You can find this by running `which python3` in your terminal. For example, if you're using a virtual environment, it might be something like `/Users/username/workspace/odoo18_mcp_project/.venv/bin/python3`.
+- Replace `your_gemini_api_key_here` with your actual Google Gemini API key if you want to use the Odoo Code Agent with Gemini integration.
+- Make sure the path to `mcp_server.py` is correct for your installation.
+
+#### Verifying the Installation
+
+After configuring Claude Desktop:
+
+1. Restart Claude Desktop to apply the changes
+2. Open Claude Desktop and click on the server selection dropdown (top-right corner)
+3. Select "Odoo 18 Integration" from the list
+4. Check the Claude Desktop logs for successful connection to Odoo
+5. Try a simple command like `/tool search_records model_name=res.partner query=company` to verify functionality
+
+#### Troubleshooting Claude Desktop Integration
+
+If you encounter issues with the Claude Desktop integration:
+
+1. **Check the Claude Desktop logs**:
+   - **macOS**: `~/Library/Logs/Claude/main.log`
+   - **Windows**: `%APPDATA%\Claude\logs\main.log`
+   - **Linux**: `~/.config/Claude/logs/main.log`
+
+2. **Verify Python path**:
+   - Make sure the Python path in the configuration is correct and accessible
+   - The Python executable should have the MCP SDK installed
+
+3. **Check environment variables**:
+   - Verify that all environment variables are correctly set
+   - Make sure the Odoo server is running and accessible at the specified URL
+
+4. **Restart Claude Desktop**:
+   - Sometimes a simple restart resolves connection issues
+
+5. **Run the MCP server directly**:
+   - Try running `python mcp_server.py` directly to check for any errors
+
+6. **Use the standalone server for testing**:
+   - Run `python standalone_mcp_server.py` and test the tools using curl commands
+
+#### Using Claude Desktop with Odoo 18 Integration
+
+Once configured, you can use all the Odoo 18 MCP tools directly within Claude Desktop:
+
+1. **Tool Commands**: Use `/tool` commands to execute specific operations
+   ```
+   /tool search_records model_name=res.partner query="company"
+   /tool get_record_template model_name=product.product
+   /tool run_odoo_code_agent query="Create a customer feedback module" use_gemini=true
+   ```
+
+2. **Resource Commands**: Use `/resource` commands to access Odoo resources
+   ```
+   /resource odoo://models/all
+   /resource odoo://model/res.partner/metadata
+   /resource odoo://model/product.product/records
+   ```
+
+3. **Prompt Commands**: Use `/prompt` commands for guided assistance
+   ```
+   /prompt create_record_prompt model_name=res.partner
+   /prompt export_records_prompt model_name=res.partner
+   /prompt odoo_code_agent_prompt
+   ```
+
+The integration provides a seamless experience, allowing you to work with Odoo directly from Claude Desktop without switching between applications.
 
 ### Building from Source
 
@@ -887,10 +972,6 @@ print(response.json())
 ```
 odoo18_mcp_project/
 ├── src/                    # Source code
-│   ├── search/             # Advanced search functionality
-│   │   ├── query_parser.py # Natural language query parser
-│   │   ├── relationship_handler.py # Model relationship handler
-│   │   └── advanced_search.py # Advanced search implementation
 │   ├── core/               # Core functionality
 │   │   ├── config.py       # Configuration management
 │   │   └── logger.py       # Logging system
@@ -898,30 +979,76 @@ odoo18_mcp_project/
 │   │   ├── client.py       # MCP client
 │   │   ├── handlers.py     # Request handlers
 │   │   └── dynamic_handlers.py # Dynamic model handlers
-│   └── odoo/               # Odoo integration
-│       ├── client.py       # Odoo client
-│       ├── schemas.py      # Data schemas
-│       └── dynamic/        # Dynamic model handling
-│           ├── model_discovery.py    # Model discovery
-│           ├── field_analyzer.py     # Field analysis
-│           ├── crud_generator.py     # CRUD operations
-│           └── nlp_analyzer.py       # NLP-based analysis
+│   ├── odoo/               # Odoo integration
+│   │   ├── client.py       # Odoo client
+│   │   ├── schemas.py      # Data schemas
+│   │   └── dynamic/        # Dynamic model handling
+│   │       ├── model_discovery.py    # Model discovery
+│   │       ├── field_analyzer.py     # Field analysis
+│   │       ├── crud_generator.py     # CRUD operations
+│   │       └── nlp_analyzer.py       # NLP-based analysis
+│   ├── agents/             # Agent-based workflows
+│   │   └── export_import/  # Export/Import agent
+│   │       ├── main.py     # Main agent implementation
+│   │       ├── state.py    # Agent state management
+│   │       ├── nodes/      # LangGraph nodes
+│   │       │   ├── export_nodes.py # Export workflow nodes
+│   │       │   └── import_nodes.py # Import workflow nodes
+│   │       └── utils/      # Utility functions
+│   │           ├── csv_handler.py # CSV processing
+│   │           └── field_mapper.py # Field mapping
+│   ├── odoo_code_agent/    # Odoo code generation agent
+│   │   ├── main.py         # Main agent implementation
+│   │   ├── state.py        # Agent state management
+│   │   ├── nodes/          # LangGraph nodes
+│   │   │   ├── analysis_nodes.py # Analysis workflow nodes
+│   │   │   ├── planning_nodes.py # Planning workflow nodes
+│   │   │   ├── feedback_nodes.py # Feedback workflow nodes
+│   │   │   └── coding_nodes.py   # Code generation nodes
+│   │   └── utils/          # Utility functions
+│   │       ├── code_generator.py # Code generation utilities
+│   │       ├── documentation_helper.py # Documentation utilities
+│   │       ├── fallback_models.py # Fallback model integration
+│   │       ├── file_saver.py # File saving utilities
+│   │       ├── gemini_client.py # Google Gemini API client
+│   │       ├── module_structure.py # Module structure utilities
+│   │       └── odoo_connector.py # Odoo connection utilities
+│   └── odoo_docs_rag/      # Odoo documentation RAG
+│       ├── docs_processor.py # Documentation processing
+│       ├── docs_retriever.py # Documentation retrieval
+│       ├── embedding_engine.py # Embedding engine
+│       └── utils.py        # Utility functions
+├── scripts/                # Utility scripts
+│   └── dynamic_data_tool.py # Export/Import CLI tool
 ├── tests/                  # Test suite
-├── main.py                 # Main entry point
+│   ├── test_core/          # Core tests
+│   ├── test_mcp/           # MCP tests
+│   ├── test_odoo/          # Odoo tests
+│   ├── test_code_generator.py # Code generator tests
+│   ├── test_module_structure.py # Module structure tests
+│   └── test_odoo_code_agent.py # Odoo code agent tests
+├── odoo_docs/              # Odoo documentation repository
+├── odoo_docs_index/        # Odoo documentation index
+│   ├── documents.pkl       # Processed documents
+│   └── faiss_index.bin     # FAISS vector index
+├── tmp/                    # Temporary files directory
 ├── mcp_server.py           # MCP server implementation
-├── client_test.py          # Client test script
-├── advanced_client_test.py # Advanced client test
-├── dynamic_model_test.py   # Dynamic model test
+├── standalone_mcp_server.py # Standalone MCP server
+├── test_mcp_functions.py   # MCP functions test
+├── test_mcp_tools.py       # MCP tools test
 ├── test_advanced_search.py # Advanced search test
+├── test_odoo_docs_rag.py   # Odoo documentation RAG test
+├── test_odoo_code_agent_tool.py # Odoo code agent tool test
+├── test_export_import_tools.py # Export/Import tools test
+├── test_export_import_agent.py # Export/Import agent test
 ├── query_parser.py         # Natural language query parser
 ├── relationship_handler.py # Model relationship handler
-├── advanced_search.py      # Advanced search implementation
-├── test_mcp_client.py      # MCP client test
-├── test_odoo_connection.py # Odoo connection test
-├── sql_schema_generator.py # SQL schema generator
+├── update_claude_config.sh # Claude Desktop config updater
 ├── .env.example            # Environment variables example
+├── .dockerignore           # Docker ignore file
 ├── pyproject.toml          # Project configuration
 ├── setup.py                # Setup script
+├── requirements.txt        # Project dependencies
 ├── README.md               # Main documentation
 ├── PLANNING.md             # Project planning
 └── TASK.md                 # Task tracking

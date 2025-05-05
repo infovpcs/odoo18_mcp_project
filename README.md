@@ -1,6 +1,6 @@
 # Odoo 18 MCP Integration (18.0 Branch)
 
-Last Updated: 2025-05-04
+Last Updated: 2025-05-18
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Odoo 18.0](https://img.shields.io/badge/odoo-18.0-green.svg)](https://www.odoo.com/)
@@ -448,9 +448,9 @@ Once you've configured Claude Desktop, you can use the Odoo 18 MCP integration:
 | **analyze_field_importance** | Analyze the importance of fields in a model | `/tool analyze_field_importance model_name=res.partner use_nlp=true` | ✅ Working |
 | **get_field_groups** | Group fields by purpose for a model | `/tool get_field_groups model_name=product.product` | ✅ Working |
 | **export_records_to_csv** | Export records from a model to CSV | `/tool export_records_to_csv model_name=res.partner fields=["id","name","email"]` | ✅ Working |
-| **import_records_from_csv** | Import records from CSV to a model | `/tool import_records_from_csv model_name=res.partner import_path="exports/partners.csv"` | ✅ Working |
+| **import_records_from_csv** | Import records from CSV to a model | `/tool import_records_from_csv model_name=res.partner input_path="exports/partners.csv"` | ✅ Working |
 | **export_related_records_to_csv** | Export parent-child records to CSV | `/tool export_related_records_to_csv parent_model=account.move child_model=account.move.line relation_field=move_id move_type=out_invoice export_path="./tmp/customer_invoices.csv"` | ✅ Working |
-| **import_related_records_from_csv** | Import parent-child records from CSV | `/tool import_related_records_from_csv parent_model=account.move child_model=account.move.line relation_field=move_id import_path="./tmp/customer_invoices.csv" reset_to_draft=true skip_readonly_fields=true` | ✅ Working |
+| **import_related_records_from_csv** | Import parent-child records from CSV | `/tool import_related_records_from_csv parent_model=account.move child_model=account.move.line relation_field=move_id input_path="./tmp/customer_invoices.csv" reset_to_draft=true skip_readonly_fields=true` | ✅ Working |
 | **advanced_search** | Perform advanced natural language search | `/tool advanced_search query="List all unpaid bills with respect of vendor details" limit=10` | ✅ Working |
 | **retrieve_odoo_documentation** | Retrieve information from Odoo 18 documentation | `/tool retrieve_odoo_documentation query="How to create a custom module in Odoo 18" max_results=5` | ✅ Working |
 | **validate_field_value** | Validate a field value for a model | `/tool validate_field_value model_name=res.partner field_name=email value="test@example.com"` | ✅ Working |
@@ -750,6 +750,40 @@ With Gemini enabled, the Odoo Code Agent can generate more sophisticated and con
 
 The project includes a direct implementation for export/import operations. This approach provides a straightforward process for exporting and importing data with proper field mapping and validation.
 
+#### Test Scripts for Export/Import Functionality
+
+We've created several test scripts to verify the export/import functionality:
+
+1. **test_export_import.py**: Tests the basic export_related_records and import_related_records functions with res.partner and res.partner.bank models.
+
+```bash
+python test_export_import.py
+```
+
+2. **test_import_records.py**: Tests the import_records function with res.partner model.
+
+```bash
+python test_import_records.py
+```
+
+3. **test_direct_export_import.py**: Tests exporting and importing account.move and account.move.line records.
+
+```bash
+python test_direct_export_import.py
+```
+
+4. **test_mcp_tools.py**: Tests the MCP tools for export/import operations.
+
+```bash
+# Make sure the standalone MCP server is running
+python standalone_mcp_server.py
+
+# In another terminal
+python test_mcp_tools.py
+```
+
+These test scripts help ensure that the export/import functionality is working correctly and provide examples of how to use the functions.
+
 #### Export/Import Features
 
 - Support for any Odoo model
@@ -761,7 +795,7 @@ The project includes a direct implementation for export/import operations. This 
 - CSV as the primary data format
 
 ```python
-from direct_export_import import export_records, import_records
+from direct_export_import import export_records, import_records, export_related_records, import_related_records
 
 # Export records
 result = export_records(
@@ -773,11 +807,33 @@ result = export_records(
 
 # Import records
 result = import_records(
-    import_path="./exports/companies.csv",
+    input_path="./exports/companies.csv",
     model_name="res.partner",
     field_mapping={"id": "id", "name": "name", "email": "email", "phone": "phone"},
     create_if_not_exists=False,
     update_if_exists=True
+)
+
+# Export related records (parent-child)
+result = export_related_records(
+    parent_model="account.move",
+    child_model="account.move.line",
+    relation_field="move_id",
+    parent_fields=["id", "name", "partner_id", "invoice_date", "amount_total"],
+    child_fields=["id", "product_id", "account_id", "quantity", "price_unit"],
+    filter_domain="[('move_type', '=', 'out_invoice')]",
+    export_path="./exports/invoices.csv"
+)
+
+# Import related records (parent-child)
+result = import_related_records(
+    parent_model="account.move",
+    child_model="account.move.line",
+    relation_field="move_id",
+    input_path="./exports/invoices.csv",
+    force=True,
+    reset_to_draft=True,
+    skip_readonly_fields=True
 )
 ```
 
@@ -1584,7 +1640,17 @@ If you encounter issues not covered in this troubleshooting guide, please:
 2. Review the Odoo documentation for the specific model or operation
 3. Open an issue on the GitHub repository with detailed information about the problem
 
-## Export/Import CLI Tool
+## Export/Import Tools
+
+The project includes powerful tools for exporting and importing data from Odoo models:
+
+- Export data from any Odoo model to CSV files
+- Import data from CSV files into any Odoo model
+- Export related models (parent-child relationships) to a single CSV file
+- Import related models from a single CSV file
+- Get information about models and their fields
+
+### Command-Line Tool
 
 Use `scripts/dynamic_data_tool.py` for dynamic, multi-model export and import:
 
@@ -1592,21 +1658,22 @@ Use `scripts/dynamic_data_tool.py` for dynamic, multi-model export and import:
 # Export any model:
 python3 scripts/dynamic_data_tool.py export \
   --model account.move \
-  --output /tmp/export.csv
+  --output ./tmp/export.csv
 
 # Import any model:
 python3 scripts/dynamic_data_tool.py import \
   --model account.move \
-  --input /tmp/import.csv \
-  --name-prefix IMPORTED
+  --input ./tmp/import.csv \
+  --defaults "{'move_type': 'out_invoice'}" \
+  --force
 
 # Export related models (e.g., invoices and lines):
 python3 scripts/dynamic_data_tool.py export-rel \
   --parent-model account.move \
   --child-model account.move.line \
   --relation-field move_id \
-  --output /tmp/export-rel.csv \
-  --move-type out_invoice
+  --output ./tmp/export-rel.csv \
+  --domain "[('move_type', '=', 'out_invoice')]"
 
 # Import related models:
 python3 scripts/dynamic_data_tool.py import-rel \
@@ -1615,11 +1682,31 @@ python3 scripts/dynamic_data_tool.py import-rel \
   --relation-field move_id \
   --parent-fields name,date,move_type,partner_id \
   --child-fields account_id,product_id,quantity,price_unit \
-  --input /tmp/export-rel.csv \
-  --name-prefix IMPORTED \
+  --input ./tmp/export-rel.csv \
   --reset-to-draft \
   --skip-readonly-fields
+
+# Get model information:
+python3 scripts/dynamic_data_tool.py info \
+  --model res.partner \
+  --required-only
 ```
+
+### MCP Tools Integration
+
+The export/import tools are also integrated with the MCP server, providing the following tools:
+
+```
+/tool export_records_to_csv model_name=res.partner export_path=./tmp/partners.csv
+
+/tool import_records_from_csv model_name=res.partner input_path=./tmp/partners.csv
+
+/tool export_related_records_to_csv parent_model=account.move child_model=account.move.line relation_field=move_id export_path=./tmp/invoices_with_lines.csv
+
+/tool import_related_records_from_csv parent_model=account.move child_model=account.move.line relation_field=move_id input_path=./tmp/invoices_with_lines.csv
+```
+
+For detailed documentation, see [Export/Import Tools Documentation](docs/EXPORT_IMPORT_TOOLS.md).
 
 The tool now includes improved CSV handling with better error reporting and support for:
 - Move type filtering for invoices (`--move-type` parameter)

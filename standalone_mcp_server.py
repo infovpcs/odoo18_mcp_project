@@ -68,22 +68,46 @@ if not mcp:
 tools = {}
 try:
     # Import the specific tools we want to test
-    from mcp_server import retrieve_odoo_documentation, advanced_search, search_records, create_record, update_record, delete_record, execute_method, export_records_to_csv, import_records_from_csv, export_related_records_to_csv, import_related_records_from_csv, validate_field_value, run_odoo_code_agent_tool
+    from mcp_server import (
+        # Documentation and search tools
+        retrieve_odoo_documentation, advanced_search, search_records,
+        # CRUD operation tools
+        create_record, update_record, delete_record, execute_method,
+        # Export/import tools with enhanced functionality
+        export_records_to_csv, import_records_from_csv,
+        export_related_records_to_csv, import_related_records_from_csv,
+        # Validation and code generation tools
+        validate_field_value, run_odoo_code_agent_tool,
+        # Field analysis tools
+        analyze_field_importance, get_field_groups, get_record_template
+    )
 
     # Add the tools to our dictionary
+    # Documentation and search tools
     tools['retrieve_odoo_documentation'] = retrieve_odoo_documentation
     tools['advanced_search'] = advanced_search
     tools['search_records'] = search_records
+
+    # CRUD operation tools
     tools['create_record'] = create_record
     tools['update_record'] = update_record
     tools['delete_record'] = delete_record
     tools['execute_method'] = execute_method
+
+    # Export/import tools with enhanced functionality
     tools['export_records_to_csv'] = export_records_to_csv
     tools['import_records_from_csv'] = import_records_from_csv
     tools['export_related_records_to_csv'] = export_related_records_to_csv
     tools['import_related_records_from_csv'] = import_related_records_from_csv
+
+    # Validation and code generation tools
     tools['validate_field_value'] = validate_field_value
     tools['run_odoo_code_agent'] = run_odoo_code_agent_tool
+
+    # Field analysis tools
+    tools['analyze_field_importance'] = analyze_field_importance
+    tools['get_field_groups'] = get_field_groups
+    tools['get_record_template'] = get_record_template
 
 except Exception as e:
     logger.error(f"Error getting tools from MCP server: {str(e)}")

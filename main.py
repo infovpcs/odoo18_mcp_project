@@ -21,6 +21,18 @@ import sys
 
 # CLI wrappers for dynamic_data_tool
 def mdt_export(model_name: str, export_path: str, domain=None, fields=None, limit=None):
+    """Export records from a model to a CSV file using dynamic_data_tool.py.
+
+    Args:
+        model_name: The technical name of the Odoo model
+        export_path: Path to export CSV file
+        domain: Optional domain filter as a Python list of tuples
+        fields: Optional list of fields to export
+        limit: Optional limit on number of records to export
+
+    Returns:
+        Dictionary with export results
+    """
     cmd = [sys.executable, 'scripts/dynamic_data_tool.py', 'export', '--model', model_name, '--output', export_path]
     if domain:
         cmd.extend(['--domain', json.dumps(domain)])
@@ -34,8 +46,26 @@ def mdt_export(model_name: str, export_path: str, domain=None, fields=None, limi
         pass
     return {'success': True, 'total_records': total, 'export_path': export_path}
 
-def mdt_import(import_path: str, model_name: str):
+def mdt_import(import_path: str, model_name: str, defaults=None, force=False, skip_invalid=False):
+    """Import records from a CSV file into a model using dynamic_data_tool.py.
+
+    Args:
+        import_path: Path to import CSV file
+        model_name: The technical name of the Odoo model
+        defaults: Optional default values for fields as a Python dict
+        force: Whether to force import even if required fields are missing
+        skip_invalid: Whether to skip invalid values for selection fields
+
+    Returns:
+        Dictionary with import results
+    """
     cmd = [sys.executable, 'scripts/dynamic_data_tool.py', 'import', '--model', model_name, '--input', import_path]
+    if defaults:
+        cmd.extend(['--defaults', json.dumps(defaults)])
+    if force:
+        cmd.append('--force')
+    if skip_invalid:
+        cmd.append('--skip-invalid')
     subprocess.run(cmd, check=True)
     total = 0
     try:
@@ -43,7 +73,7 @@ def mdt_import(import_path: str, model_name: str):
     except IOError:
         pass
     return {'success': True, 'imported_records': total, 'updated_records': 0}
-    
+
 from typing import Optional, List, Dict, Any, Union
 
 from src.core import get_settings, get_logger

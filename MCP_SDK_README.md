@@ -136,9 +136,9 @@ The MCP server provides the following tools:
 | **analyze_field_importance** | Analyze field importance | ✅ Working | `/tool analyze_field_importance model_name=res.partner use_nlp=true` |
 | **get_field_groups** | Group fields by purpose | ✅ Working | `/tool get_field_groups model_name=product.product` |
 | **export_records_to_csv** | Export records to CSV | ✅ Working | `/tool export_records_to_csv model_name=res.partner fields=["id","name","email"]` |
-| **import_records_from_csv** | Import records from CSV | ✅ Working | `/tool import_records_from_csv model_name=res.partner import_path="exports/partners.csv"` |
+| **import_records_from_csv** | Import records from CSV | ✅ Working | `/tool import_records_from_csv model_name=res.partner input_path="exports/partners.csv"` |
 | **export_related_records_to_csv** | Export parent-child records | ✅ Working | `/tool export_related_records_to_csv parent_model=account.move child_model=account.move.line relation_field=move_id` |
-| **import_related_records_from_csv** | Import parent-child records | ✅ Working | `/tool import_related_records_from_csv parent_model=account.move child_model=account.move.line relation_field=move_id import_path="./tmp/invoices.csv"` |
+| **import_related_records_from_csv** | Import parent-child records | ✅ Working | `/tool import_related_records_from_csv parent_model=account.move child_model=account.move.line relation_field=move_id input_path="./tmp/invoices.csv"` |
 | **advanced_search** | Natural language search | ✅ Working | `/tool advanced_search query="List all unpaid bills with vendor details" limit=10` |
 | **retrieve_odoo_documentation** | Get Odoo 18 documentation | ✅ Working | `/tool retrieve_odoo_documentation query="How to create a custom module" max_results=5` |
 | **validate_field_value** | Validate a field value | ✅ Working | `/tool validate_field_value model_name=res.partner field_name=email value="test@example.com"` |

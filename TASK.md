@@ -1,6 +1,6 @@
 # Odoo 18 Integration MCP Server - Tasks
 
-Last Updated: 2025-05-04
+Last Updated: 2025-05-18
 
 ## Phase 1: Project Setup and Basic Infrastructure
 - [x] Initialize project structure (2023-12-20)
@@ -196,6 +196,27 @@ Last Updated: 2025-05-04
 - [x] Test the file saving functionality
 - [x] Update documentation with MCP tool usage information
 
+## Phase 18: Enhanced Export/Import Tools (2025-05-17)
+- [x] Enhance export functionality with field filtering
+- [x] Add improved error handling and reporting for export
+- [x] Implement automatic creation of output directories
+- [x] Add special handling for binary fields
+- [x] Implement detailed progress messages during export
+- [x] Add support for default values for required fields in import
+- [x] Implement validation for selection fields
+- [x] Add force import option for missing required fields
+- [x] Implement skip invalid values option for selection fields
+- [x] Add row-level error reporting for import
+- [x] Implement import summary statistics
+- [x] Enhance related records export/import with field filtering
+- [x] Add support for default values in related records import
+- [x] Implement export of parent records without child records
+- [x] Create comprehensive documentation for export/import tools
+- [x] Update README.md with export/import tools information
+- [x] Create example scripts for common export/import scenarios
+- [x] Test enhanced export/import functionality with various models
+- [x] Add model information tool for field discovery
+
 ## Discovered During Work
 - [x] Fix Python version compatibility issues (2025-04-27)
 - [x] Update PyTorch version constraints for macOS compatibility (2025-04-27)
@@ -325,7 +346,50 @@ Last Updated: 2025-05-04
 - [x] Test Odoo code agent with different queries (2025-05-04)
 - [x] Update documentation with Odoo code agent information (2025-05-04)
 
+## Phase 19: Export/Import Functionality Fixes (2025-05-18)
+- [x] Fix import_related_records function to use input_path instead of import_path
+- [x] Update import_records function to use input_path instead of import_path
+- [x] Add proper error handling and detailed result information
+- [x] Create test scripts to verify export/import functionality
+- [x] Test direct_export_import.py functions
+- [x] Update standalone MCP server to use the correct parameter names
+- [x] Create test_export_import.py script for testing export/import functionality
+- [x] Create test_import_records.py script for testing import_records functionality
+- [x] Create test_direct_export_import.py script for testing account.move export/import
+- [x] Create test_mcp_tools.py script for testing MCP tools
+- [x] Update documentation with export/import functionality changes
+
 ## Completed Tasks
+- [x] Fix import_related_records function to use input_path instead of import_path (2025-05-18)
+- [x] Update import_records function to use input_path instead of import_path (2025-05-18)
+- [x] Add proper error handling and detailed result information (2025-05-18)
+- [x] Create test scripts to verify export/import functionality (2025-05-18)
+- [x] Test direct_export_import.py functions (2025-05-18)
+- [x] Update standalone MCP server to use the correct parameter names (2025-05-18)
+- [x] Create test_export_import.py script for testing export/import functionality (2025-05-18)
+- [x] Create test_import_records.py script for testing import_records functionality (2025-05-18)
+- [x] Create test_direct_export_import.py script for testing account.move export/import (2025-05-18)
+- [x] Create test_mcp_tools.py script for testing MCP tools (2025-05-18)
+- [x] Update documentation with export/import functionality changes (2025-05-18)
+- [x] Enhance export functionality with field filtering (2025-05-17)
+- [x] Add improved error handling and reporting for export (2025-05-17)
+- [x] Implement automatic creation of output directories (2025-05-17)
+- [x] Add special handling for binary fields (2025-05-17)
+- [x] Implement detailed progress messages during export (2025-05-17)
+- [x] Add support for default values for required fields in import (2025-05-17)
+- [x] Implement validation for selection fields (2025-05-17)
+- [x] Add force import option for missing required fields (2025-05-17)
+- [x] Implement skip invalid values option for selection fields (2025-05-17)
+- [x] Add row-level error reporting for import (2025-05-17)
+- [x] Implement import summary statistics (2025-05-17)
+- [x] Enhance related records export/import with field filtering (2025-05-17)
+- [x] Add support for default values in related records import (2025-05-17)
+- [x] Implement export of parent records without child records (2025-05-17)
+- [x] Create comprehensive documentation for export/import tools (2025-05-17)
+- [x] Update README.md with export/import tools information (2025-05-17)
+- [x] Create example scripts for common export/import scenarios (2025-05-17)
+- [x] Test enhanced export/import functionality with various models (2025-05-17)
+- [x] Add model information tool for field discovery (2025-05-17)
 - [x] Initialize project structure (2023-12-20)
 - [x] Set up development environment (2023-12-20)
 - [x] Configure Python dependencies (2023-12-20)

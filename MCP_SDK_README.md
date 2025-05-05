@@ -142,7 +142,7 @@ The MCP server provides the following tools:
 | **advanced_search** | Natural language search | ✅ Working | `/tool advanced_search query="List all unpaid bills with vendor details" limit=10` |
 | **retrieve_odoo_documentation** | Get Odoo 18 documentation | ✅ Working | `/tool retrieve_odoo_documentation query="How to create a custom module" max_results=5` |
 | **validate_field_value** | Validate a field value | ✅ Working | `/tool validate_field_value model_name=res.partner field_name=email value="test@example.com"` |
-| **run_odoo_code_agent** | Generate Odoo 18 module code | ✅ Working | `/tool run_odoo_code_agent query="Create a customer feedback module" use_gemini=true` |
+| **run_odoo_code_agent_tool** | Generate Odoo 18 module code | ✅ Working | `/tool run_odoo_code_agent_tool query="Create a customer feedback module" use_gemini=true` |
 
 #### Search Records
 
@@ -251,7 +251,7 @@ Example:
 #### Run Odoo Code Agent
 
 ```
-/tool run_odoo_code_agent query={query} use_gemini={use_gemini} use_ollama={use_ollama} feedback={feedback} save_to_files={save_to_files} output_dir={output_dir}
+/tool run_odoo_code_agent_tool query={query} use_gemini={use_gemini} use_ollama={use_ollama} feedback={feedback} save_to_files={save_to_files} output_dir={output_dir}
 ```
 
 This tool generates Odoo 18 module code based on a natural language query. It follows a structured workflow with analysis, planning, human feedback, coding, and finalization phases.
@@ -266,7 +266,7 @@ Parameters:
 
 Example:
 ```
-/tool run_odoo_code_agent query="Create a customer feedback module for Odoo 18" use_gemini=true
+/tool run_odoo_code_agent_tool query="Create a customer feedback module for Odoo 18" use_gemini=true
 ```
 
 For the best results, we recommend using Google Gemini as a fallback model by setting `use_gemini=true`. This requires setting up the GEMINI_API_KEY environment variable in your .env file or when installing the MCP server.

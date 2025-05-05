@@ -25,7 +25,7 @@ logger = logging.getLogger("odoo_code_agent_tool_test")
 MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://127.0.0.1:8001")
 
 def test_odoo_code_agent_tool(query: str, use_gemini: bool = False, use_ollama: bool = False, feedback: Optional[str] = None, save_to_files: bool = False, output_dir: Optional[str] = None) -> Tuple[bool, Any]:
-    """Test the run_odoo_code_agent tool with the given parameters"""
+    """Test the run_odoo_code_agent_tool tool with the given parameters"""
     url = f"{MCP_SERVER_URL}/call_tool"
 
     params = {
@@ -43,14 +43,14 @@ def test_odoo_code_agent_tool(query: str, use_gemini: bool = False, use_ollama: 
     if output_dir:
         params["output_dir"] = output_dir
 
-    logger.info(f"Testing run_odoo_code_agent tool")
+    logger.info(f"Testing run_odoo_code_agent_tool tool")
     logger.info(f"Parameters: {json.dumps(params, indent=2)}")
 
     try:
         response = requests.post(
             url,
             json={
-                "tool": "run_odoo_code_agent",
+                "tool": "run_odoo_code_agent_tool",
                 "params": params
             }
         )
@@ -86,8 +86,8 @@ def test_odoo_code_agent_tool(query: str, use_gemini: bool = False, use_ollama: 
         return False, str(e)
 
 def test_with_feedback(query: str, feedback: str, use_gemini: bool = False) -> Tuple[bool, Any]:
-    """Test the run_odoo_code_agent tool with feedback"""
-    logger.info("\n=== Testing run_odoo_code_agent with feedback ===")
+    """Test the run_odoo_code_agent_tool tool with feedback"""
+    logger.info("\n=== Testing run_odoo_code_agent_tool with feedback ===")
     return test_odoo_code_agent_tool(query, use_gemini, False, feedback)
 
 def main():

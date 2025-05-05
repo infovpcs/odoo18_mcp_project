@@ -102,7 +102,7 @@ try:
 
     # Validation and code generation tools
     tools['validate_field_value'] = validate_field_value
-    tools['run_odoo_code_agent'] = run_odoo_code_agent_tool
+    tools['run_odoo_code_agent_tool'] = run_odoo_code_agent_tool
 
     # Field analysis tools
     tools['analyze_field_importance'] = analyze_field_importance

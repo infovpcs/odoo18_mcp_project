@@ -455,7 +455,7 @@ Once you've configured Claude Desktop, you can use the Odoo 18 MCP integration:
 | **advanced_search** | Perform advanced natural language search | `/tool advanced_search query="List all unpaid bills with respect of vendor details" limit=10` | ✅ Working |
 | **retrieve_odoo_documentation** | Retrieve information from Odoo 18 documentation | `/tool retrieve_odoo_documentation query="How to create a custom module in Odoo 18" max_results=5` | ✅ Working |
 | **validate_field_value** | Validate a field value for a model | `/tool validate_field_value model_name=res.partner field_name=email value="test@example.com"` | ✅ Working |
-| **run_odoo_code_agent** | Generate Odoo 18 module code | `/tool run_odoo_code_agent query="Create a customer feedback module" use_gemini=true use_ollama=false` | ✅ Working |
+| **run_odoo_code_agent** | Generate Odoo 18 module code | `/tool run_odoo_code_agent_tool query="Create a customer feedback module" use_gemini=true use_ollama=false` | ✅ Working |
 
 #### Available Prompts
 

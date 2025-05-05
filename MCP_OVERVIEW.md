@@ -168,7 +168,7 @@ The Odoo 18 MCP Integration includes a powerful Odoo Code Agent that helps with 
    ```
    /resource odoo://models/all
    /tool search_records model_name=res.partner query=company
-   /tool run_odoo_code_agent query="Create a customer feedback module for Odoo 18" use_gemini=true
+   /tool run_odoo_code_agent_tool query="Create a customer feedback module for Odoo 18" use_gemini=true
    /tool retrieve_odoo_documentation query="How to create a custom module in Odoo 18"
    ```
 
@@ -189,7 +189,7 @@ The Odoo 18 MCP Integration includes a powerful Odoo Code Agent that helps with 
    # Generate Odoo module code
    curl -X POST "http://localhost:8001/call_tool" \
      -H "Content-Type: application/json" \
-     -d '{"tool": "run_odoo_code_agent", "params": {"query": "Create a customer feedback module", "use_gemini": true}}'
+     -d '{"tool": "run_odoo_code_agent_tool", "params": {"query": "Create a customer feedback module", "use_gemini": true}}'
 
    # Retrieve Odoo documentation
    curl -X POST "http://localhost:8001/call_tool" \

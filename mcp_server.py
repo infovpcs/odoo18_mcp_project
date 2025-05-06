@@ -328,6 +328,9 @@ try:
                 odoo_docs_retriever_instance = OdooDocsRetriever(
                     docs_dir=docs_dir,
                     index_dir=index_dir,
+                    model_name="all-mpnet-base-v2",  # Using a more powerful model
+                    chunk_size=1500,  # Larger chunks for more context
+                    chunk_overlap=300,  # More overlap to avoid missing context
                     force_rebuild=False  # Set to True to force rebuilding the index
                 )
                 logger.info("Odoo documentation retriever initialized successfully")
@@ -1102,7 +1105,7 @@ try:
             # Set default export path if not provided
             if not export_path:
                 model_name_safe = model_name.replace('.', '_')
-                export_path = f"./tmp/{model_name_safe}_export.csv"
+                export_path = f"/tmp/{model_name_safe}_export.csv"
 
             # Create output directory if it doesn't exist
             os.makedirs(os.path.dirname(os.path.abspath(export_path)), exist_ok=True)
@@ -1269,7 +1272,7 @@ try:
                 parent_model_safe = parent_model.replace('.', '_')
                 child_model_safe = child_model.replace('.', '_')
                 # Use a path in the tmp directory
-                export_path = f"./tmp/{parent_model_safe}_{child_model_safe}_export.csv"
+                export_path = f"/tmp/{parent_model_safe}_{child_model_safe}_export.csv"
 
             # Create output directory if it doesn't exist
             os.makedirs(os.path.dirname(os.path.abspath(export_path)), exist_ok=True)
@@ -1983,8 +1986,61 @@ This approach is much more efficient than exporting and importing parent and chi
             return "# Error: Odoo Documentation Retriever Not Available\n\nThe Odoo documentation retriever is not available. Please make sure the required dependencies are installed."
 
         try:
-            # Query the documentation
-            return odoo_docs_retriever_instance.query(query, max_results=max_results)
+            # Log the query for debugging
+            logger.info(f"Retrieving Odoo documentation for query: '{query}'")
+
+            # Preprocess the query if it contains specific keywords
+            processed_query = query
+
+            # Check for tax-related queries
+            if any(keyword in query.lower() for keyword in ["tax", "taxes", "taxation"]):
+                logger.info("Detected tax-related query, enhancing search")
+                if "india" in query.lower() or "indian" in query.lower():
+                    # For Indian tax queries, focus on GST and fiscal localization
+                    processed_query = f"Odoo 18 India fiscal localization GST tax {query}"
+                else:
+                    # For general tax queries
+                    processed_query = f"Odoo 18 tax configuration {query}"
+
+            # Check for localization-related queries
+            elif any(keyword in query.lower() for keyword in ["localization", "localisation", "country"]):
+                logger.info("Detected localization-related query, enhancing search")
+                if "india" in query.lower() or "indian" in query.lower():
+                    processed_query = f"Odoo 18 India fiscal localization {query}"
+                else:
+                    processed_query = f"Odoo 18 fiscal localization {query}"
+
+            # Check for e-invoicing queries
+            elif "e-invoic" in query.lower() or "einvoic" in query.lower():
+                logger.info("Detected e-invoicing query, enhancing search")
+                if "india" in query.lower() or "indian" in query.lower():
+                    processed_query = f"Odoo 18 India e-invoicing system {query}"
+                else:
+                    processed_query = f"Odoo 18 e-invoicing {query}"
+
+            # Log the processed query if it was modified
+            if processed_query != query:
+                logger.info(f"Processed query: '{processed_query}'")
+
+            # Query the documentation with a higher max_results to get more options
+            results = odoo_docs_retriever_instance.query(processed_query, max_results=max_results)
+
+            # If no results found, try with a more general query
+            if "No relevant information found" in results:
+                logger.info(f"No results found for '{processed_query}', trying more general query")
+
+                # Create a more general query by removing specific terms
+                general_query = query.lower()
+                for term in ["18.0", "18", "odoo", "with"]:
+                    general_query = general_query.replace(term, "")
+
+                general_query = f"Odoo 18 {general_query.strip()}"
+                logger.info(f"General query: '{general_query}'")
+
+                # Try with the general query
+                results = odoo_docs_retriever_instance.query(general_query, max_results=max_results)
+
+            return results
         except Exception as e:
             logger.error(f"Error retrieving Odoo documentation: {str(e)}")
             return f"# Error Retrieving Odoo Documentation\n\n{str(e)}"
@@ -2213,14 +2269,20 @@ This approach is much more efficient than exporting and importing parent and chi
 
     # Tool for running the Odoo code agent
     @mcp.tool()
-    def run_odoo_code_agent_tool(query: str, use_gemini: bool = False, use_ollama: bool = False, feedback: Optional[str] = None, save_to_files: bool = False, output_dir: Optional[str] = None) -> str:
+    def run_odoo_code_agent_tool(query: str, use_gemini: bool = False, use_ollama: bool = False,
+                                feedback: Optional[str] = None, save_to_files: bool = False,
+                                output_dir: Optional[str] = None, wait_for_validation: bool = False,
+                                current_phase: Optional[str] = None, state_dict: Optional[Dict[str, Any]] = None) -> str:
         """Generate Odoo 18 module code based on a natural language query.
 
         This tool uses the Odoo Code Agent to analyze requirements, plan, and generate
         code for Odoo 18 modules based on your query. It follows a structured workflow:
         1. Analysis: Understand requirements and gather documentation
         2. Planning: Create a plan and tasks for implementation
-        3. Coding: Generate module structure and code files
+        3. Human Feedback 1: Get feedback on the plan
+        4. Coding: Generate module structure and code files
+        5. Human Feedback 2: Get feedback on the generated code
+        6. Finalization: Finalize the code based on feedback
 
         The agent can optionally use Google Gemini or Ollama as fallback models for improved code generation.
         It can also save the generated files to disk if requested.
@@ -2232,6 +2294,9 @@ This approach is much more efficient than exporting and importing parent and chi
             feedback: Optional feedback to incorporate into the code generation
             save_to_files: Whether to save the generated files to disk
             output_dir: Directory to save the generated files to (defaults to ./generated_modules)
+            wait_for_validation: Whether to wait for human validation at validation points
+            current_phase: The current phase to resume from (if continuing execution)
+            state_dict: Serialized state to resume from (if continuing execution)
 
         Returns:
             A formatted string with the code generation results
@@ -2287,7 +2352,10 @@ This approach is much more efficient than exporting and importing parent and chi
                 use_ollama=use_ollama,
                 feedback=feedback,
                 save_to_files=save_to_files,
-                output_dir=output_dir
+                output_dir=output_dir,
+                wait_for_validation=wait_for_validation,
+                current_phase=current_phase,
+                state_dict=state_dict
             )
 
             # Check if result is valid
@@ -2297,6 +2365,17 @@ This approach is much more efficient than exporting and importing parent and chi
 
             # Format the output
             output = f"# Odoo Code Agent Results\n\n"
+
+            # Add current phase and validation status
+            current_phase = result.get('current_phase', 'unknown')
+            requires_validation = result.get('requires_validation', False)
+            is_complete = result.get('is_complete', False)
+
+            # Add status information
+            output += f"## Status\n\n"
+            output += f"- **Current Phase**: {current_phase}\n"
+            output += f"- **Requires Validation**: {'Yes' if requires_validation else 'No'}\n"
+            output += f"- **Is Complete**: {'Yes' if is_complete else 'No'}\n\n"
 
             # Add query
             query_value = result.get('query', 'No query provided')
@@ -2414,8 +2493,22 @@ This approach is much more efficient than exporting and importing parent and chi
                 output += "3. Install the module in Odoo\n\n"
 
             output += "You can also:\n\n"
-            output += "- Provide feedback to refine the generated code by calling this tool again with the feedback parameter\n"
-            output += "- Save the generated files to disk by setting `save_to_files=true` when calling this tool\n"
+
+            # Add different instructions based on validation status
+            if requires_validation:
+                output += "- Provide feedback by calling this tool again with the same parameters plus your feedback\n"
+                output += "- Continue the process by calling this tool again with the same parameters and `wait_for_validation=false`\n"
+
+                # Add state_dict for resuming
+                state_dict_value = result.get('state_dict')
+                if state_dict_value:
+                    output += "\nTo resume the process later, you can use the following state_dict (truncated for readability):\n\n"
+                    output += "```json\n"
+                    output += "state_dict: <serialized state object>\n"
+                    output += "```\n\n"
+            else:
+                output += "- Provide feedback to refine the generated code by calling this tool again with the feedback parameter\n"
+                output += "- Save the generated files to disk by setting `save_to_files=true` when calling this tool\n"
 
             return output
 

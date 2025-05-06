@@ -56,7 +56,7 @@ def run_export_flow(
         # Set default export path if not provided
         if not export_path:
             model_name_safe = model_name.replace('.', '_')
-            export_path = f"exports/{model_name_safe}_export.csv"
+            export_path = f"/tmp/{model_name_safe}_export.csv"
 
         # Create exports directory if it doesn't exist
         os.makedirs(os.path.dirname(export_path), exist_ok=True)

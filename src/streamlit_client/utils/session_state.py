@@ -1,0 +1,211 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Session State Management for Streamlit Client
+
+This module provides session state management for the Streamlit client.
+"""
+
+import json
+import logging
+import os
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Dict, List, Optional, Union
+
+import streamlit as st
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("session_state")
+
+class AgentPhase(str, Enum):
+    """Phase of operation for the agent flow."""
+    ANALYSIS = "analysis"
+    PLANNING = "planning"
+    HUMAN_FEEDBACK_1 = "human_feedback_1"
+    CODING = "coding"
+    HUMAN_FEEDBACK_2 = "human_feedback_2"
+    FINALIZATION = "finalization"
+
+@dataclass
+class CodeAgentState:
+    """State for the code agent."""
+    query: str = ""
+    phase: AgentPhase = AgentPhase.ANALYSIS
+    plan: str = ""
+    tasks: List[str] = field(default_factory=list)
+    module_name: str = ""
+    files_to_create: Dict[str, str] = field(default_factory=dict)
+    feedback: str = ""
+    history: List[str] = field(default_factory=list)
+    error: Optional[str] = None
+    use_gemini: bool = False
+    use_ollama: bool = False
+    save_to_files: bool = False
+    output_dir: Optional[str] = None
+    state_dict: Optional[Dict[str, Any]] = None  # Serialized state from the agent for resuming later
+    requires_validation: bool = False  # Whether the agent is waiting for validation
+    current_step: Optional[str] = None  # Current step in the agent workflow
+
+@dataclass
+class ExportImportState:
+    """State for export/import operations."""
+    model_name: str = ""
+    fields: List[str] = field(default_factory=list)
+    filter_domain: str = ""
+    limit: int = 1000
+    export_path: str = "/tmp/export.csv"
+    input_path: str = "/tmp/import.csv"
+    field_mapping: str = ""
+    create_if_not_exists: bool = True
+    update_if_exists: bool = True
+    parent_model: str = ""
+    child_model: str = ""
+    relation_field: str = ""
+    parent_fields: List[str] = field(default_factory=list)
+    child_fields: List[str] = field(default_factory=list)
+    move_type: Optional[str] = None
+
+@dataclass
+class DocumentationState:
+    """State for documentation retrieval."""
+    query: str = ""
+    max_results: int = 5
+    results: List[Dict[str, Any]] = field(default_factory=list)
+    raw_results: str = ""
+
+@dataclass
+class ChatMessage:
+    """Chat message."""
+    role: str  # 'user' or 'assistant'
+    content: str
+    timestamp: str = ""
+
+@dataclass
+class ChatState:
+    """State for chat."""
+    messages: List[ChatMessage] = field(default_factory=list)
+    current_message: str = ""
+
+class SessionState:
+    """Session state manager for the Streamlit client."""
+
+    def __init__(self):
+        """Initialize the session state."""
+        # Initialize session state if not already initialized
+        if 'initialized' not in st.session_state:
+            st.session_state.initialized = True
+            st.session_state.code_agent = CodeAgentState()
+            st.session_state.export_import = ExportImportState()
+            st.session_state.documentation = DocumentationState()
+            st.session_state.chat = ChatState()
+            st.session_state.mcp_server_url = "http://localhost:8001"
+            st.session_state.current_page = "code_agent"
+            logger.info("Session state initialized")
+
+    @property
+    def code_agent(self) -> CodeAgentState:
+        """Get the code agent state.
+
+        Returns:
+            Code agent state
+        """
+        return st.session_state.code_agent
+
+    @property
+    def export_import(self) -> ExportImportState:
+        """Get the export/import state.
+
+        Returns:
+            Export/import state
+        """
+        return st.session_state.export_import
+
+    @property
+    def documentation(self) -> DocumentationState:
+        """Get the documentation state.
+
+        Returns:
+            Documentation state
+        """
+        return st.session_state.documentation
+
+    @property
+    def chat(self) -> ChatState:
+        """Get the chat state.
+
+        Returns:
+            Chat state
+        """
+        return st.session_state.chat
+
+    @property
+    def mcp_server_url(self) -> str:
+        """Get the MCP server URL.
+
+        Returns:
+            MCP server URL
+        """
+        return st.session_state.mcp_server_url
+
+    @mcp_server_url.setter
+    def mcp_server_url(self, value: str):
+        """Set the MCP server URL.
+
+        Args:
+            value: MCP server URL
+        """
+        st.session_state.mcp_server_url = value
+
+    @property
+    def current_page(self) -> str:
+        """Get the current page.
+
+        Returns:
+            Current page
+        """
+        return st.session_state.current_page
+
+    @current_page.setter
+    def current_page(self, value: str):
+        """Set the current page.
+
+        Args:
+            value: Current page
+        """
+        st.session_state.current_page = value
+
+    def add_chat_message(self, role: str, content: str):
+        """Add a chat message.
+
+        Args:
+            role: Role of the message sender ('user' or 'assistant')
+            content: Content of the message
+        """
+        from datetime import datetime
+
+        message = ChatMessage(
+            role=role,
+            content=content,
+            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
+
+        st.session_state.chat.messages.append(message)
+
+    def clear_chat(self):
+        """Clear the chat history."""
+        st.session_state.chat.messages = []
+        st.session_state.chat.current_message = ""
+
+    def reset_code_agent(self):
+        """Reset the code agent state."""
+        st.session_state.code_agent = CodeAgentState()
+
+    def reset_export_import(self):
+        """Reset the export/import state."""
+        st.session_state.export_import = ExportImportState()
+
+    def reset_documentation(self):
+        """Reset the documentation state."""
+        st.session_state.documentation = DocumentationState()

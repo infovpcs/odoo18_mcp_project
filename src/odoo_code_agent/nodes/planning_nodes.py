@@ -41,8 +41,31 @@ def create_plan(state: OdooCodeAgentState) -> OdooCodeAgentState:
             logger.info("Using Gemini to create plan")
             gemini_client = GeminiClient()
 
-            # Get the plan from Gemini
-            plan_result = gemini_client.create_plan(analysis)
+            # Get documentation and model information from the analysis state
+            documentation = state.analysis_state.context.get("documentation", [])
+            model_info = state.analysis_state.context.get("model_info", {})
+            module_types = state.analysis_state.context.get("module_types", [])
+
+            # Format context information for planning
+            context = ""
+
+            if module_types:
+                context += "MODULE TYPES: " + ", ".join(module_types) + "\n\n"
+
+            if model_info:
+                context += "RELEVANT MODELS:\n"
+                for model_name, info in model_info.items():
+                    context += f"- {model_name}: {info.get('name', '')}\n"
+                context += "\n"
+
+            if documentation:
+                context += "DOCUMENTATION REFERENCES:\n"
+                for doc in documentation:
+                    context += f"- {doc.get('source', 'Unknown')}\n"
+                context += "\n"
+
+            # Get the plan from Gemini with context
+            plan_result = gemini_client.create_plan(analysis, context)
 
             if "error" in plan_result:
                 logger.error(f"Gemini planning error: {plan_result['error']}")

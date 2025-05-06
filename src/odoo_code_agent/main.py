@@ -59,7 +59,10 @@ def run_odoo_code_agent(
     feedback: Optional[str] = None,
     max_steps: int = 20,
     save_to_files: bool = False,
-    output_dir: Optional[str] = None
+    output_dir: Optional[str] = None,
+    wait_for_validation: bool = False,
+    current_phase: Optional[str] = None,
+    state_dict: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """Run the Odoo Code Agent with the given query.
 
@@ -75,30 +78,71 @@ def run_odoo_code_agent(
         max_steps: Maximum number of steps to run
         save_to_files: Whether to save the generated files to disk
         output_dir: Directory to save the generated files to (defaults to ./generated_modules)
+        wait_for_validation: Whether to wait for human validation at validation points
+        current_phase: The current phase to resume from (if continuing execution)
+        state_dict: Serialized state to resume from (if continuing execution)
 
     Returns:
         Dict containing the agent's response
     """
     logger.info(f"Running Odoo Code Agent with query: {query}")
 
-    # Initialize the agent state
-    state = OdooCodeAgentState()
+    # Initialize or restore the agent state
+    if state_dict:
+        # Restore from serialized state
+        logger.info(f"Restoring agent state from serialized state")
+        state = OdooCodeAgentState.model_validate(state_dict)
 
-    # Set the Odoo connection details
-    state.odoo_url = odoo_url
-    state.odoo_db = odoo_db
-    state.odoo_username = odoo_username
-    state.odoo_password = odoo_password
+        # Update with any new parameters
+        state.use_gemini = use_gemini
+        state.use_ollama = use_ollama
 
-    # Set the model preferences
-    state.use_gemini = use_gemini
-    state.use_ollama = use_ollama
+        # If feedback is provided, update it
+        if feedback:
+            state.feedback_state.feedback = feedback
 
-    # Initialize the analysis state with the query
-    state.analysis_state.query = query
+        logger.info(f"Restored agent state with phase: {state.phase}, step: {state.current_step}")
+    else:
+        # Initialize a new agent state
+        state = OdooCodeAgentState()
 
-    # Set the initial step
-    state.current_step = "initialize"
+        # Set the Odoo connection details
+        state.odoo_url = odoo_url
+        state.odoo_db = odoo_db
+        state.odoo_username = odoo_username
+        state.odoo_password = odoo_password
+
+        # Set the model preferences
+        state.use_gemini = use_gemini
+        state.use_ollama = use_ollama
+
+        # Initialize the analysis state with the query
+        state.analysis_state.query = query
+
+        # Set the initial step
+        state.current_step = "initialize"
+
+        # If a specific phase is requested, set it
+        if current_phase:
+            try:
+                state.phase = AgentPhase(current_phase)
+                logger.info(f"Setting initial phase to: {state.phase}")
+
+                # Set appropriate initial step based on the phase
+                if state.phase == AgentPhase.PLANNING:
+                    state.current_step = "create_plan"
+                elif state.phase == AgentPhase.HUMAN_FEEDBACK_1:
+                    state.current_step = "request_feedback"
+                elif state.phase == AgentPhase.CODING:
+                    state.current_step = "setup_module_structure"
+                elif state.phase == AgentPhase.HUMAN_FEEDBACK_2:
+                    state.current_step = "request_feedback"
+                elif state.phase == AgentPhase.FINALIZATION:
+                    state.current_step = "finalize_code"
+            except ValueError:
+                logger.warning(f"Invalid phase: {current_phase}, using default")
+
+    logger.info(f"Agent state initialized with phase: {state.phase}, step: {state.current_step}")
 
     # Run the agent workflow
     step_count = 0
@@ -126,6 +170,18 @@ def run_odoo_code_agent(
         # Add a small delay to avoid overwhelming the system
         time.sleep(0.1)
 
+        # Check if we need to wait for human validation
+        if wait_for_validation:
+            # If we just completed planning and are at the first human feedback point
+            if state.phase == AgentPhase.HUMAN_FEEDBACK_1 and state.current_step == "request_feedback":
+                logger.info("Stopping at first human validation point (after planning)")
+                break
+
+            # If we just completed coding and are at the second human feedback point
+            if state.phase == AgentPhase.HUMAN_FEEDBACK_2 and state.current_step == "request_feedback":
+                logger.info("Stopping at second human validation point (after coding)")
+                break
+
     # Check if we reached the maximum number of steps
     if step_count >= max_steps:
         logger.warning(f"Reached maximum number of steps ({max_steps})")
@@ -141,7 +197,12 @@ def run_odoo_code_agent(
         "files_to_create": state.coding_state.files_to_create,
         "feedback": state.feedback_state.feedback,
         "history": state.history,
-        "error": state.analysis_state.error or state.planning_state.error or state.coding_state.error or state.feedback_state.error
+        "error": state.analysis_state.error or state.planning_state.error or state.coding_state.error or state.feedback_state.error,
+        "current_phase": state.phase.value,
+        "current_step": state.current_step,
+        "requires_validation": state.phase in [AgentPhase.HUMAN_FEEDBACK_1, AgentPhase.HUMAN_FEEDBACK_2] and state.current_step == "request_feedback",
+        "is_complete": state.current_step == "complete",
+        "state_dict": state.model_dump()  # Serialize the state for resuming later
     }
 
     # Save files to disk if requested

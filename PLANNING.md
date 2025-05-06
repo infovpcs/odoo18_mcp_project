@@ -1,6 +1,6 @@
 # Odoo 18 Integration MCP Server - Project Planning
 
-Last Updated: 2025-05-18
+Last Updated: 2025-05-23
 
 ## Project Overview
 This project aims to create a robust integration server that connects MCP (Master Control Program) with Odoo 18.0 ERP system, focusing on efficient data synchronization, API management, and secure communications. The implementation provides a standardized interface for performing CRUD operations on Odoo 18 models through a simple API, with dynamic model discovery and field analysis capabilities. The project includes direct implementation for advanced operations like data export and import, with dynamic model and field discovery using ir.model and ir.model.fields. Additionally, the project includes an Odoo code agent that helps with generating Odoo 18 modules and code using a structured workflow with analysis, planning, human feedback, coding, and finalization phases.
@@ -45,6 +45,10 @@ This project aims to create a robust integration server that connects MCP (Maste
    - MCP server integration ✅
    - File saving functionality ✅
    - Improved error handling ✅
+   - Two-stage human validation workflow ✅
+   - State serialization and resumption ✅
+   - Streamlit client integration with validation steps ✅
+   - Comprehensive testing of validation workflow ✅
 
 3. **Odoo 18 Connector**
    - XML-RPC client implementation ✅
@@ -326,24 +330,34 @@ odoo18-mcp-project/
 ### Odoo Documentation RAG Tool
 1. **Documentation Processing**
    - Clone and process Odoo 18 documentation repository ✅
-   - Extract text from Markdown and HTML files ✅
-   - Chunk text into manageable segments ✅
-   - Extract metadata from file paths and content ✅
+   - Extract text from Markdown, HTML, and RST files ✅
+   - Implement intelligent chunking strategies ✅
+   - Extract comprehensive metadata from file paths and content ✅
    - Handle documentation updates ✅
+   - Improve text cleaning for better search quality ✅
+   - Implement section-based chunking to maintain context ✅
+   - Add minimum content length filtering ✅
 
 2. **Embedding and Vector Storage**
    - Generate embeddings using sentence-transformers ✅
+   - Upgrade to more powerful embedding model (all-mpnet-base-v2) ✅
    - Store embeddings in FAISS vector database ✅
    - Implement efficient similarity search ✅
    - Persist index and documents for reuse ✅
    - Handle model loading and initialization ✅
+   - Optimize chunk size and overlap for better context ✅
 
 3. **Retrieval and Integration**
    - Implement semantic search for documentation ✅
-   - Format search results with context ✅
+   - Add query preprocessing for better search results ✅
+   - Implement keyword boosting for relevant documents ✅
+   - Format search results with enhanced context ✅
+   - Add related search suggestions ✅
    - Integrate with MCP server as a tool ✅
    - Provide prompt for documentation queries ✅
    - Handle error cases and fallbacks ✅
+   - Add fallback to more general queries when specific queries fail ✅
+   - Implement specialized handling for tax and localization queries ✅
 
 ### Odoo Code Agent
 1. **Agent Workflow**
@@ -353,6 +367,9 @@ odoo18-mcp-project/
    - Coding phase for generating Odoo module code ✅
    - Second human feedback loop for code refinement ✅
    - Finalization phase for completing the module ✅
+   - Two-stage human validation workflow ✅
+   - Wait points for human feedback ✅
+   - Resumable workflow with state persistence ✅
 
 2. **State Management**
    - Pydantic models for state representation ✅
@@ -360,6 +377,10 @@ odoo18-mcp-project/
    - State transitions between phases ✅
    - Error handling and recovery ✅
    - History tracking ✅
+   - State serialization and deserialization ✅
+   - State dictionary for workflow resumption ✅
+   - Validation status tracking ✅
+   - Current phase tracking ✅
 
 3. **LangGraph Integration**
    - StateGraph for workflow definition ✅
@@ -367,6 +388,8 @@ odoo18-mcp-project/
    - Conditional edges for dynamic flow ✅
    - Error handling nodes ✅
    - Compilation and execution ✅
+   - Human-in-the-loop validation points ✅
+   - Workflow resumption from saved state ✅
 
 4. **Module Generation**
    - Dynamic module name extraction ✅
@@ -414,6 +437,11 @@ odoo18-mcp-project/
    - Standalone server support ✅
    - Test script for MCP tool ✅
    - Documentation for MCP tool usage ✅
+   - Human validation workflow support ✅
+   - Wait for validation parameter ✅
+   - Current phase parameter ✅
+   - State dictionary parameter ✅
+   - Comprehensive testing of validation workflow ✅
 
 ## Performance Goals
 - Response time < 200ms ✅
@@ -440,6 +468,81 @@ The Docker setup includes three main services:
    - Runs function tests and tool tests
    - Validates the MCP server functionality
    - Useful for CI/CD pipelines
+
+## Streamlit Client Architecture
+
+The Streamlit client provides a user-friendly interface for interacting with the Odoo 18 MCP tools:
+
+1. **Core Components**
+   - Main application entry point ✅
+   - Navigation sidebar ✅
+   - Page routing system ✅
+   - Session state management ✅
+   - MCP connector for tool integration ✅
+   - Asynchronous polling mechanism ✅
+   - Progress indicators for long-running operations ✅
+   - Error handling and recovery ✅
+   - Responsive UI design ✅
+   - Custom styling and theming ✅
+
+2. **Pages**
+   - Code Agent page for module generation ✅
+   - Export/Import page for data operations ✅
+   - Documentation page for Odoo documentation search ✅
+   - Advanced page for model and field information ✅
+   - Chat page for natural language interaction ✅
+
+3. **Components**
+   - Chat component for human interaction ✅
+   - File viewer for generated code and CSV files ✅
+   - Feedback forms for code agent workflow ✅
+   - Progress indicators for long-running operations ✅
+   - Error handling and display ✅
+   - Form validation ✅
+   - Results formatting and display ✅
+   - Two-stage validation UI for code agent ✅
+   - State persistence between validation steps ✅
+   - Workflow resumption from saved state ✅
+
+4. **MCP Connector**
+   - HTTP API integration ✅
+   - Tool discovery and listing ✅
+   - Asynchronous tool calls ✅
+   - Polling for long-running operations ✅
+   - Timeout management ✅
+   - Error handling and recovery ✅
+   - Tool-specific convenience methods ✅
+   - Connection type support (HTTP/STDIO) ✅
+   - Health check functionality ✅
+
+5. **Session State Management**
+   - Persistent state across page navigation ✅
+   - Tool-specific state management ✅
+   - Chat history management ✅
+   - Form state persistence ✅
+   - Results caching ✅
+   - Error state handling ✅
+   - Code agent state serialization ✅
+   - Validation status tracking ✅
+   - Current phase tracking ✅
+   - State dictionary for workflow resumption ✅
+
+6. **Asynchronous Polling Mechanism**
+   - Initial request handling ✅
+   - Polling for complete results ✅
+   - Progress indicators during polling ✅
+   - Timeout handling ✅
+   - Error recovery ✅
+   - Tool-specific polling configurations ✅
+   - Request tracking with unique IDs ✅
+
+7. **Server-Side Query Processing**
+   - Natural language query handling ✅
+   - Dynamic model detection ✅
+   - Relationship handling between models ✅
+   - Field mapping for natural language terms ✅
+   - Query execution against Odoo database ✅
+   - Response formatting for display ✅
 
 ## Documentation Requirements
 - API documentation ✅

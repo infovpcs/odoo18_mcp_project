@@ -1,6 +1,6 @@
 # Odoo 18 MCP Integration (18.0 Branch)
 
-Last Updated: 2025-05-18
+Last Updated: 2025-05-23
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Odoo 18.0](https://img.shields.io/badge/odoo-18.0-green.svg)](https://www.odoo.com/)
@@ -31,6 +31,7 @@ A robust integration server that connects MCP (Master Control Program) with Odoo
 - **Dynamic Query Parsing**: Natural language query parsing with dynamic model and field discovery using ir.model and ir.model.fields
 - **MCP Integration**: API endpoints for MCP integration with standardized request/response format
 - **Claude Desktop Integration**: Seamless integration with Claude Desktop using the MCP SDK
+- **Official MCP SDK Support**: Support for both HTTP API and official MCP SDK with STDIO transport
 - **Environment Configuration**: Easy configuration using environment variables
 - **Type Safety**: Pydantic models for data validation and type checking
 - **Logging**: Comprehensive logging system with detailed error information
@@ -46,6 +47,8 @@ A robust integration server that connects MCP (Master Control Program) with Odoo
 - **Odoo Documentation Retrieval**: RAG-based retrieval of information from the official Odoo 18 documentation
 - **Odoo Code Agent**: Generate Odoo 18 modules and code using a structured workflow
 - **LangGraph Workflow**: Analysis, planning, human feedback, coding, and finalization phases
+- **Two-Stage Human Validation**: Interactive workflow with validation points after planning and coding
+- **State Persistence**: Serialization and resumption of workflow state between validation steps
 - **Google Gemini Integration**: Direct integration with Google Gemini API for code generation
 - **Environment Variable Configuration**: Use GEMINI_API_KEY and GEMINI_MODEL environment variables
 - **Fallback Models**: Integration with Google Gemini and Ollama for code generation
@@ -493,6 +496,95 @@ You can specify host and port:
 python main.py --host 127.0.0.1 --port 8080
 ```
 
+### MCP Connector Implementation
+
+The project includes a flexible MCP connector implementation that supports both the official MCP Python SDK with STDIO transport and a custom HTTP API:
+
+#### Using the MCP Connector with HTTP API
+
+```python
+from src.streamlit_client.utils.mcp_connector import MCPConnector, ConnectionType
+
+# Create a connector using the HTTP API
+connector = MCPConnector(
+    connection_type=ConnectionType.HTTP,
+    server_url="http://localhost:8001"
+)
+
+# Connect to the MCP server
+import asyncio
+async def run():
+    # Connect to the server
+    connected = await connector.connect()
+    if not connected:
+        print("Failed to connect")
+        print("Make sure the standalone MCP server is running")
+        return
+
+    try:
+        # Call a tool asynchronously
+        result = await connector.async_call_tool(
+            "search_records",
+            {"model_name": "res.partner", "query": "company"}
+        )
+        print(result)
+
+        # Call another tool
+        result = await connector.async_call_tool(
+            "advanced_search",
+            {"query": "List all customers", "limit": 5}
+        )
+        print(result)
+    finally:
+        # Close the connection when done
+        await connector.close()
+
+# Run the async function
+asyncio.run(run())
+
+# Alternatively, you can use the synchronous interface
+connector = MCPConnector(
+    connection_type=ConnectionType.HTTP,
+    server_url="http://localhost:8001"
+)
+if connector.health_check():
+    result = connector.call_tool(
+        "search_records",
+        {"model_name": "res.partner", "query": "company"}
+    )
+```
+
+#### Example Scripts
+
+The project includes example scripts for using the MCP connector:
+
+1. **HTTP API Example**:
+```bash
+# First, start the standalone MCP server
+uv run standalone_mcp_server.py
+
+# Then, in another terminal, run the example
+uv run src/streamlit_client/examples/mcp_sdk_example.py
+```
+
+2. **Alternative HTTP API Example**:
+```bash
+# First, start the standalone MCP server
+uv run standalone_mcp_server.py
+
+# Then, in another terminal, run the example
+uv run src/streamlit_client/examples/http_api_example.py
+```
+
+The connector automatically handles:
+- Connection management
+- Tool discovery and listing
+- Asynchronous tool calls with proper error handling
+- Polling for long-running operations
+- Timeout management for different tools
+
+See the example in `src/streamlit_client/examples/mcp_sdk_example.py` for a complete example.
+
 ### Standalone MCP Server for Testing
 
 We've created a standalone MCP server that can be used for testing the MCP tools without Claude Desktop. This server exposes the MCP tools as HTTP endpoints:
@@ -558,10 +650,12 @@ The project includes an Odoo code agent that helps with generating Odoo 18 modul
 
 - **Analysis Phase**: Analyzes requirements and gathers relevant Odoo documentation
 - **Planning Phase**: Creates a plan and tasks for implementing the requirements
-- **Human Feedback Loop**: Gets feedback from the user on the plan
+- **First Human Validation Point**: Pauses for user feedback on the plan
 - **Coding Phase**: Generates the code for the Odoo module using the code generator utility
-- **Human Feedback Loop**: Gets feedback from the user on the code
+- **Second Human Validation Point**: Pauses for user feedback on the code
 - **Finalization Phase**: Finalizes the code based on feedback
+- **Two-Stage Human Validation Workflow**: Interactive workflow with validation points after planning and coding
+- **State Persistence**: Serialization and resumption of workflow state between validation steps
 - **Fallback Models**: Integration with Google Gemini and Ollama for code generation
 - **Code Generator Utility**: Comprehensive utility for generating Odoo 18 model classes, views, and other components
 - **Odoo 18 Compliant Views**: Generate views following Odoo 18 guidelines (list view, single chatter tag)
@@ -650,6 +744,9 @@ The Odoo Code Agent accepts the following parameters:
 | `use_gemini` | boolean | Whether to use Google Gemini as a fallback | `false` |
 | `use_ollama` | boolean | Whether to use Ollama as a fallback | `false` |
 | `feedback` | string | Optional feedback to incorporate into the code generation | `null` |
+| `wait_for_validation` | boolean | Whether to pause at human validation points | `false` |
+| `current_phase` | string | Current phase for resuming the workflow | `null` |
+| `state_dict` | object | Serialized state for workflow resumption | `null` |
 
 #### Example Output
 
@@ -730,6 +827,29 @@ To use the generated module:
 
 You can also provide feedback to refine the generated code by calling this tool again with the feedback parameter.
 ```
+
+#### Human Validation Workflow
+
+The Odoo Code Agent supports a two-stage human validation workflow that allows you to provide feedback at critical points in the development process:
+
+1. **First Validation Point (After Planning)**: The agent pauses after analyzing requirements and creating a plan, allowing you to review and provide feedback before code generation begins.
+
+2. **Second Validation Point (After Coding)**: The agent pauses after generating the initial code, allowing you to review and provide feedback before finalizing the module.
+
+To use the human validation workflow:
+
+```
+# Start the workflow and pause at the first validation point
+/tool run_odoo_code_agent query="Create a customer feedback module" wait_for_validation=true
+
+# Continue from the first validation point with feedback
+/tool run_odoo_code_agent query="Create a customer feedback module" feedback="Please add a dashboard with key metrics" current_phase="human_feedback_1" wait_for_validation=true
+
+# Continue from the second validation point with feedback
+/tool run_odoo_code_agent query="Create a customer feedback module" feedback="Please add more comments to the code" current_phase="human_feedback_2" wait_for_validation=false
+```
+
+The Streamlit client provides a user-friendly interface for this workflow, with dedicated tabs for each phase and feedback forms at each validation point.
 
 #### Iterative Development with Feedback
 
@@ -1280,23 +1400,31 @@ We've implemented a powerful Retrieval Augmented Generation (RAG) tool for acces
 
 1. **Documentation Repository Integration**: The tool clones and processes the official Odoo 18 documentation repository (https://github.com/odoo/documentation/tree/18.0) to extract relevant content.
 
-2. **Semantic Search**: Using sentence-transformers and FAISS vector database, the tool provides semantic search capabilities for finding relevant documentation based on natural language queries.
+2. **Enhanced Semantic Search**: Using the powerful all-mpnet-base-v2 model from sentence-transformers and FAISS vector database, the tool provides advanced semantic search capabilities for finding relevant documentation based on natural language queries.
 
-3. **Chunking and Processing**: The documentation is processed and chunked into manageable segments with proper metadata extraction for improved retrieval.
+3. **Intelligent Chunking and Processing**: The documentation is processed using intelligent chunking strategies that respect document structure, maintain context within sections, and ensure proper overlap between chunks. The tool handles Markdown, HTML, and RST files with specialized processing for each format.
 
-4. **MCP Integration**: The RAG tool is fully integrated with the MCP server, providing a new `retrieve_odoo_documentation` tool and `odoo_documentation_prompt` for Claude Desktop.
+4. **Comprehensive Metadata Extraction**: The tool extracts detailed metadata from file paths and content, including section, subsection, country information, and titles, providing better context for search results.
 
-5. **Comprehensive Results**: Search results include relevant documentation sections with source information and context.
+5. **Query Preprocessing and Enhancement**: Queries are preprocessed to improve search results, with specialized handling for tax and localization queries. The tool implements keyword replacement for better matching and adds context for version-specific queries.
 
-6. **Persistent Storage**: The tool uses persistent storage for embeddings and processed documentation, making subsequent queries faster.
+6. **Keyword Boosting**: Documents containing relevant keywords are boosted in the search results, ensuring that the most relevant information appears at the top.
 
-7. **Automatic Updates**: The tool can update the documentation repository to ensure the latest information is available.
+7. **Enhanced Result Formatting**: Search results include detailed source information with section and category details, related search suggestions, and helpful guidance when no results are found.
 
-8. **Error Handling**: Comprehensive error handling ensures the tool works reliably even when dependencies are missing or the documentation repository is unavailable.
+8. **MCP Integration**: The RAG tool is fully integrated with the MCP server, providing a new `retrieve_odoo_documentation` tool and `odoo_documentation_prompt` for Claude Desktop.
 
-9. **Dependency Management**: The tool handles dependencies gracefully, with proper error messages when required packages are missing.
+9. **Fallback Mechanisms**: When specific queries don't yield results, the tool automatically falls back to more general queries to ensure users always get helpful information.
 
-10. **Test Script**: A test script (`test_odoo_docs_rag.py`) is provided to verify the functionality works correctly with various query types.
+10. **Persistent Storage**: The tool uses persistent storage for embeddings and processed documentation, making subsequent queries faster.
+
+11. **Automatic Updates**: The tool can update the documentation repository to ensure the latest information is available.
+
+12. **Comprehensive Error Handling**: Robust error handling ensures the tool works reliably even when dependencies are missing or the documentation repository is unavailable.
+
+13. **Dependency Management**: The tool handles dependencies gracefully, with proper error messages when required packages are missing.
+
+14. **Test Scripts**: Comprehensive test scripts (`test_odoo_docs_rag.py` and `test_specific_queries.py`) are provided to verify the functionality works correctly with various query types, including specialized tests for tax and localization queries.
 
 ### Example Usage
 
@@ -1329,6 +1457,46 @@ odoo_docs_retriever_instance = OdooDocsRetriever(
 ```
 
 ## Recent Improvements and Fixes
+
+### Odoo Documentation RAG Improvements
+
+We've made significant improvements to the Odoo documentation RAG tool to enhance its ability to find relevant information, particularly for tax and localization queries:
+
+1. **Enhanced Document Processing**:
+   - Improved file filtering to focus on relevant documentation files
+   - Added better handling of RST files (reStructuredText) which are common in Odoo documentation
+   - Enhanced text cleaning to remove irrelevant characters and improve search quality
+
+2. **Improved Chunking Strategy**:
+   - Implemented a more intelligent chunking algorithm that respects document structure
+   - Added section-based chunking to maintain context within sections
+   - Improved overlap handling to avoid missing information at chunk boundaries
+   - Added minimum content length filtering to avoid tiny, irrelevant chunks
+
+3. **Enhanced Metadata Extraction**:
+   - Added more detailed metadata from file paths
+   - Extracted section, subsection, and country information for better context
+   - Added title extraction from filenames
+
+4. **Improved Query Processing**:
+   - Added query preprocessing to handle variations in terminology
+   - Implemented keyword replacement for better matching
+   - Added context for version-specific queries
+   - Implemented keyword boosting for relevant documents
+
+5. **Better Results Formatting**:
+   - Enhanced result presentation with more context
+   - Added source information with section and category details
+   - Included related search suggestions
+   - Added helpful guidance when no results are found
+
+6. **MCP Server Integration**:
+   - Updated the MCP server to use our improved implementation
+   - Added query preprocessing specific to tax and localization queries
+   - Implemented fallback to more general queries when specific queries fail
+   - Added better logging for debugging
+
+These improvements significantly enhance the RAG system's ability to find relevant information about Odoo taxes and Indian localization, which were the specific areas mentioned as having issues.
 
 ### Code Generator Utility
 
@@ -1465,6 +1633,52 @@ We've made several improvements to the MCP server to ensure all tools work corre
 2. **Reduced XML-RPC calls**: Minimized the number of XML-RPC calls to Odoo for better performance.
 
 3. **Improved error handling**: Added better error handling and reporting for more reliable operation.
+
+### Streamlit Client Implementation
+
+We've implemented a comprehensive Streamlit client for interacting with the Odoo 18 MCP tools:
+
+1. **Modular Architecture**:
+   - Created a modular architecture with separate pages for different functionality
+   - Implemented reusable components for chat, file viewing, and feedback forms
+   - Developed utility functions for MCP connection and session state management
+   - Added responsive design that works on different screen sizes
+
+2. **User-Friendly Interface**:
+   - Implemented a navigation sidebar with page routing
+   - Added custom styling and theming for better user experience
+   - Created progress indicators for long-running operations
+   - Implemented form validation and error handling
+   - Added results formatting and display for better readability
+
+3. **Asynchronous Polling Mechanism**:
+   - Implemented an asynchronous polling mechanism for long-running operations
+   - Added tool-specific polling configurations based on operation complexity
+   - Created request tracking with unique IDs for better reliability
+   - Implemented fallback messages for timeout situations
+   - Added error recovery for failed requests
+
+4. **MCP Server Integration**:
+   - Created a robust MCP connector for communicating with the MCP server
+   - Implemented tool-specific convenience methods for common operations
+   - Added health check functionality to verify server status
+   - Created detailed logging for debugging
+   - Implemented intelligent query handling with fallback mechanisms
+
+5. **Comprehensive Features**:
+   - Code agent interface for Odoo module generation
+   - Export/import interface for data operations
+   - Documentation search for Odoo documentation
+   - Advanced search for natural language queries
+   - Chat interface for conversational interaction
+   - Model documentation for detailed model information
+   - Field validation for checking field values
+
+6. **Testing and Documentation**:
+   - Created comprehensive tests for the Streamlit client
+   - Added detailed documentation for installation and usage
+   - Implemented example workflows for common operations
+   - Created troubleshooting guides for common issues
 
 ### Dependency Management Improvements
 
@@ -1729,11 +1943,225 @@ The tool now includes improved CSV handling with better error reporting and supp
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
+## Streamlit Client
+
+The project includes a Streamlit client that provides a user-friendly interface for interacting with the Odoo 18 MCP tools. The Streamlit client offers a comprehensive set of features and a robust architecture for a seamless user experience.
+
+### Features
+
+- **Code Agent Interface**: Generate Odoo 18 modules using the code agent with a user-friendly interface
+- **Human Feedback Loop**: Provide feedback on the generated code and plans
+- **Export/Import Interface**: Export and import records from Odoo models with a visual interface
+- **Documentation Search**: Search for information in the Odoo 18 documentation
+- **Chat Interface**: Chat with the Odoo 18 MCP server using natural language
+- **File Viewer**: View and download generated code files
+- **CSV Viewer**: View and download exported CSV files
+- **Advanced Search**: Perform advanced natural language searches across multiple Odoo models
+- **Model Documentation**: Get detailed information about Odoo models and their fields
+- **Field Validation**: Validate field values against Odoo field requirements
+- **Responsive Design**: User-friendly interface that works on different screen sizes
+- **Progress Indicators**: Visual feedback during long-running operations
+- **Error Handling**: Comprehensive error handling with helpful messages
+
+### Installation
+
+1. Install the Streamlit client dependencies:
+
+```bash
+pip install -r requirements-streamlit.txt
+```
+
+2. Start the Streamlit client:
+
+```bash
+streamlit run app.py
+```
+
+3. Open your browser and navigate to http://localhost:8501
+
+### Usage
+
+The Streamlit client provides a user-friendly interface for interacting with the Odoo 18 MCP tools:
+
+1. **Code Agent**: Generate Odoo 18 modules using the code agent
+   - Specify your requirements for the module
+   - Review the plan and provide feedback
+   - Review the generated code and provide feedback
+   - Download the generated files
+   - Choose between Gemini and Ollama for code generation
+   - Save generated files to disk
+
+2. **Export/Import**: Export and import records from Odoo models
+   - Export records from any Odoo model to CSV files
+   - Import records from CSV files into any Odoo model
+   - Export and import related records (parent-child relationships)
+   - Filter records using domain expressions
+   - Select specific fields to export
+   - Map CSV fields to Odoo fields during import
+   - View and download exported CSV files
+
+3. **Documentation**: Search for information in the Odoo 18 documentation
+   - Search for information using natural language queries
+   - View relevant documentation sections with source information
+   - Get context-aware search results
+   - See related search suggestions
+   - Access comprehensive documentation on Odoo features
+
+4. **Advanced**: Access advanced Odoo 18 tools
+   - Get model documentation and field information
+   - Validate field values against Odoo field requirements
+   - Perform advanced natural language searches across multiple models
+   - View field importance and grouping
+   - Get record templates for creating new records
+
+5. **Chat**: Chat with the Odoo 18 MCP server using natural language
+   - Ask questions about Odoo 18
+   - Request information about models and fields
+   - Get help with Odoo 18 development
+   - Perform searches using natural language
+   - Access documentation through conversational interface
+
+### Testing the MCP Server Connection
+
+Before starting the Streamlit client, you can test the MCP server connection using the provided test script:
+
+```bash
+# Test if the MCP server is running
+python test_mcp_connection.py --test health
+
+# List available tools
+python test_mcp_connection.py --test tools
+
+# Test the search_records tool
+python test_mcp_connection.py --test search
+
+# Test the advanced_search tool
+python test_mcp_connection.py --test advanced
+
+# Test the retrieve_odoo_documentation tool
+python test_mcp_connection.py --test docs
+
+# Test the run_odoo_code_agent_tool tool
+python test_mcp_connection.py --test agent
+
+# Run all tests
+python test_mcp_connection.py --test all
+```
+
+This script helps verify that the MCP server is running correctly and that all the required tools are available and functioning properly before launching the Streamlit client.
+
+### Architecture
+
+The Streamlit client is built with a modular architecture designed for extensibility and maintainability:
+
+#### Core Components
+
+- **Main App (`main.py`)**: The main entry point for the Streamlit app, handling page routing and navigation
+- **Pages Directory**: Separate modules for different functionality:
+  - `code_agent.py`: Interface for the Odoo code agent
+  - `documentation.py`: Interface for Odoo documentation search
+  - `export_import.py`: Interface for data export and import operations
+- **Components Directory**: Reusable UI components:
+  - `chat.py`: Chat interface component for human interaction
+  - `file_viewer.py`: Component for viewing and downloading files
+- **Utils Directory**: Utility functions and classes:
+  - `mcp_connector.py`: Connector for MCP server communication
+  - `session_state.py`: State management for the Streamlit app
+
+#### Session State Management
+
+The client uses a comprehensive session state management system to maintain state across page navigation:
+
+1. **Global State**: Maintains global application state like current page and MCP server URL
+2. **Page-Specific State**: Each page has its own state management for form values and results
+3. **Chat History**: Maintains chat history for the chat interface
+4. **Results Caching**: Caches results to avoid unnecessary server calls
+5. **Form State**: Preserves form values when navigating between pages
+
+#### MCP Connector
+
+The MCP connector provides a robust interface for communicating with the MCP server:
+
+1. **Connection Types**: Supports both HTTP and STDIO connection types
+2. **Tool Discovery**: Automatically discovers available tools on the MCP server
+3. **Tool-Specific Methods**: Provides convenience methods for common tools
+4. **Error Handling**: Comprehensive error handling with detailed logging
+5. **Health Check**: Verifies that the MCP server is running
+6. **Asynchronous Support**: Supports asynchronous tool calls
+
+### Asynchronous Polling Mechanism
+
+The Streamlit client uses a sophisticated asynchronous polling mechanism to handle long-running operations:
+
+1. **Initial Request**: The client sends a request to the MCP server and receives an initial response
+2. **Request Tracking**: Each request is assigned a unique ID for tracking
+3. **Intelligent Polling**: If the initial response doesn't contain data, the client polls the server at regular intervals
+4. **Tool-Specific Configuration**: Different tools have different polling configurations based on their complexity:
+   - Advanced search: 20 polling attempts with 3-second intervals
+   - Code agent: 30 polling attempts with 3-second intervals
+   - Documentation retrieval: 10 polling attempts with 2-second intervals
+   - Export/import operations: 15 polling attempts with 2-second intervals
+5. **Progress Indicators**: While polling, the client shows progress indicators to provide feedback to the user
+6. **Timeout Handling**: If the server doesn't respond within a specified timeout, the client shows an error message
+7. **Fallback Messages**: If polling completes without receiving data, the client shows a helpful message
+8. **Error Recovery**: The client can recover from certain error conditions and continue polling
+
+This mechanism ensures that the client can handle operations that take a long time to complete, such as complex searches or code generation, while providing a responsive user experience.
+
+### Server-Side Query Processing
+
+The Streamlit client relies on the MCP server's advanced search capabilities to process natural language queries:
+
+1. **Natural Language Processing**: The MCP server uses advanced NLP to understand and process queries
+2. **Query Classification**: The client attempts to classify queries as search or documentation queries
+3. **Dynamic Model Detection**: The server automatically identifies the relevant Odoo models based on the query
+4. **Relationship Handling**: The server handles complex relationships between models (many2one, one2many)
+5. **Field Mapping**: The server maps natural language terms to Odoo field names
+6. **Query Execution**: The server executes the query against the Odoo database
+7. **Response Formatting**: The server formats the response in a user-friendly way
+8. **Fallback Mechanisms**: If one approach fails, the client tries alternative approaches:
+   - If advanced search fails, try documentation retrieval
+   - If both fail, try advanced search with a longer timeout
+   - If all fail, show a helpful error message
+
+This approach leverages the full power of the MCP server's capabilities, ensuring that queries are processed correctly and efficiently. The client focuses on its core responsibility: providing a user-friendly interface and handling the communication with the server.
+
+### Requirements
+
+- Streamlit 1.30.0 or higher
+- Pandas 1.5.0 or higher
+- Requests 2.31.0 or higher
+- Python-dotenv 1.0.0 or higher
+- Pydantic 2.0.0 or higher
+
+### Recent Improvements
+
+#### Enhanced Asynchronous Polling
+
+We've significantly improved the asynchronous polling mechanism to better handle long-running operations:
+
+1. **Tool-Specific Configurations**: Different tools now have customized polling configurations based on their complexity
+2. **Request Tracking**: Each request is now assigned a unique ID for better tracking
+3. **Improved Progress Indicators**: More detailed progress indicators during polling
+4. **Better Timeout Handling**: More intelligent timeout handling with helpful messages
+5. **Enhanced Error Recovery**: Better recovery from network errors and timeouts
+
+#### Improved Query Processing
+
+The client now uses a more sophisticated approach to query processing:
+
+1. **Query Classification**: Attempts to classify queries as search or documentation queries
+2. **Multiple Approaches**: Tries different approaches if the first one fails
+3. **Longer Timeouts for Complex Queries**: Automatically uses longer timeouts for complex queries
+4. **Helpful Error Messages**: More detailed error messages when queries fail
+5. **Fallback Mechanisms**: Falls back to alternative approaches when primary approach fails
+
 ## Acknowledgements
 
 - Odoo Community
 - Python Community
 - MCP SDK Team
+- Streamlit Team
 
 ## Odoo 18 Code Agent
 

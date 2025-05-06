@@ -27,7 +27,7 @@ dependencies = [
     "uvicorn>=0.22.0",
     "python-dotenv>=1.0.0",
     "requests>=2.31.0",
-    "mcp>=0.1.0",
+    "mcp>=1.7.0",
     "sqlparse>=0.4.4",
     "pandas>=1.5.0,<2.0.0",  # Using pandas 1.x for compatibility with Python 3.12
     "torch>=2.2.0,<=2.2.2",  # Specify a compatible PyTorch version
@@ -51,7 +51,12 @@ dev = [
     "pytest-cov>=4.1.0",
 ]
 cli = [
-    "mcp[cli]>=0.1.0",
+    "mcp[cli]>=1.7.0",
+]
+streamlit = [
+    "streamlit>=1.30.0",
+    "streamlit-extras>=0.3.0",
+    "mcp>=1.7.0",
 ]
 
 [project.urls]

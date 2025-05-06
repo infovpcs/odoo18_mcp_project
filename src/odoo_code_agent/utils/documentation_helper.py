@@ -19,7 +19,8 @@ try:
 
     # Use the existing documentation repository
     docs_dir = "/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs"
-    _retriever = OdooDocsRetriever(docs_dir=docs_dir, force_rebuild=False)
+    # Force rebuild to ensure index dimensions match the model
+    _retriever = OdooDocsRetriever(docs_dir=docs_dir, force_rebuild=True)
     _has_retriever = True
 except ImportError:
     logger.warning("Could not import OdooDocsRetriever, using fallback documentation")
@@ -66,3 +67,23 @@ def get_model_documentation(model_name: str) -> str:
     except Exception as e:
         logger.error(f"Error retrieving model documentation: {str(e)}")
         return f"Error retrieving model documentation: {str(e)}"
+
+
+def force_rebuild_index() -> bool:
+    """Force rebuild the documentation index.
+
+    This is useful when the index is corrupted or the model has changed.
+
+    Returns:
+        True if the index was rebuilt successfully, False otherwise
+    """
+    if not _has_retriever:
+        logger.error("Documentation retriever is not available")
+        return False
+
+    try:
+        logger.info("Forcing rebuild of documentation index")
+        return _retriever.initialize_index()
+    except Exception as e:
+        logger.error(f"Error rebuilding documentation index: {str(e)}")
+        return False

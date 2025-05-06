@@ -73,3 +73,6 @@ exports/
 # Odoo Documentation RAG
 odoo_docs/
 odoo_docs_index/
+
+# Generated Odoo modules
+generated_modules/

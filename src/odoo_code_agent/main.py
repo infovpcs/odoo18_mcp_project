@@ -26,6 +26,7 @@ NODE_MAPPING = {
     # Analysis phase
     "initialize": analysis_nodes.initialize_analysis,
     "gather_documentation": analysis_nodes.gather_documentation,
+    "gather_model_information": analysis_nodes.gather_model_information,
     "analyze_requirements": analysis_nodes.analyze_requirements,
     "complete_analysis": analysis_nodes.complete_analysis,
 

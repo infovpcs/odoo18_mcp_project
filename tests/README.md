@@ -9,11 +9,17 @@ This directory contains test scripts for the Odoo 18 MCP Project.
 - **test_export_import_agent.py**: Tests the langgraph agent flow for exporting and importing Odoo records.
 - **test_direct_export_import.py**: Tests the direct export and import functions without using the agent flow.
 
+### MCP Server Tests
+
+- **test_mcp_server_consolidated.py**: Comprehensive tests for the MCP server, including health checks, tool listing, and testing various tools.
+
 ### Odoo Code Agent Tests
 
-- **test_odoo_code_agent.py**: Tests the Odoo Code Agent with various queries.
-- **test_odoo_code_agent_tool.py**: Tests the Odoo Code Agent MCP tool.
-- **test_odoo_code_agent_utils.py**: Tests the utilities used by the Odoo Code Agent.
+- **test_odoo_code_agent_consolidated.py**: Consolidated tests for the Odoo Code Agent, including basic functionality, feedback handling, and testing with different LLM backends.
+- **test_odoo_code_agent_utils_consolidated.py**: Consolidated tests for the Odoo Code Agent utilities, including documentation helper, Odoo connector, and file handling.
+- **test_odoo_code_agent_playwright.ts**: End-to-end tests for the Odoo Code Agent using Playwright to test the Streamlit interface.
+- **test_odoo_code_agent.py**: (Legacy) Tests the Odoo Code Agent with various queries.
+- **run_playwright_test.py**: Helper script to run the Playwright tests.
 
 ## Running the Tests
 
@@ -58,38 +64,79 @@ python tests/test_direct_export_import.py --related-import --model sale.order --
 python tests/test_direct_export_import.py
 ```
 
+### MCP Server Tests
+
+```bash
+# Run all MCP server tests
+uv run tests/test_mcp_server_consolidated.py --all
+
+# Run specific tests
+uv run tests/test_mcp_server_consolidated.py --health --tools --search
+
+# Test advanced search
+uv run tests/test_mcp_server_consolidated.py --advanced
+
+# Test the Odoo code agent tool
+uv run tests/test_mcp_server_consolidated.py --code-agent
+
+# Test export/import tools
+uv run tests/test_mcp_server_consolidated.py --export --import
+```
+
 ### Odoo Code Agent Tests
 
 ```bash
-# Test the Odoo Code Agent
-python tests/test_odoo_code_agent.py
+# Run all Odoo Code Agent tests
+uv run tests/test_odoo_code_agent_consolidated.py --all
 
-# Test with Google Gemini as a fallback
-python tests/test_odoo_code_agent.py --gemini
-
-# Test with Ollama as a fallback
-python tests/test_odoo_code_agent.py --ollama
-
-# Test the Odoo Code Agent MCP tool
-python test_odoo_code_agent_tool.py
-
-# Test with Google Gemini as a fallback
-python test_odoo_code_agent_tool.py --gemini
-
-# Test with Ollama as a fallback
-python test_odoo_code_agent_tool.py --ollama
+# Run basic functionality test
+uv run tests/test_odoo_code_agent_consolidated.py --basic
 
 # Test with feedback
-python test_odoo_code_agent_tool.py --feedback
+uv run tests/test_odoo_code_agent_consolidated.py --feedback
 
-# Test saving files to disk
-python test_odoo_code_agent_tool.py --save --output-dir ./generated_modules
+# Test with Google Gemini as a fallback
+uv run tests/test_odoo_code_agent_consolidated.py --gemini
+
+# Test with Ollama as a fallback
+uv run tests/test_odoo_code_agent_consolidated.py --ollama
+
+# Test complete workflow
+uv run tests/test_odoo_code_agent_consolidated.py --workflow
+```
+
+### Odoo Code Agent Utilities Tests
+
+```bash
+# Run all Odoo Code Agent utilities tests
+uv run tests/test_odoo_code_agent_utils_consolidated.py --all
+
+# Test documentation helper
+uv run tests/test_odoo_code_agent_utils_consolidated.py --docs
+
+# Test Odoo connector
+uv run tests/test_odoo_code_agent_utils_consolidated.py --connector
 
 # Test human validation workflow
-python test_odoo_code_agent_tool.py --validation
+uv run tests/test_odoo_code_agent_utils_consolidated.py --workflow
 
-# Test the Odoo Code Agent utilities
-python test_odoo_code_agent_utils.py
+# Test file saver
+uv run tests/test_odoo_code_agent_utils_consolidated.py --files
+
+# Test module structure
+uv run tests/test_odoo_code_agent_utils_consolidated.py --structure
+```
+### Legacy Tests (For Reference)
+
+```bash
+# Test the Odoo Code Agent (legacy)
+uv run tests/test_odoo_code_agent.py
+
+# Test with Google Gemini as a fallback (legacy)
+uv run tests/test_odoo_code_agent.py --gemini
+
+# Test with Ollama as a fallback (legacy)
+uv run tests/test_odoo_code_agent.py --ollama
 ```
 
 ## Test Data

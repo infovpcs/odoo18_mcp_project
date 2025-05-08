@@ -1,6 +1,6 @@
 # Odoo 18 Integration MCP Server - Project Planning
 
-Last Updated: 2025-05-23
+Last Updated: 2025-05-24
 
 ## Project Overview
 This project aims to create a robust integration server that connects MCP (Master Control Program) with Odoo 18.0 ERP system, focusing on efficient data synchronization, API management, and secure communications. The implementation provides a standardized interface for performing CRUD operations on Odoo 18 models through a simple API, with dynamic model discovery and field analysis capabilities. The project includes direct implementation for advanced operations like data export and import, with dynamic model and field discovery using ir.model and ir.model.fields. Additionally, the project includes an Odoo code agent that helps with generating Odoo 18 modules and code using a structured workflow with analysis, planning, human feedback, coding, and finalization phases.
@@ -457,6 +457,10 @@ The Docker setup includes three main services:
    - Exposes port 8000 for API access
    - Connects to Odoo via XML-RPC
    - Provides MCP tools for Claude Desktop
+   - **Environment Variables**:
+     - `ODOO_DOCS_DIR`: Directory to store the Odoo documentation (default: ./odoo_docs)
+     - `ODOO_INDEX_DIR`: Directory to store the index and documents (default: ./odoo_docs_index)
+     - `ODOO_DB_PATH`: Path to the database file (default: ./odoo_docs_index/embeddings.db)
 
 2. **standalone-server**: A standalone server for testing MCP tools
    - Exposes port 8001 for API access (configurable via environment variables)
@@ -535,6 +539,10 @@ The Streamlit client provides a user-friendly interface for interacting with the
    - Error recovery ✅
    - Tool-specific polling configurations ✅
    - Request tracking with unique IDs ✅
+   - Enhanced error handling for timeout situations ✅
+   - Improved fallback messages for timeout situations ✅
+   - Intelligent timeout calculation based on query complexity ✅
+   - Optimized polling intervals for different tool types ✅
 
 7. **Server-Side Query Processing**
    - Natural language query handling ✅

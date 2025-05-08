@@ -15,6 +15,7 @@ import streamlit as st
 
 from src.streamlit_client.components.chat import render_chat
 from src.streamlit_client.pages.code_agent import render_code_agent_page
+from src.streamlit_client.pages.code_agent_graph import render_code_agent_graph_page
 from src.streamlit_client.pages.documentation import render_documentation_page, render_model_documentation, render_field_documentation
 from src.streamlit_client.pages.export_import import render_export_import_page
 from src.streamlit_client.utils.mcp_connector import MCPConnector
@@ -94,6 +95,11 @@ def render_sidebar(session_state: SessionState) -> None:
     # Code Agent
     if st.sidebar.button("Code Agent", use_container_width=True, type="primary" if session_state.current_page == "code_agent" else "secondary"):
         session_state.current_page = "code_agent"
+        st.rerun()
+
+    # Code Agent Graph
+    if st.sidebar.button("Code Agent Graph", use_container_width=True, type="primary" if session_state.current_page == "code_agent_graph" else "secondary"):
+        session_state.current_page = "code_agent_graph"
         st.rerun()
 
     # Export/Import
@@ -417,6 +423,8 @@ def main():
     # Render the current page
     if session_state.current_page == "code_agent":
         render_code_agent_page(session_state, mcp_connector)
+    elif session_state.current_page == "code_agent_graph":
+        render_code_agent_graph_page(session_state, mcp_connector)
     elif session_state.current_page == "export_import":
         render_export_import_page(session_state, mcp_connector)
     elif session_state.current_page == "documentation":

@@ -4,9 +4,16 @@
 import sys
 import traceback
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # Set up basic logging
 import logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+logging.basicConfig(
+    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger("odoo_mcp")
 
 try:
@@ -16,7 +23,6 @@ try:
     This module provides an MCP server implementation using the standard MCP Python SDK
     that integrates with our existing Odoo 18 MCP project.
     """
-
     import os
     import json
     import xmlrpc.client
@@ -31,22 +37,32 @@ try:
     # Import the advanced search implementation
     from advanced_search import AdvancedSearch
 
-    # Import the Odoo documentation retriever
+    # Import the Odoo documentation retriever and storage
     try:
-        from src.odoo_docs_rag import OdooDocsRetriever
+        from src.odoo_docs_rag import (
+            OdooDocsRetriever,
+            EmbeddingDatabase,
+            EmbeddingEngine,
+        )
+
         odoo_docs_retriever_available = True
-        logger.info("Odoo documentation retriever imported successfully")
+        logger.info("Odoo documentation retriever and storage imported successfully")
     except ImportError as e:
-        logger.warning(f"Odoo documentation retriever not available. Import error: {e}")
-        logger.warning("Install the required dependencies: sentence-transformers, faiss-cpu, beautifulsoup4, markdown, gitpython")
+        logger.warning(
+            f"Odoo documentation retriever and storage not available. Import error: {e}"
+        )
+        logger.warning(
+            "Install the required dependencies: sentence-transformers, faiss-cpu, beautifulsoup4, markdown, gitpython"
+        )
         odoo_docs_retriever_available = False
     except Exception as e:
-        logger.error(f"Error importing Odoo documentation retriever: {e}")
+        logger.error(f"Error importing Odoo documentation retriever and storage: {e}")
         odoo_docs_retriever_available = False
 
     # Import the Odoo code agent
     try:
         from src.odoo_code_agent.main import run_odoo_code_agent
+
         odoo_code_agent_available = True
         logger.info("Odoo code agent imported successfully")
     except ImportError as e:
@@ -85,11 +101,15 @@ try:
             """Establish connection to Odoo server"""
             try:
                 common = xmlrpc.client.ServerProxy(f"{self.url}/xmlrpc/2/common")
-                self.uid = common.authenticate(self.db, self.username, self.password, {})
+                self.uid = common.authenticate(
+                    self.db, self.username, self.password, {}
+                )
                 if not self.uid:
                     logger.error("Authentication failed")
                     raise Exception("Authentication failed")
-                self.models_proxy = xmlrpc.client.ServerProxy(f"{self.url}/xmlrpc/2/object")
+                self.models_proxy = xmlrpc.client.ServerProxy(
+                    f"{self.url}/xmlrpc/2/object"
+                )
                 logger.info(f"Connected to Odoo as user ID {self.uid}")
             except Exception as e:
                 logger.error(f"Error connecting to Odoo: {str(e)}")
@@ -99,17 +119,23 @@ try:
             """Get all available models"""
             try:
                 model_ids = self.models_proxy.execute_kw(
-                    self.db, self.uid, self.password,
-                    'ir.model', 'search',
-                    [[('transient', '=', False)]],  # Exclude transient models
-                    {'order': 'model'}
+                    self.db,
+                    self.uid,
+                    self.password,
+                    "ir.model",
+                    "search",
+                    [[("transient", "=", False)]],  # Exclude transient models
+                    {"order": "model"},
                 )
 
                 models = self.models_proxy.execute_kw(
-                    self.db, self.uid, self.password,
-                    'ir.model', 'read',
+                    self.db,
+                    self.uid,
+                    self.password,
+                    "ir.model",
+                    "read",
                     [model_ids],
-                    {'fields': ['name', 'model']}
+                    {"fields": ["name", "model"]},
                 )
                 return models
             except Exception as e:
@@ -124,10 +150,23 @@ try:
             """Get all fields for a specific model"""
             try:
                 fields = self.models_proxy.execute_kw(
-                    self.db, self.uid, self.password,
-                    model_name, 'fields_get',
+                    self.db,
+                    self.uid,
+                    self.password,
+                    model_name,
+                    "fields_get",
                     [],
-                    {'attributes': ['string', 'help', 'type', 'required', 'readonly', 'selection', 'relation']}
+                    {
+                        "attributes": [
+                            "string",
+                            "help",
+                            "type",
+                            "required",
+                            "readonly",
+                            "selection",
+                            "relation",
+                        ]
+                    },
                 )
                 return fields
             except Exception as e:
@@ -144,13 +183,21 @@ try:
                 fields = self.get_model_fields(model_name)
 
                 # Select fields to display (prioritize name, id, and a few other common fields)
-                fields_to_show = ['id']
-                if 'name' in fields:
-                    fields_to_show.append('name')
+                fields_to_show = ["id"]
+                if "name" in fields:
+                    fields_to_show.append("name")
 
                 # Add a few more useful fields based on type
                 for field_name, field_info in fields.items():
-                    if field_name in ['email', 'phone', 'default_code', 'code', 'reference', 'list_price', 'standard_price']:
+                    if field_name in [
+                        "email",
+                        "phone",
+                        "default_code",
+                        "code",
+                        "reference",
+                        "list_price",
+                        "standard_price",
+                    ]:
                         fields_to_show.append(field_name)
 
                     # Limit to reasonable number of fields
@@ -159,10 +206,13 @@ try:
 
                 # Get records
                 records = self.models_proxy.execute_kw(
-                    self.db, self.uid, self.password,
-                    model_name, 'search_read',
+                    self.db,
+                    self.uid,
+                    self.password,
+                    model_name,
+                    "search_read",
                     [domain],
-                    {'fields': fields_to_show, 'limit': limit, 'offset': offset}
+                    {"fields": fields_to_show, "limit": limit, "offset": offset},
                 )
                 return records, fields_to_show, fields
             except Exception as e:
@@ -175,17 +225,23 @@ try:
                 # Get model info - Odoo 18 may not have 'description' field in ir.model
                 try:
                     model_info = self.models_proxy.execute_kw(
-                        self.db, self.uid, self.password,
-                        'ir.model', 'search',
-                        [[('model', '=', model_name)]]
+                        self.db,
+                        self.uid,
+                        self.password,
+                        "ir.model",
+                        "search",
+                        [[("model", "=", model_name)]],
                     )
 
                     if model_info:
                         model_info = self.models_proxy.execute_kw(
-                            self.db, self.uid, self.password,
-                            'ir.model', 'read',
+                            self.db,
+                            self.uid,
+                            self.password,
+                            "ir.model",
+                            "read",
                             [model_info],
-                            {'fields': ['name', 'model']}
+                            {"fields": ["name", "model"]},
                         )
                     else:
                         model_info = []
@@ -200,19 +256,34 @@ try:
                 fields = self.get_model_fields(model_name)
 
                 # Get required fields
-                required_fields = [field for field, info in fields.items() if info.get('required', False)]
+                required_fields = [
+                    field
+                    for field, info in fields.items()
+                    if info.get("required", False)
+                ]
 
                 # Get recommended fields for creation (required + important non-required fields)
                 create_fields = required_fields.copy()
                 for field, info in fields.items():
-                    if field in ['name', 'code', 'default_code', 'email', 'phone', 'list_price'] and field not in create_fields:
+                    if (
+                        field
+                        in [
+                            "name",
+                            "code",
+                            "default_code",
+                            "email",
+                            "phone",
+                            "list_price",
+                        ]
+                        and field not in create_fields
+                    ):
                         create_fields.append(field)
 
                 return {
                     "model": model_info[0] if model_info else {},
                     "fields": fields,
                     "required_fields": required_fields,
-                    "create_fields": create_fields
+                    "create_fields": create_fields,
                 }
             except Exception as e:
                 logger.error(f"Error getting schema for {model_name}: {str(e)}")
@@ -222,9 +293,7 @@ try:
             """Create a new record in a model"""
             try:
                 record_id = self.models_proxy.execute_kw(
-                    self.db, self.uid, self.password,
-                    model_name, 'create',
-                    [values]
+                    self.db, self.uid, self.password, model_name, "create", [values]
                 )
                 return record_id
             except Exception as e:
@@ -235,26 +304,36 @@ try:
             """Update an existing record"""
             try:
                 result = self.models_proxy.execute_kw(
-                    self.db, self.uid, self.password,
-                    model_name, 'write',
-                    [[record_id], values]
+                    self.db,
+                    self.uid,
+                    self.password,
+                    model_name,
+                    "write",
+                    [[record_id], values],
                 )
                 return result
             except Exception as e:
-                logger.error(f"Error updating record {record_id} in {model_name}: {str(e)}")
+                logger.error(
+                    f"Error updating record {record_id} in {model_name}: {str(e)}"
+                )
                 return False
 
         def delete_record(self, model_name, record_id):
             """Delete a record"""
             try:
                 result = self.models_proxy.execute_kw(
-                    self.db, self.uid, self.password,
-                    model_name, 'unlink',
-                    [[record_id]]
+                    self.db,
+                    self.uid,
+                    self.password,
+                    model_name,
+                    "unlink",
+                    [[record_id]],
                 )
                 return result
             except Exception as e:
-                logger.error(f"Error deleting record {record_id} from {model_name}: {str(e)}")
+                logger.error(
+                    f"Error deleting record {record_id} from {model_name}: {str(e)}"
+                )
                 return False
 
         def execute_method(self, model_name, method, args_list, kwargs_dict=None):
@@ -272,26 +351,38 @@ try:
             try:
                 if kwargs_dict:
                     # If we have keyword arguments, pass them as the 7th parameter
-                    logger.debug(f"Executing {model_name}.{method} with args={args_list} and kwargs={kwargs_dict}")
+                    logger.debug(
+                        f"Executing {model_name}.{method} with args={args_list} and kwargs={kwargs_dict}"
+                    )
                     result = self.models_proxy.execute_kw(
-                        self.db, self.uid, self.password,
-                        model_name, method, args_list, kwargs_dict
+                        self.db,
+                        self.uid,
+                        self.password,
+                        model_name,
+                        method,
+                        args_list,
+                        kwargs_dict,
                     )
                 else:
                     # Otherwise, just pass the positional arguments
-                    logger.debug(f"Executing {model_name}.{method} with args={args_list}")
+                    logger.debug(
+                        f"Executing method {method} on {model_name} with args: {args_list}"
+                    )
                     result = self.models_proxy.execute_kw(
-                        self.db, self.uid, self.password,
-                        model_name, method, args_list
+                        self.db, self.uid, self.password, model_name, method, args_list
                     )
                 return result
             except Exception as e:
-                logger.error(f"Error executing method {method} on {model_name}: {str(e)}")
+                logger.error(
+                    f"Error executing method {method} on {model_name}: {str(e)}"
+                )
                 raise
 
     # Initialize Odoo model discovery
     try:
-        model_discovery = OdooModelDiscovery(ODOO_URL, ODOO_DB, ODOO_USERNAME, ODOO_PASSWORD)
+        model_discovery = OdooModelDiscovery(
+            ODOO_URL, ODOO_DB, ODOO_USERNAME, ODOO_PASSWORD
+        )
         logger.info("Odoo model discovery initialized successfully")
 
         # Initialize advanced search
@@ -306,15 +397,65 @@ try:
     odoo_docs_retriever_instance = None
     if odoo_docs_retriever_available:
         try:
-            # Use a directory in the project for storing the documentation
-            docs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "odoo_docs")
-            index_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "odoo_docs_index")
+            # Use environment variables for documentation and index directories,
+            # falling back to relative paths if not set.
+            default_docs_dir = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "odoo_docs"
+            )
+            default_index_dir = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "odoo_docs_index"
+            )
+            default_db_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "odoo_docs_index",
+                "embeddings.db",
+            )  # Default database path
+
+            # Get paths from environment variables
+            env_docs_dir = os.getenv("ODOO_DOCS_DIR")
+            env_index_dir = os.getenv("ODOO_INDEX_DIR")
+            env_db_path = os.getenv("ODOO_DB_PATH")
+
+            # Handle relative paths in environment variables
+            if env_docs_dir:
+                if os.path.isabs(env_docs_dir):
+                    docs_dir = env_docs_dir
+                else:
+                    docs_dir = os.path.join(
+                        os.path.dirname(os.path.abspath(__file__)), env_docs_dir
+                    )
+            else:
+                docs_dir = default_docs_dir
+
+            if env_index_dir:
+                if os.path.isabs(env_index_dir):
+                    index_dir = env_index_dir
+                else:
+                    index_dir = os.path.join(
+                        os.path.dirname(os.path.abspath(__file__)), env_index_dir
+                    )
+            else:
+                index_dir = default_index_dir
+
+            if env_db_path:
+                if os.path.isabs(env_db_path):
+                    db_path = env_db_path
+                else:
+                    db_path = os.path.join(
+                        os.path.dirname(os.path.abspath(__file__)), env_db_path
+                    )
+            else:
+                db_path = default_db_path
 
             # Create directories if they don't exist
             os.makedirs(docs_dir, exist_ok=True)
-            os.makedirs(index_dir, exist_ok=True)
+            os.makedirs(
+                os.path.dirname(db_path), exist_ok=True
+            )  # Ensure directory for DB exists
 
-            logger.info(f"Initializing Odoo documentation retriever with docs_dir={docs_dir}, index_dir={index_dir}")
+            logger.info(
+                f"Initializing Odoo documentation retriever with docs_dir={docs_dir}, db_path={db_path}"
+            )
 
             # Check if the required dependencies are available
             try:
@@ -323,20 +464,67 @@ try:
                 import bs4
                 import markdown
                 import git
-                logger.info("All required dependencies for Odoo documentation retriever are available")
 
-                odoo_docs_retriever_instance = OdooDocsRetriever(
-                    docs_dir=docs_dir,
-                    index_dir=index_dir,
-                    model_name="all-mpnet-base-v2",  # Using a more powerful model
-                    chunk_size=1500,  # Larger chunks for more context
-                    chunk_overlap=300,  # More overlap to avoid missing context
-                    force_rebuild=False  # Set to True to force rebuilding the index
+                logger.info(
+                    "All required dependencies for Odoo documentation retriever are available"
                 )
-                logger.info("Odoo documentation retriever initialized successfully")
+
+                # Initialize the EmbeddingDatabase
+                embedding_db = EmbeddingDatabase(
+                    db_path=db_path, model_name="all-mpnet-base-v2"
+                )
+
+                # Optional: Migrate from old file-based storage if database is empty
+                # You might want to add logic here to check if the DB is empty
+                # and if the old files exist, then call embedding_db.migrate_from_files(documents_path, index_path)
+                # For now, we'll rely on the EmbeddingEngine's load logic to handle file fallback.
+
+                # Check if embeddings already exist to avoid unnecessary rebuilding
+                embeddings_exist = os.path.exists(db_path) and os.path.getsize(db_path) > 0
+
+                # Check if we need to update the repository
+                repo_needs_update = False
+                if os.path.exists(os.path.join(docs_dir, "odoo_documentation")):
+                    # Repository exists, check if it needs update
+                    repo_needs_update = False  # Set to True if you want to update on every startup
+
+                try:
+                    # Check if embeddings already exist in the database or files
+                    embeddings_exist_in_db = embedding_db and embedding_db.has_embeddings("all-mpnet-base-v2")
+                    embeddings_exist_in_files = os.path.exists(os.path.join(index_dir, "faiss_index.bin"))
+
+                    logger.info(f"Embeddings exist in database: {embeddings_exist_in_db}")
+                    logger.info(f"Embeddings exist in files: {embeddings_exist_in_files}")
+
+                    # Always skip embedding creation if they exist
+                    skip_embeddings = embeddings_exist_in_db or embeddings_exist_in_files
+
+                    odoo_docs_retriever_instance = OdooDocsRetriever(
+                        docs_dir=docs_dir,
+                        index_dir=index_dir,  # Still pass index_dir for potential file fallback/migration
+                        model_name="all-mpnet-base-v2",  # Using a more powerful model
+                        chunk_size=1500,  # Larger chunks for more context
+                        chunk_overlap=300,  # More overlap to avoid missing context
+                        force_rebuild=False,  # Never force rebuild if embeddings exist
+                        db=embedding_db,  # Pass the database
+                        update_repo=repo_needs_update,  # Only update if needed
+                        skip_embedding_if_exists=skip_embeddings,  # Skip embedding creation if they exist
+                    )
+                    logger.info("Odoo documentation retriever initialized successfully")
+                    if embeddings_exist:
+                        logger.info("Using existing embeddings from database")
+                except Exception as e:
+                    logger.error(
+                        f"Failed to initialize Odoo documentation retriever: {str(e)}"
+                    )
+                    odoo_docs_retriever_instance = None
             except ImportError as e:
-                logger.warning(f"Missing dependency for Odoo documentation retriever: {e}")
-                logger.warning("Install the required dependencies: sentence-transformers, faiss-cpu, beautifulsoup4, markdown, gitpython")
+                logger.warning(
+                    f"Missing dependency for Odoo documentation retriever: {e}"
+                )
+                logger.warning(
+                    "Install the required dependencies: sentence-transformers, faiss-cpu, beautifulsoup4, markdown, gitpython"
+                )
                 odoo_docs_retriever_instance = None
         except Exception as e:
             logger.error(f"Failed to initialize Odoo documentation retriever: {str(e)}")
@@ -346,7 +534,7 @@ try:
     mcp = FastMCP(
         "Odoo 18 MCP",
         description="Dynamic Odoo 18 integration with MCP",
-        dependencies=["fastapi", "pydantic", "requests"]
+        dependencies=["fastapi", "pydantic", "requests"],
     )
 
     # Resource for discovering available models
@@ -397,18 +585,20 @@ try:
                 result += f"## Model Information\n\n"
                 result += f"- **Name**: {model_info.get('name')}\n"
                 result += f"- **Technical Name**: {model_info.get('model')}\n"
-                if model_info.get('description'):
+                if model_info.get("description"):
                     result += f"- **Description**: {model_info.get('description')}\n"
 
             # Fields
             fields = metadata.get("fields", {})
             if fields:
                 result += f"\n## Fields ({len(fields)})\n\n"
-                for field_name, field_info in list(fields.items())[:20]:  # Limit to 20 fields
-                    field_type = field_info.get('type', 'unknown')
-                    field_string = field_info.get('string', field_name)
-                    required = field_info.get('required', False)
-                    readonly = field_info.get('readonly', False)
+                for field_name, field_info in list(fields.items())[
+                    :20
+                ]:  # Limit to 20 fields
+                    field_type = field_info.get("type", "unknown")
+                    field_string = field_info.get("string", field_name)
+                    required = field_info.get("required", False)
+                    readonly = field_info.get("readonly", False)
 
                     result += f"- **{field_string}** (`{field_name}`): {field_type}"
                     if required:
@@ -446,7 +636,9 @@ try:
             return "# Error: Odoo Connection\n\nCould not connect to Odoo server. Please check your connection settings."
 
         try:
-            records, fields_to_show, fields_info = model_discovery.get_model_records(model_name)
+            records, fields_to_show, fields_info = model_discovery.get_model_records(
+                model_name
+            )
 
             # Format the records as a readable string
             result = f"# Records for {model_name}\n\n"
@@ -455,16 +647,36 @@ try:
                 return result + "No records found."
 
             # Create a table header
-            header = "| ID | " + " | ".join([fields_info.get(field, {}).get('string', field) for field in fields_to_show if field != 'id']) + " |\n"
-            separator = "|----| " + " | ".join(["----" for _ in fields_to_show if _ != 'id']) + " |\n"
+            header = (
+                "| ID | "
+                + " | ".join(
+                    [
+                        fields_info.get(field, {}).get("string", field)
+                        for field in fields_to_show
+                        if field != "id"
+                    ]
+                )
+                + " |\n"
+            )
+            separator = (
+                "|----| "
+                + " | ".join(["----" for _ in fields_to_show if _ != "id"])
+                + " |\n"
+            )
 
             result += header + separator
 
             # Add records to the table
             for record in records:
-                record_id = record.get('id', 'N/A')
+                record_id = record.get("id", "N/A")
                 row = f"| {record_id} | "
-                row += " | ".join([str(record.get(field, '')) for field in fields_to_show if field != 'id'])
+                row += " | ".join(
+                    [
+                        str(record.get(field, ""))
+                        for field in fields_to_show
+                        if field != "id"
+                    ]
+                )
                 row += " |\n"
                 result += row
 
@@ -496,7 +708,7 @@ try:
                     domain = []
                 else:
                     # Try to find records matching the query in name field
-                    domain = [('name', 'ilike', query)]
+                    domain = [("name", "ilike", query)]
 
             records, fields_to_show, fields_info = model_discovery.get_model_records(
                 model_name, limit=10, domain=domain
@@ -509,16 +721,36 @@ try:
                 return result + "No records found matching the query."
 
             # Create a table header
-            header = "| ID | " + " | ".join([fields_info.get(field, {}).get('string', field) for field in fields_to_show if field != 'id']) + " |\n"
-            separator = "|----| " + " | ".join(["----" for _ in fields_to_show if _ != 'id']) + " |\n"
+            header = (
+                "| ID | "
+                + " | ".join(
+                    [
+                        fields_info.get(field, {}).get("string", field)
+                        for field in fields_to_show
+                        if field != "id"
+                    ]
+                )
+                + " |\n"
+            )
+            separator = (
+                "|----| "
+                + " | ".join(["----" for _ in fields_to_show if _ != "id"])
+                + " |\n"
+            )
 
             result += header + separator
 
             # Add records to the table
             for record in records:
-                record_id = record.get('id', 'N/A')
+                record_id = record.get("id", "N/A")
                 row = f"| {record_id} | "
-                row += " | ".join([str(record.get(field, '')) for field in fields_to_show if field != 'id'])
+                row += " | ".join(
+                    [
+                        str(record.get(field, ""))
+                        for field in fields_to_show
+                        if field != "id"
+                    ]
+                )
                 row += " |\n"
                 result += row
 
@@ -605,7 +837,9 @@ try:
 
     # Tool for updating records
     @mcp.tool()
-    def update_record(model_name: str, record_id: int, values: Union[str, Dict[str, Any]]) -> str:
+    def update_record(
+        model_name: str, record_id: int, values: Union[str, Dict[str, Any]]
+    ) -> str:
         """Update an existing record in an Odoo model.
 
         Args:
@@ -676,7 +910,9 @@ try:
 
     # Tool for executing custom Odoo methods
     @mcp.tool()
-    def execute_method(model_name: str, method: str, args: Union[str, List, Dict[str, Any]]) -> str:
+    def execute_method(
+        model_name: str, method: str, args: Union[str, List, Dict[str, Any]]
+    ) -> str:
         """Execute a custom method on an Odoo model.
 
         Args:
@@ -703,7 +939,12 @@ try:
                         args_list = parsed_args
                     elif isinstance(parsed_args, dict):
                         # For name_search and similar methods, dictionaries should be passed as kwargs
-                        if method in ['name_search', 'search', 'search_read', 'fields_get']:
+                        if method in [
+                            "name_search",
+                            "search",
+                            "search_read",
+                            "fields_get",
+                        ]:
                             kwargs_dict = parsed_args
                             args_list = []
                         else:
@@ -712,9 +953,10 @@ try:
                         args_list = [parsed_args]
                 except json.JSONDecodeError:
                     # If not valid JSON, try to interpret as a simple list or string
-                    if args.startswith('[') and args.endswith(']'):
+                    if args.startswith("[") and args.endswith("]"):
                         # Try to evaluate as a Python list
                         import ast
+
                         try:
                             args_list = ast.literal_eval(args)
                         except (SyntaxError, ValueError):
@@ -728,7 +970,7 @@ try:
                 args_list = args
             elif isinstance(args, dict):
                 # For name_search and similar methods, dictionaries should be passed as kwargs
-                if method in ['name_search', 'search', 'search_read', 'fields_get']:
+                if method in ["name_search", "search", "search_read", "fields_get"]:
                     kwargs_dict = args
                     args_list = []
                 else:
@@ -738,19 +980,29 @@ try:
                 args_list = [str(args)]
 
             # Special handling for name_search with a single string
-            if method == 'name_search' and len(args_list) == 1 and isinstance(args_list[0], str):
+            if (
+                method == "name_search"
+                and len(args_list) == 1
+                and isinstance(args_list[0], str)
+            ):
                 # If args is just a string for name_search, convert it to the proper format
-                kwargs_dict = {'name': args_list[0]}
+                kwargs_dict = {"name": args_list[0]}
                 args_list = []
 
             # Log the arguments for debugging
             if kwargs_dict:
-                logger.debug(f"Executing method {method} on {model_name} with args: {args_list} and kwargs: {kwargs_dict}")
+                logger.debug(
+                    f"Executing method {method} on {model_name} with args: {args_list} and kwargs={kwargs_dict}"
+                )
             else:
-                logger.debug(f"Executing method {method} on {model_name} with args: {args_list}")
+                logger.debug(
+                    f"Executing method {method} on {model_name} with args: {args_list}"
+                )
 
             # Execute the method
-            result = model_discovery.execute_method(model_name, method, args_list, kwargs_dict)
+            result = model_discovery.execute_method(
+                model_name, method, args_list, kwargs_dict
+            )
 
             # Format the result
             if isinstance(result, (dict, list)):
@@ -790,24 +1042,24 @@ try:
                 score = 50
 
                 # Required fields are more important
-                if field_info.get('required', False):
+                if field_info.get("required", False):
                     score += 30
 
                 # Common important fields
-                if field_name in ['name', 'code', 'default_code']:
+                if field_name in ["name", "code", "default_code"]:
                     score += 20
-                elif field_name in ['email', 'phone', 'mobile']:
+                elif field_name in ["email", "phone", "mobile"]:
                     score += 15
-                elif field_name in ['street', 'city', 'zip', 'country_id']:
+                elif field_name in ["street", "city", "zip", "country_id"]:
                     score += 10
-                elif field_name in ['list_price', 'standard_price', 'price']:
+                elif field_name in ["list_price", "standard_price", "price"]:
                     score += 15
 
                 # Field types importance
-                field_type = field_info.get('type', '')
-                if field_type == 'many2one':
+                field_type = field_info.get("type", "")
+                if field_type == "many2one":
                     score += 5
-                elif field_type == 'one2many':
+                elif field_type == "one2many":
                     score += 3
 
                 # Cap at 100
@@ -823,8 +1075,18 @@ try:
             result += "| Field | Importance |\n"
             result += "|-------|-----------|\n"
 
-            for field, score in sorted_fields[:20]:  # Limit to 20 fields
-                result += f"| {field} | {score} |\n"
+            for field, score in sorted_fields[:2]:
+                # Sort fields by importance
+                sorted_fields = sorted(
+                    importance.items(), key=lambda x: x[1], reverse=True
+                )
+
+                # Create a table
+                result += "| Field | Importance |\n"
+                result += "|-------|-----------|\n"
+
+                for field, score in sorted_fields[:20]:  # Limit to 20 fields
+                    result += f"| {field} | {score} |\n"
 
             if len(sorted_fields) > 20:
                 result += f"\n*...and {len(sorted_fields) - 20} more fields*\n"
@@ -864,46 +1126,92 @@ try:
                 "inventory_info": [],
                 "categorization": [],
                 "dates": [],
-                "other": []
+                "other": [],
             }
 
             for field_name, field_info in fields.items():
-                field_type = field_info.get('type', '')
+                field_type = field_info.get("type", "")
 
                 # Skip binary fields and attachments
-                if field_type == 'binary' or 'attachment' in field_name:
+                if field_type == "binary" or "attachment" in field_name:
                     continue
 
                 # Basic info
-                if field_name in ['name', 'display_name', 'title', 'description', 'note', 'comment', 'lang', 'company_type']:
+                if field_name in [
+                    "name",
+                    "display_name",
+                    "title",
+                    "description",
+                    "note",
+                    "comment",
+                    "lang",
+                    "company_type",
+                ]:
                     groups["basic_info"].append(field_name)
 
                 # Contact info
-                elif field_name in ['email', 'phone', 'mobile', 'website', 'fax']:
+                elif field_name in ["email", "phone", "mobile", "website", "fax"]:
                     groups["contact_info"].append(field_name)
 
                 # Address info
-                elif field_name in ['street', 'street2', 'city', 'state_id', 'zip', 'country_id']:
+                elif field_name in [
+                    "street",
+                    "street2",
+                    "city",
+                    "state_id",
+                    "zip",
+                    "country_id",
+                ]:
                     groups["address_info"].append(field_name)
 
                 # Business info
-                elif field_name in ['vat', 'ref', 'industry_id', 'company_id', 'user_id', 'partner_id', 'currency_id']:
+                elif field_name in [
+                    "vat",
+                    "ref",
+                    "industry_id",
+                    "company_id",
+                    "user_id",
+                    "partner_id",
+                    "currency_id",
+                ]:
                     groups["business_info"].append(field_name)
 
                 # Pricing info
-                elif 'price' in field_name or field_name in ['list_price', 'standard_price', 'cost']:
+                elif "price" in field_name or field_name in [
+                    "list_price",
+                    "standard_price",
+                    "cost",
+                ]:
                     groups["pricing_info"].append(field_name)
 
                 # Inventory info
-                elif field_name in ['default_code', 'barcode', 'qty_available', 'virtual_available', 'incoming_qty', 'outgoing_qty']:
+                elif field_name in [
+                    "default_code",
+                    "barcode",
+                    "qty_available",
+                    "virtual_available",
+                    "incoming_qty",
+                    "outgoing_qty",
+                ]:
                     groups["inventory_info"].append(field_name)
 
                 # Categorization
-                elif field_name in ['categ_id', 'uom_id', 'uom_po_id', 'product_tmpl_id', 'tag_ids', 'category_id']:
+                elif field_name in [
+                    "categ_id",
+                    "uom_id",
+                    "uom_po_id",
+                    "product_tmpl_id",
+                    "tag_ids",
+                    "category_id",
+                ]:
                     groups["categorization"].append(field_name)
 
                 # Dates
-                elif 'date' in field_name or field_type == 'datetime' or field_type == 'date':
+                elif (
+                    "date" in field_name
+                    or field_type == "datetime"
+                    or field_type == "date"
+                ):
                     groups["dates"].append(field_name)
 
                 # Other
@@ -953,7 +1261,7 @@ try:
 
             # If we couldn't get the schema, provide a default template based on the model
             if not schema:
-                if model_name == 'res.partner':
+                if model_name == "res.partner":
                     template = {
                         "name": "",
                         "email": "",
@@ -961,19 +1269,19 @@ try:
                         "is_company": False,
                         "street": "",
                         "city": "",
-                        "country_id": False  # Will need to be set to a valid country ID
+                        "country_id": False,  # Will need to be set to a valid country ID
                     }
-                elif model_name == 'product.product':
+                elif model_name == "product.product":
                     template = {
                         "name": "",
                         "default_code": "",  # Internal reference
-                        "list_price": 0.0,   # Sales price
+                        "list_price": 0.0,  # Sales price
                         "standard_price": 0.0,  # Cost
-                        "type": "consu",     # Product type: 'consu', 'service', 'product'
-                        "categ_id": False,   # Will need to be set to a valid category ID
-                        "uom_id": False,     # Will need to be set to a valid UoM ID
+                        "type": "consu",  # Product type: 'consu', 'service', 'product'
+                        "categ_id": False,  # Will need to be set to a valid category ID
+                        "uom_id": False,  # Will need to be set to a valid UoM ID
                         "uom_po_id": False,  # Will need to be set to a valid Purchase UoM ID
-                        "description": ""    # Description
+                        "description": "",  # Description
                     }
                 else:
                     # Generic template with just a name field
@@ -987,46 +1295,68 @@ try:
 
             # If no create_fields were found, add some common fields based on the model
             if not create_fields:
-                if model_name == 'res.partner':
-                    create_fields = ['name', 'email', 'phone', 'is_company', 'street', 'city', 'country_id']
-                elif model_name == 'product.product':
-                    create_fields = ['name', 'default_code', 'list_price', 'standard_price', 'type', 'categ_id', 'uom_id', 'uom_po_id', 'description']
+                if model_name == "res.partner":
+                    create_fields = [
+                        "name",
+                        "email",
+                        "phone",
+                        "is_company",
+                        "street",
+                        "city",
+                        "country_id",
+                    ]
+                elif model_name == "product.product":
+                    create_fields = [
+                        "name",
+                        "default_code",
+                        "list_price",
+                        "standard_price",
+                        "type",
+                        "categ_id",
+                        "uom_id",
+                        "uom_po_id",
+                        "description",
+                    ]
                 else:
                     # For other models, just add the name field
-                    create_fields = ['name']
+                    create_fields = ["name"]
 
             for field in create_fields:
                 if field in fields:
                     field_info = fields[field]
-                    field_type = field_info.get('type')
+                    field_type = field_info.get("type")
 
                     # Set default values based on field type
-                    if field_type == 'char':
+                    if field_type == "char":
                         template[field] = ""
-                    elif field_type == 'integer':
+                    elif field_type == "integer":
                         template[field] = 0
-                    elif field_type == 'float':
+                    elif field_type == "float":
                         template[field] = 0.0
-                    elif field_type == 'boolean':
+                    elif field_type == "boolean":
                         template[field] = False
-                    elif field_type == 'many2one':
+                    elif field_type == "many2one":
                         template[field] = False
-                    elif field_type == 'selection':
-                        selections = field_info.get('selection', [])
+                    elif field_type == "selection":
+                        selections = field_info.get("selection", [])
                         template[field] = selections[0][0] if selections else False
-                    elif field_type == 'text' or field_type == 'html':
+                    elif field_type == "text" or field_type == "html":
                         template[field] = ""
                     else:
                         template[field] = False
                 else:
                     # Field not found in fields, add it with a default value based on field name
-                    if field == 'name' or field.endswith('_name') or field == 'description':
+                    if (
+                        field == "name"
+                        or field.endswith("_name")
+                        or field == "description"
+                    ):
                         template[field] = ""
-                    elif field.endswith('_price') or field.endswith('_cost'):
+                    elif field.endswith("_price") or field.endswith("_cost"):
                         template[field] = 0.0
-                    elif field.endswith('_id'):
+                    elif field.endswith("_id"):
                         template[field] = False
-                    elif field.startswith('is_') or field.startswith('has_'):
+                    elif field.startswith("is_") or field.startswith("has_"):
                         template[field] = False
                     else:
                         template[field] = ""
@@ -1037,7 +1367,13 @@ try:
 
     # Tool for exporting records to CSV
     @mcp.tool()
-    def export_records_to_csv(model_name: str, fields: Optional[List[str]] = None, filter_domain: Optional[Union[str, List]] = None, limit: int = 1000, export_path: Optional[str] = None) -> str:
+    def export_records_to_csv(
+        model_name: str,
+        fields: Optional[List[str]] = None,
+        filter_domain: Optional[Union[str, List]] = None,
+        limit: int = 1000,
+        export_path: Optional[str] = None,
+    ) -> str:
         """Export records from an Odoo model to a CSV file.
 
         Args:
@@ -1066,7 +1402,9 @@ try:
 
             # Validate fields if provided
             if fields:
-                invalid_fields = [field for field in fields if field not in available_fields]
+                invalid_fields = [
+                    field for field in fields if field not in available_fields
+                ]
                 if invalid_fields:
                     return f"# Error: Invalid Fields\n\nThe following fields do not exist in model '{model_name}':\n- {', '.join(invalid_fields)}\n\nAvailable fields include:\n- {', '.join(list(available_fields.keys())[:20])}\n- ..."
 
@@ -1087,6 +1425,7 @@ try:
                         try:
                             # Try to evaluate as Python expression
                             import ast
+
                             domain = ast.literal_eval(filter_domain)
                             domain_str = filter_domain
                         except (SyntaxError, ValueError):
@@ -1097,14 +1436,17 @@ try:
                     for condition in domain:
                         if isinstance(condition, (list, tuple)) and len(condition) >= 3:
                             field_name = condition[0]
-                            if field_name not in available_fields and field_name != 'id':
+                            if (
+                                field_name not in available_fields
+                                and field_name != "id"
+                            ):
                                 return f"# Error: Invalid Domain Field\n\nThe field '{field_name}' in the domain filter does not exist in model '{model_name}'."
                 except Exception as e:
                     return f"# Error: Invalid Domain Structure\n\nThe domain filter has an invalid structure: {str(e)}"
 
             # Set default export path if not provided
             if not export_path:
-                model_name_safe = model_name.replace('.', '_')
+                model_name_safe = model_name.replace(".", "_")
                 export_path = f"/tmp/{model_name_safe}_export.csv"
 
             # Create output directory if it doesn't exist
@@ -1119,11 +1461,13 @@ try:
                 output_path=export_path,
                 filter_domain=domain_str,
                 fields=fields,
-                limit=limit
+                limit=limit,
             )
 
             if not result["success"]:
-                logger.error(f"Export command failed with error: {result.get('error', 'Unknown error')}")
+                logger.error(
+                    f"Export command failed with error: {result.get('error', 'Unknown error')}"
+                )
                 return f"# Error Exporting Records\n\n{result.get('error', 'Unknown error')}"
 
             # Count exported records (exclude header)
@@ -1150,10 +1494,12 @@ try:
             output += "This information can be useful when importing the data back:\n\n"
 
             selected_fields = fields or list(available_fields.keys())[:20]
-            for field in selected_fields[:10]:  # Limit to 10 fields to avoid too much text
+            for field in selected_fields[
+                :10
+            ]:  # Limit to 10 fields to avoid too much text
                 if field in available_fields:
-                    field_type = available_fields[field].get('type', 'unknown')
-                    field_string = available_fields[field].get('string', field)
+                    field_type = available_fields[field].get("type", "unknown")
+                    field_string = available_fields[field].get("string", field)
                     output += f"- **{field_string}** (`{field}`): {field_type}\n"
 
             if len(selected_fields) > 10:
@@ -1167,10 +1513,17 @@ try:
 
     # Tool for exporting related records to CSV
     @mcp.tool()
-    def export_related_records_to_csv(parent_model: str, child_model: str, relation_field: str,
-                                     parent_fields: Optional[List[str]] = None, child_fields: Optional[List[str]] = None,
-                                     filter_domain: Optional[Union[str, List]] = None, limit: int = 1000,
-                                     export_path: Optional[str] = None, move_type: Optional[str] = None) -> str:
+    def export_related_records_to_csv(
+        parent_model: str,
+        child_model: str,
+        relation_field: str,
+        parent_fields: Optional[List[str]] = None,
+        child_fields: Optional[List[str]] = None,
+        filter_domain: Optional[Union[str, List]] = None,
+        limit: int = 1000,
+        export_path: Optional[str] = None,
+        move_type: Optional[str] = None,
+    ) -> str:
         """Export records from related models (parent and child) to a structured CSV file.
 
         Args:
@@ -1216,22 +1569,30 @@ try:
                 return f"# Error: Invalid Relation Field\n\nThe field '{relation_field}' does not exist in model '{child_model}'."
 
             # Validate relation field is a many2one field
-            if child_available_fields[relation_field].get('type') != 'many2one':
+            if child_available_fields[relation_field].get("type") != "many2one":
                 return f"# Error: Invalid Relation Field Type\n\nThe field '{relation_field}' in model '{child_model}' is not a many2one field."
 
             # Validate relation field points to parent model
-            if child_available_fields[relation_field].get('relation') != parent_model:
+            if child_available_fields[relation_field].get("relation") != parent_model:
                 return f"# Error: Invalid Relation\n\nThe field '{relation_field}' in model '{child_model}' does not point to model '{parent_model}'."
 
             # Validate parent fields if provided
             if parent_fields:
-                invalid_parent_fields = [field for field in parent_fields if field not in parent_available_fields]
+                invalid_parent_fields = [
+                    field
+                    for field in parent_fields
+                    if field not in parent_available_fields
+                ]
                 if invalid_parent_fields:
                     return f"# Error: Invalid Parent Fields\n\nThe following fields do not exist in model '{parent_model}':\n- {', '.join(invalid_parent_fields)}\n\nAvailable fields include:\n- {', '.join(list(parent_available_fields.keys())[:20])}\n- ..."
 
             # Validate child fields if provided
             if child_fields:
-                invalid_child_fields = [field for field in child_fields if field not in child_available_fields]
+                invalid_child_fields = [
+                    field
+                    for field in child_fields
+                    if field not in child_available_fields
+                ]
                 if invalid_child_fields:
                     return f"# Error: Invalid Child Fields\n\nThe following fields do not exist in model '{child_model}':\n- {', '.join(invalid_child_fields)}\n\nAvailable fields include:\n- {', '.join(list(child_available_fields.keys())[:20])}\n- ..."
 
@@ -1252,6 +1613,7 @@ try:
                         try:
                             # Try to evaluate as Python expression
                             import ast
+
                             domain = ast.literal_eval(filter_domain)
                             domain_str = filter_domain
                         except (SyntaxError, ValueError):
@@ -1262,15 +1624,18 @@ try:
                     for condition in domain:
                         if isinstance(condition, (list, tuple)) and len(condition) >= 3:
                             field_name = condition[0]
-                            if field_name not in parent_available_fields and field_name != 'id':
+                            if (
+                                field_name not in parent_available_fields
+                                and field_name != "id"
+                            ):
                                 return f"# Error: Invalid Domain Field\n\nThe field '{field_name}' in the domain filter does not exist in model '{parent_model}'."
                 except Exception as e:
                     return f"# Error: Invalid Domain Structure\n\nThe domain filter has an invalid structure: {str(e)}"
 
             # Set default export path if not provided
             if not export_path:
-                parent_model_safe = parent_model.replace('.', '_')
-                child_model_safe = child_model.replace('.', '_')
+                parent_model_safe = parent_model.replace(".", "_")
+                child_model_safe = child_model.replace(".", "_")
                 # Use a path in the tmp directory
                 export_path = f"/tmp/{parent_model_safe}_{child_model_safe}_export.csv"
 
@@ -1278,57 +1643,114 @@ try:
             os.makedirs(os.path.dirname(os.path.abspath(export_path)), exist_ok=True)
 
             # Add move_type to filter domain if specified
-            if parent_model == 'account.move' and move_type:
+            if parent_model == "account.move" and move_type:
                 # Check if we already have a move_type filter
                 has_move_type_filter = False
                 for condition in domain:
-                    if isinstance(condition, (list, tuple)) and len(condition) >= 3 and condition[0] == 'move_type':
+                    if (
+                        isinstance(condition, (list, tuple))
+                        and len(condition) >= 3
+                        and condition[0] == "move_type"
+                    ):
                         has_move_type_filter = True
                         break
 
                 # If no move_type filter, add one based on the specified move_type
                 if not has_move_type_filter:
-                    if move_type in ['out_invoice', 'out_refund', 'in_invoice', 'in_refund', 'out_receipt', 'in_receipt']:
-                        domain.append(['move_type', '=', move_type])
+                    if move_type in [
+                        "out_invoice",
+                        "out_refund",
+                        "in_invoice",
+                        "in_refund",
+                        "out_receipt",
+                        "in_receipt",
+                    ]:
+                        domain.append(["move_type", "=", move_type])
                         if domain_str:
-                            domain_str = domain_str[:-1] + ", ['move_type', '=', '" + move_type + "']]"
+                            domain_str = (
+                                domain_str[:-1]
+                                + ", ['move_type', '=', '"
+                                + move_type
+                                + "']]"
+                            )
                         else:
                             domain_str = "[['move_type', '=', '" + move_type + "']]"
-                    elif move_type == 'invoice':
-                        domain.append(['move_type', 'in', ['out_invoice', 'in_invoice']])
+                    elif move_type == "invoice":
+                        domain.append(
+                            ["move_type", "in", ["out_invoice", "in_invoice"]]
+                        )
                         if domain_str:
-                            domain_str = domain_str[:-1] + ", ['move_type', 'in', ['out_invoice', 'in_invoice']]]"
+                            domain_str = (
+                                domain_str[:-1]
+                                + ", ['move_type', 'in', ['out_invoice', 'in_invoice']]]"
+                            )
                         else:
-                            domain_str = "[['move_type', 'in', ['out_invoice', 'in_invoice']]]"
-                    elif move_type == 'refund':
-                        domain.append(['move_type', 'in', ['out_refund', 'in_refund']])
+                            domain_str = (
+                                "[['move_type', 'in', ['out_invoice', 'in_invoice']]]"
+                            )
+                    elif move_type == "refund":
+                        domain.append(["move_type", "in", ["out_refund", "in_refund"]])
                         if domain_str:
-                            domain_str = domain_str[:-1] + ", ['move_type', 'in', ['out_refund', 'in_refund']]]"
+                            domain_str = (
+                                domain_str[:-1]
+                                + ", ['move_type', 'in', ['out_refund', 'in_refund']]]"
+                            )
                         else:
-                            domain_str = "[['move_type', 'in', ['out_refund', 'in_refund']]]"
-                    elif move_type == 'receipt':
-                        domain.append(['move_type', 'in', ['out_receipt', 'in_receipt']])
+                            domain_str = (
+                                "[['move_type', 'in', ['out_refund', 'in_refund']]]"
+                            )
+                    elif move_type == "receipt":
+                        domain.append(
+                            ["move_type", "in", ["out_receipt", "in_receipt"]]
+                        )
                         if domain_str:
-                            domain_str = domain_str[:-1] + ", ['move_type', 'in', ['out_receipt', 'in_receipt']]]"
+                            domain_str = (
+                                domain_str[:-1]
+                                + ", ['move_type', 'in', ['out_receipt', 'in_receipt']]]"
+                            )
                         else:
-                            domain_str = "[['move_type', 'in', ['out_receipt', 'in_receipt']]]"
-                    elif move_type == 'out':
-                        domain.append(['move_type', 'in', ['out_invoice', 'out_refund', 'out_receipt']])
+                            domain_str = (
+                                "[['move_type', 'in', ['out_receipt', 'in_receipt']]]"
+                            )
+                    elif move_type == "out":
+                        domain.append(
+                            [
+                                "move_type",
+                                "in",
+                                ["out_invoice", "out_refund", "out_receipt"],
+                            ]
+                        )
                         if domain_str:
-                            domain_str = domain_str[:-1] + ", ['move_type', 'in', ['out_invoice', 'out_refund', 'out_receipt']]]"
+                            domain_str = (
+                                domain_str[:-1]
+                                + ", ['move_type', 'in', ['out_invoice', 'out_refund', 'out_receipt']]]"
+                            )
                         else:
                             domain_str = "[['move_type', 'in', ['out_invoice', 'out_refund', 'out_receipt']]]"
-                    elif move_type == 'in':
-                        domain.append(['move_type', 'in', ['in_invoice', 'in_refund', 'in_receipt']])
+                    elif move_type == "in":
+                        domain.append(
+                            [
+                                "move_type",
+                                "in",
+                                ["in_invoice", "in_refund", "in_receipt"],
+                            ]
+                        )
                         if domain_str:
-                            domain_str = domain_str[:-1] + ", ['move_type', 'in', ['in_invoice', 'in_refund', 'in_receipt']]]"
+                            domain_str = (
+                                domain_str[:-1]
+                                + ", ['move_type', 'in', ['in_invoice', 'in_refund', 'in_receipt']]]"
+                            )
                         else:
                             domain_str = "[['move_type', 'in', ['in_invoice', 'in_refund', 'in_receipt']]]"
 
-                    logger.info(f"Added move_type filter for account.move: {domain[-1]}")
+                    logger.info(
+                        f"Added move_type filter for account.move: {domain[-1]}"
+                    )
 
             # Use the direct_export_import module to export related records
-            from direct_export_import import export_related_records as direct_export_related_records
+            from direct_export_import import (
+                export_related_records as direct_export_related_records,
+            )
 
             # Call the export_related_records function
             result = direct_export_related_records(
@@ -1339,11 +1761,13 @@ try:
                 child_fields=child_fields,
                 filter_domain=domain_str,
                 limit=limit,
-                export_path=export_path
+                export_path=export_path,
             )
 
             if not result["success"]:
-                logger.error(f"Export-rel command failed with error: {result.get('error', 'Unknown error')}")
+                logger.error(
+                    f"Export-rel command failed with error: {result.get('error', 'Unknown error')}"
+                )
                 return f"# Error Exporting Related Records\n\n{result.get('error', 'Unknown error')}"
 
             # Count exported records (exclude header)
@@ -1351,13 +1775,14 @@ try:
             combined_records = 0
             try:
                 import csv
-                with open(export_path, 'r') as f:
+
+                with open(export_path, "r") as f:
                     reader = csv.DictReader(f)
                     for row in reader:
-                        if '_record_type' in row:
-                            if row['_record_type'] == 'parent':
+                        if "_record_type" in row:
+                            if row["_record_type"] == "parent":
                                 parent_records += 1
-                            elif row['_record_type'] == 'combined':
+                            elif row["_record_type"] == "combined":
                                 combined_records += 1
             except Exception as e:
                 logger.error(f"Error reading export file: {str(e)}")
@@ -1377,28 +1802,40 @@ try:
             output += f"\n## Field Types\n\n"
             output += "This information can be useful when importing the data back:\n\n"
 
-            selected_parent_fields = parent_fields or list(parent_available_fields.keys())[:10]
-            selected_child_fields = child_fields or list(child_available_fields.keys())[:10]
+            selected_parent_fields = (
+                parent_fields or list(parent_available_fields.keys())[:10]
+            )
+            selected_child_fields = (
+                child_fields or list(child_available_fields.keys())[:10]
+            )
 
             output += "### Parent Fields\n\n"
-            for field in selected_parent_fields[:5]:  # Limit to 5 fields to avoid too much text
+            for field in selected_parent_fields[
+                :5
+            ]:  # Limit to 5 fields to avoid too much text
                 if field in parent_available_fields:
-                    field_type = parent_available_fields[field].get('type', 'unknown')
-                    field_string = parent_available_fields[field].get('string', field)
+                    field_type = parent_available_fields[field].get("type", "unknown")
+                    field_string = parent_available_fields[field].get("string", field)
                     output += f"- **{field_string}** (`parent_{field}`): {field_type}\n"
 
             if len(selected_parent_fields) > 5:
-                output += f"\n*...and {len(selected_parent_fields) - 5} more parent fields*\n"
+                output += (
+                    f"\n*...and {len(selected_parent_fields) - 5} more parent fields*\n"
+                )
 
             output += "\n### Child Fields\n\n"
-            for field in selected_child_fields[:5]:  # Limit to 5 fields to avoid too much text
+            for field in selected_child_fields[
+                :5
+            ]:  # Limit to 5 fields to avoid too much text
                 if field in child_available_fields:
-                    field_type = child_available_fields[field].get('type', 'unknown')
-                    field_string = child_available_fields[field].get('string', field)
+                    field_type = child_available_fields[field].get("type", "unknown")
+                    field_string = child_available_fields[field].get("string", field)
                     output += f"- **{field_string}** (`child_{field}`): {field_type}\n"
 
             if len(selected_child_fields) > 5:
-                output += f"\n*...and {len(selected_child_fields) - 5} more child fields*\n"
+                output += (
+                    f"\n*...and {len(selected_child_fields) - 5} more child fields*\n"
+                )
 
             output += f"\n## CSV Structure\n\n"
             output += "The exported CSV file has the following structure:\n\n"
@@ -1407,8 +1844,12 @@ try:
             output += "   - `_record_type`: Either 'parent' (parent record only) or 'combined' (parent with child)\n"
             output += "   - `_child_count`: Number of child records for this parent\n"
             output += "   - `_child_index`: Index of this child record (for combined records)\n\n"
-            output += "2. **Parent fields**: All parent fields are prefixed with 'parent_'\n"
-            output += "3. **Child fields**: All child fields are prefixed with 'child_'\n\n"
+            output += (
+                "2. **Parent fields**: All parent fields are prefixed with 'parent_'\n"
+            )
+            output += (
+                "3. **Child fields**: All child fields are prefixed with 'child_'\n\n"
+            )
             output += "This structure allows for importing the data back while maintaining the parent-child relationships."
 
             return output
@@ -1419,12 +1860,21 @@ try:
 
     # Tool for importing related records from CSV
     @mcp.tool()
-    def import_related_records_from_csv(input_path: str, parent_model: str, child_model: str, relation_field: str,
-                                       create_if_not_exists: bool = True, update_if_exists: bool = True,
-                                       draft_only: bool = False, reset_to_draft: bool = False,
-                                       skip_readonly_fields: bool = True, parent_defaults: Optional[str] = None,
-                                       child_defaults: Optional[str] = None, force: bool = False,
-                                       name_prefix: Optional[str] = None) -> str:
+    def import_related_records_from_csv(
+        input_path: str,
+        parent_model: str,
+        child_model: str,
+        relation_field: str,
+        create_if_not_exists: bool = True,
+        update_if_exists: bool = True,
+        draft_only: bool = False,
+        reset_to_draft: bool = False,
+        skip_readonly_fields: bool = True,
+        parent_defaults: Optional[str] = None,
+        child_defaults: Optional[str] = None,
+        force: bool = False,
+        name_prefix: Optional[str] = None,
+    ) -> str:
         """Import records from a structured CSV file into related models (parent and child).
 
         Args:
@@ -1474,11 +1924,11 @@ try:
                 return f"# Error: Invalid Relation Field\n\nThe field '{relation_field}' does not exist in model '{child_model}'."
 
             # Validate relation field is a many2one field
-            if child_available_fields[relation_field].get('type') != 'many2one':
+            if child_available_fields[relation_field].get("type") != "many2one":
                 return f"# Error: Invalid Relation Field Type\n\nThe field '{relation_field}' in model '{child_model}' is not a many2one field."
 
             # Validate relation field points to parent model
-            if child_available_fields[relation_field].get('relation') != parent_model:
+            if child_available_fields[relation_field].get("relation") != parent_model:
                 return f"# Error: Invalid Relation\n\nThe field '{relation_field}' in model '{child_model}' does not point to model '{parent_model}'."
 
             # Check if import file exists
@@ -1486,7 +1936,7 @@ try:
                 return f"# Error: File Not Found\n\nThe file '{input_path}' does not exist."
 
             # Check if file is a CSV
-            if not input_path.lower().endswith('.csv'):
+            if not input_path.lower().endswith(".csv"):
                 return f"# Error: Invalid File Format\n\nThe file '{input_path}' is not a CSV file."
 
             # Parse default values if provided
@@ -1497,9 +1947,10 @@ try:
                 except json.JSONDecodeError:
                     try:
                         import ast
+
                         p_defaults = ast.literal_eval(parent_defaults)
                     except (SyntaxError, ValueError):
-                        return f"# Error: Invalid Parent Defaults\n\nThe parent defaults format is invalid: {parent_defaults}\n\nExample valid format: \"{{\\\"move_type\\\": \\\"out_invoice\\\"}}\""
+                        return f'# Error: Invalid Parent Defaults\n\nThe parent defaults format is invalid: {parent_defaults}\n\nExample valid format: "{{\\"move_type\\": \\"out_invoice\\"}}"'
 
             c_defaults = None
             if child_defaults:
@@ -1508,12 +1959,15 @@ try:
                 except json.JSONDecodeError:
                     try:
                         import ast
+
                         c_defaults = ast.literal_eval(child_defaults)
                     except (SyntaxError, ValueError):
-                        return f"# Error: Invalid Child Defaults\n\nThe child defaults format is invalid: {child_defaults}\n\nExample valid format: \"{{\\\"tax_ids\\\": [[6, 0, [1]]]}}\""
+                        return f'# Error: Invalid Child Defaults\n\nThe child defaults format is invalid: {child_defaults}\n\nExample valid format: "{{\\"tax_ids\\": [[6, 0, [1]]]}}"'
 
             # Use the direct_export_import module to import related records
-            from direct_export_import import import_related_records as direct_import_related_records
+            from direct_export_import import (
+                import_related_records as direct_import_related_records,
+            )
 
             # Call the import_related_records function
             result = direct_import_related_records(
@@ -1521,7 +1975,7 @@ try:
                 child_model=child_model,
                 relation_field=relation_field,
                 parent_fields=None,  # Not needed for import
-                child_fields=None,   # Not needed for import
+                child_fields=None,  # Not needed for import
                 input_path=input_path,
                 name_prefix=name_prefix,
                 parent_defaults=p_defaults,
@@ -1530,7 +1984,7 @@ try:
                 reset_to_draft=reset_to_draft,
                 skip_readonly_fields=skip_readonly_fields,
                 create_if_not_exists=create_if_not_exists,
-                update_if_exists=update_if_exists
+                update_if_exists=update_if_exists,
             )
 
             if not result["success"]:
@@ -1549,20 +2003,22 @@ try:
             output += f"- **Child Records Updated**: {result['child_updated']}\n"
             output += f"- **Child Records Failed**: {result['child_failed']}\n"
 
-            if result['parent_failed'] > 0 or result['child_failed'] > 0:
+            if result["parent_failed"] > 0 or result["child_failed"] > 0:
                 output += f"\n## Failed Records\n\n"
 
                 # Show the first 5 validation errors
-                for i, error in enumerate(result['validation_errors'][:5]):
+                for i, error in enumerate(result["validation_errors"][:5]):
                     output += f"### Error {i+1}\n"
                     output += f"- **Model**: {error.get('model', 'Unknown')}\n"
-                    output += f"- **Error Message**: {error.get('error', 'Unknown error')}\n"
+                    output += (
+                        f"- **Error Message**: {error.get('error', 'Unknown error')}\n"
+                    )
 
                     # Show record data if available
-                    if 'record' in error:
+                    if "record" in error:
                         output += f"- **Record Data**: ```json\n{json.dumps(error['record'], indent=2)}\n```\n"
 
-                if len(result['validation_errors']) > 5:
+                if len(result["validation_errors"]) > 5:
                     output += f"\n*...and {len(result['validation_errors']) - 5} more errors*\n"
 
                 # Add suggestions for fixing common errors
@@ -1581,10 +2037,17 @@ try:
 
     # Tool for importing records from CSV
     @mcp.tool()
-    def import_records_from_csv(input_path: str, model_name: str, field_mapping: Optional[str] = None,
-                               create_if_not_exists: bool = True, update_if_exists: bool = True,
-                               defaults: Optional[str] = None, force: bool = False,
-                               skip_invalid: bool = False, name_prefix: Optional[str] = None) -> str:
+    def import_records_from_csv(
+        input_path: str,
+        model_name: str,
+        field_mapping: Optional[str] = None,
+        create_if_not_exists: bool = True,
+        update_if_exists: bool = True,
+        defaults: Optional[str] = None,
+        force: bool = False,
+        skip_invalid: bool = False,
+        name_prefix: Optional[str] = None,
+    ) -> str:
         """Import records from a CSV file into an Odoo model.
 
         Args:
@@ -1620,13 +2083,14 @@ try:
                 return f"# Error: File Not Found\n\nThe file '{input_path}' does not exist."
 
             # Check if file is a CSV
-            if not input_path.lower().endswith('.csv'):
+            if not input_path.lower().endswith(".csv"):
                 return f"# Error: Invalid File Format\n\nThe file '{input_path}' is not a CSV file."
 
             # Read CSV headers to validate field mapping
             try:
                 import csv
-                with open(input_path, 'r') as f:
+
+                with open(input_path, "r") as f:
                     reader = csv.reader(f)
                     csv_headers = next(reader)
             except Exception as e:
@@ -1638,17 +2102,23 @@ try:
                 try:
                     mapping = json.loads(field_mapping)
                 except json.JSONDecodeError:
-                    return f"# Error: Invalid Field Mapping\n\nThe field mapping format is invalid: {field_mapping}\n\nExample valid format:\n```json\n{{\n  \"csv_field1\": \"odoo_field1\",\n  \"csv_field2\": \"odoo_field2\"\n}}\n```"
+                    return f'# Error: Invalid Field Mapping\n\nThe field mapping format is invalid: {field_mapping}\n\nExample valid format:\n```json\n{{\n  "csv_field1": "odoo_field1",\n  "csv_field2": "odoo_field2"\n}}\n```'
 
                 # Validate field mapping
                 if mapping:
                     # Check if CSV fields exist in the CSV file
-                    invalid_csv_fields = [field for field in mapping.keys() if field not in csv_headers]
+                    invalid_csv_fields = [
+                        field for field in mapping.keys() if field not in csv_headers
+                    ]
                     if invalid_csv_fields:
                         return f"# Error: Invalid CSV Fields in Mapping\n\nThe following CSV fields in the mapping do not exist in the CSV file:\n- {', '.join(invalid_csv_fields)}\n\nAvailable CSV fields:\n- {', '.join(csv_headers)}"
 
                     # Check if Odoo fields exist in the model
-                    invalid_odoo_fields = [field for field in mapping.values() if field not in available_fields and field != 'id']
+                    invalid_odoo_fields = [
+                        field
+                        for field in mapping.values()
+                        if field not in available_fields and field != "id"
+                    ]
                     if invalid_odoo_fields:
                         return f"# Error: Invalid Odoo Fields in Mapping\n\nThe following Odoo fields in the mapping do not exist in model '{model_name}':\n- {', '.join(invalid_odoo_fields)}\n\nAvailable Odoo fields include:\n- {', '.join(list(available_fields.keys())[:20])}\n- ..."
             else:
@@ -1660,19 +2130,24 @@ try:
                         mapping[csv_field] = csv_field
                     # Try normalized match (lowercase, no underscores)
                     else:
-                        normalized_csv_field = csv_field.lower().replace('_', '')
+                        normalized_csv_field = csv_field.lower().replace("_", "")
                         for odoo_field in available_fields.keys():
-                            normalized_odoo_field = odoo_field.lower().replace('_', '')
+                            normalized_odoo_field = odoo_field.lower().replace("_", "")
                             if normalized_csv_field == normalized_odoo_field:
                                 mapping[csv_field] = odoo_field
                                 break
 
             # Check for required fields
-            required_fields = [field for field, info in available_fields.items()
-                              if info.get('required', False) and field != 'id']
+            required_fields = [
+                field
+                for field, info in available_fields.items()
+                if info.get("required", False) and field != "id"
+            ]
 
             mapped_odoo_fields = set(mapping.values() if mapping else [])
-            missing_required = [field for field in required_fields if field not in mapped_odoo_fields]
+            missing_required = [
+                field for field in required_fields if field not in mapped_odoo_fields
+            ]
 
             if missing_required and create_if_not_exists:
                 return f"# Warning: Missing Required Fields\n\nThe following required fields are not mapped but are needed for creating new records:\n- {', '.join(missing_required)}\n\nPlease update your field mapping to include these fields or set create_if_not_exists=False."
@@ -1685,9 +2160,10 @@ try:
                 except json.JSONDecodeError:
                     try:
                         import ast
+
                         default_values = ast.literal_eval(defaults)
                     except (SyntaxError, ValueError):
-                        return f"# Error: Invalid Defaults\n\nThe defaults format is invalid: {defaults}\n\nExample valid format: \"{{\\\"autopost_bills\\\": \\\"never\\\"}}\""
+                        return f'# Error: Invalid Defaults\n\nThe defaults format is invalid: {defaults}\n\nExample valid format: "{{\\"autopost_bills\\": \\"never\\"}}"'
 
             # Use the direct_export_import module to import records
             from direct_export_import import import_records as direct_import_records
@@ -1702,7 +2178,7 @@ try:
                 defaults=default_values,
                 force=force,
                 skip_invalid=skip_invalid,
-                name_prefix=name_prefix
+                name_prefix=name_prefix,
             )
 
             if not result["success"]:
@@ -1718,19 +2194,21 @@ try:
             output += f"- **Updated Records**: {result['updated_records']}\n"
             output += f"- **Failed Records**: {result['failed_records']}\n"
 
-            if result['failed_records'] > 0 and 'validation_errors' in result:
+            if result["failed_records"] > 0 and "validation_errors" in result:
                 output += f"\n## Failed Records\n\n"
 
                 # Show the first 5 validation errors
-                for i, error in enumerate(result['validation_errors'][:5]):
+                for i, error in enumerate(result["validation_errors"][:5]):
                     output += f"### Error {i+1}\n"
-                    output += f"- **Error Message**: {error.get('error', 'Unknown error')}\n"
+                    output += (
+                        f"- **Error Message**: {error.get('error', 'Unknown error')}\n"
+                    )
 
                     # Show record data if available
-                    if 'record' in error:
+                    if "record" in error:
                         output += f"- **Record Data**: ```json\n{json.dumps(error['record'], indent=2)}\n```\n"
 
-                if len(result['validation_errors']) > 5:
+                if len(result["validation_errors"]) > 5:
                     output += f"\n*...and {len(result['validation_errors']) - 5} more errors*\n"
 
                 # Add suggestions for fixing common errors
@@ -1753,19 +2231,19 @@ try:
         """Create a prompt for performing advanced searches across Odoo models."""
         return """I need to search for information across multiple Odoo models using natural language.
 
-Please help me by:
-1. Using the advanced_search tool to interpret my query and find relevant records
-2. Explaining the results and relationships between different models
-3. Suggesting follow-up queries if needed
+    Please help me by:
+    1. Using the advanced_search tool to interpret my query and find relevant records
+    2. Explaining the results and relationships between different models
+    3. Suggesting follow-up queries if needed
 
-Examples of queries I can use:
-- "List all sales orders under the customer's name, Gemini Furniture"
-- "List all customer invoices for the customer name Wood Corner"
-- "List out all projects"
-- "List out all Project tasks for project name Research & Development"
-- "List all unpaid bills with respect of vendor details"
-- "List all project tasks according to their deadline date"
-"""
+    Examples of queries I can use:
+    - "List all sales orders under the customer's name, Gemini Furniture"
+    - "List all customer invoices for the customer name Wood Corner"
+    - "List out all projects"
+    - "List out all Project tasks for project name Research & Development"
+    - "List all unpaid bills with respect of vendor details"
+    - "List all project tasks according to their deadline date"
+    """
 
     # Add a prompt for creating a new record
     @mcp.prompt()
@@ -1785,12 +2263,12 @@ Examples of queries I can use:
         """Create a prompt for exporting records from an Odoo model."""
         return f"""I need to export records from the Odoo model '{model_name}' to a CSV file.
 
-Please help me by:
-1. Showing me the available fields for this model using the get_model_metadata tool
-2. Guiding me through selecting fields to export (including important fields like ID and name)
-3. Helping me set up filter criteria if needed (e.g., [["customer_rank", ">", 0]] for customers)
-4. Exporting the records using the export_records_to_csv tool
-5. Explaining the field types in the exported data for future reference"""
+    Please help me by:
+    1. Showing me the available fields for this model using the get_model_metadata tool
+    2. Guiding me through selecting fields to export (including important fields like ID and name)
+    3. Helping me set up filter criteria if needed (e.g., [["customer_rank", ">", 0]] for customers)
+    4. Exporting the records using the export_records_to_csv tool
+    5. Explaining the field types in the exported data for future reference"""
 
     # Add a prompt for importing records
     @mcp.prompt()
@@ -1798,16 +2276,16 @@ Please help me by:
         """Create a prompt for importing records into an Odoo model."""
         return f"""I need to import records into the Odoo model '{model_name}' from a CSV file.
 
-Please help me by:
-1. Asking for the path to the CSV file
-2. Showing me the required fields for this model using the get_model_metadata tool
-3. Helping me create a proper field mapping from CSV fields to Odoo fields
-4. Explaining how to handle special field types:
-   - Many2one fields (like partner_id): Need to be integer IDs
-   - Selection fields (like state): Need to match allowed values
-   - Date fields: Need to be in YYYY-MM-DD format
-5. Importing the records using the import_records_from_csv tool
-6. Helping me understand and fix any import errors"""
+    Please help me by:
+    1. Asking for the path to the CSV file
+    2. Showing me the required fields for this model using the get_model_metadata tool
+    3. Helping me create a proper field mapping from CSV fields to Odoo fields
+    4. Explaining how to handle special field types:
+    - Many2one fields (like partner_id): Need to be integer IDs
+    - Selection fields (like state): Need to match allowed values
+    - Date fields: Need to be in YYYY-MM-DD format
+    5. Importing the records using the import_records_from_csv tool
+    6. Helping me understand and fix any import errors"""
 
     # Add a prompt for updating CRM lead descriptions
     @mcp.prompt()
@@ -1815,22 +2293,22 @@ Please help me by:
         """Create a prompt for updating CRM lead descriptions."""
         return f"""I need to update the descriptions of CRM leads (opportunities) in Odoo.
 
-Please help me by:
-1. Exporting CRM leads to a CSV file using the export_records_to_csv tool with these fields:
-   - id (essential for updating existing records)
-   - name (for identification)
-   - description (the field we want to update)
-   - partner_id, stage_id (important relationships)
-   - email_from, phone (contact information)
+    Please help me by:
+    1. Exporting CRM leads to a CSV file using the export_records_to_csv tool with these fields:
+    - id (essential for updating existing records)
+    - name (for identification)
+    - description (the field we want to update)
+    - partner_id, stage_id (important relationships)
+    - email_from, phone (contact information)
 
-2. Guiding me through modifying the descriptions in the CSV file
+    2. Guiding me through modifying the descriptions in the CSV file
 
-3. Helping me import the updated records back to Odoo with proper field mapping:
-   - Handling many2one fields (partner_id, stage_id) by extracting IDs
-   - Excluding problematic fields like priority and date_deadline
-   - Focusing only on updating the description field
+    3. Helping me import the updated records back to Odoo with proper field mapping:
+    - Handling many2one fields (partner_id, stage_id) by extracting IDs
+    - Excluding problematic fields like priority and date_deadline
+    - Focusing only on updating the description field
 
-4. Explaining how to troubleshoot common import errors"""
+    4. Explaining how to troubleshoot common import errors"""
 
     # Add a prompt for dynamic model export/import
     @mcp.prompt()
@@ -1838,28 +2316,28 @@ Please help me by:
         """Create a prompt for dynamically exporting and importing any Odoo model."""
         return f"""I need to export data from an Odoo model and then import it back with modifications.
 
-Please help me by:
-1. Asking which Odoo model I want to work with
-2. Showing me the available fields for that model using get_model_metadata
-3. Guiding me through selecting fields to export, including:
-   - id field (for record identification)
-   - name or other descriptive fields
-   - fields I want to modify
-   - relationship fields (many2one, one2many, many2many)
+    Please help me by:
+    1. Asking which Odoo model I want to work with
+    2. Showing me the available fields for that model using get_model_metadata
+    3. Guiding me through selecting fields to export, including:
+    - id field (for record identification)
+    - name or other descriptive fields
+    - fields I want to modify
+    - relationship fields (many2one, one2many, many2many)
 
-4. Helping me export the data using export_records_to_csv
+    4. Helping me export the data using export_records_to_csv
 
-5. Explaining how to modify the CSV file based on field types:
-   - Text fields: Can be directly edited
-   - Many2one fields: Need special handling (extract IDs)
-   - Selection fields: Must match allowed values
-   - Date fields: Must use proper format
+    5. Explaining how to modify the CSV file based on field types:
+    - Text fields: Can be directly edited
+    - Many2one fields: Need special handling (extract IDs)
+    - Selection fields: Must match allowed values
+    - Date fields: Must use proper format
 
-6. Creating a proper field mapping for import
+    6. Creating a proper field mapping for import
 
-7. Importing the modified data using import_records_from_csv
+    7. Importing the modified data using import_records_from_csv
 
-8. Helping me understand and fix any import errors"""
+    8. Helping me understand and fix any import errors"""
 
     # Add a prompt for invoice export/import
     @mcp.prompt()
@@ -1867,39 +2345,39 @@ Please help me by:
         """Create a prompt for exporting and importing invoices."""
         return f"""I need to work with invoices (account.move) in Odoo, including exporting existing invoices and importing new ones.
 
-Please help me by:
-1. Explaining the different invoice types in Odoo:
-   - Customer Invoices (out_invoice)
-   - Vendor Bills (in_invoice)
-   - Credit Notes (out_refund, in_refund)
+    Please help me by:
+    1. Explaining the different invoice types in Odoo:
+    - Customer Invoices (out_invoice)
+    - Vendor Bills (in_invoice)
+    - Credit Notes (out_refund, in_refund)
 
-2. Showing me how to export existing invoices:
-   - Using export_records_to_csv with account.move model
-   - Including important fields like id, name, partner_id, invoice_date, amount_total
-   - Filtering by invoice type and state
+    2. Showing me how to export existing invoices:
+    - Using export_records_to_csv with account.move model
+    - Including important fields like id, name, partner_id, invoice_date, amount_total
+    - Filtering by invoice type and state
 
-3. Guiding me through exporting invoice lines:
-   - Using export_records_to_csv with account.move.line model
-   - Including fields like move_id, product_id, account_id, quantity, price_unit
-   - Explaining the relationship between invoices and invoice lines
+    3. Guiding me through exporting invoice lines:
+    - Using export_records_to_csv with account.move.line model
+    - Including fields like move_id, product_id, account_id, quantity, price_unit
+    - Explaining the relationship between invoices and invoice lines
 
-4. Helping me create new invoices via CSV import:
-   - Creating the invoice header CSV with required fields
-   - Creating the invoice lines CSV with required fields
-   - Importing the header first, then the lines with the correct move_id
+    4. Helping me create new invoices via CSV import:
+    - Creating the invoice header CSV with required fields
+    - Creating the invoice lines CSV with required fields
+    - Importing the header first, then the lines with the correct move_id
 
-5. Explaining how to handle special field types:
-   - Many2one fields (partner_id, product_id, account_id)
-   - Selection fields (move_type, state)
-   - Monetary fields (price_unit, amount_total)
-   - Tax fields (tax_ids)
+    5. Explaining how to handle special field types:
+    - Many2one fields (partner_id, product_id, account_id)
+    - Selection fields (move_type, state)
+    - Monetary fields (price_unit, amount_total)
+    - Tax fields (tax_ids)
 
-6. Showing me how to update existing invoices:
-   - Exporting draft invoices
-   - Modifying fields like reference, date, or amounts
-   - Importing back with the correct field mapping
+    6. Showing me how to update existing invoices:
+    - Exporting draft invoices
+    - Modifying fields like reference, date, or amounts
+    - Importing back with the correct field mapping
 
-7. Helping me understand and fix any import errors"""
+    7. Helping me understand and fix any import errors"""
 
     # Add a prompt for Odoo documentation retrieval
     @mcp.prompt()
@@ -1907,20 +2385,20 @@ Please help me by:
         """Create a prompt for retrieving information from Odoo documentation."""
         return """I need to find information in the Odoo 18 documentation.
 
-Please help me by:
-1. Using the retrieve_odoo_documentation tool to search for relevant information
-2. Explaining the results and providing context
-3. Suggesting related topics if needed
+    Please help me by:
+    1. Using the retrieve_odoo_documentation tool to search for relevant information
+    2. Explaining the results and providing context
+    3. Suggesting related topics if needed
 
-Examples of queries I can use:
-- "How to create a custom module in Odoo 18"
-- "Odoo 18 ORM API reference"
-- "Odoo 18 view inheritance"
-- "How to implement a wizard in Odoo 18"
-- "Odoo 18 security and access rights"
-- "Odoo 18 report creation"
-- "Odoo 18 field types and attributes"
-"""
+    Examples of queries I can use:
+    - "How to create a custom module in Odoo 18"
+    - "Odoo 18 ORM API reference"
+    - "Odoo 18 view inheritance"
+    - "How to implement a wizard in Odoo 18"
+    - "Odoo 18 security and access rights"
+    - "Odoo 18 report creation"
+    - "Odoo 18 field types and attributes"
+    """
 
     # Add a prompt for related records export/import
     @mcp.prompt()
@@ -1928,43 +2406,43 @@ Examples of queries I can use:
         """Create a prompt for exporting and importing related records."""
         return f"""I need to work with related models in Odoo, exporting and importing parent and child records together while maintaining their relationships.
 
-Please help me by:
-1. Explaining how parent-child relationships work in Odoo:
-   - Many2one fields (e.g., move_id in account.move.line)
-   - One2many fields (e.g., invoice_line_ids in account.move)
-   - How these relationships are maintained during import/export
+    Please help me by:
+    1. Explaining how parent-child relationships work in Odoo:
+    - Many2one fields (e.g., move_id in account.move.line)
+    - One2many fields (e.g., invoice_line_ids in account.move)
+    - How these relationships are maintained during import/export
 
-2. Guiding me through exporting related records:
-   - Using export_related_records_to_csv with parent and child models
-   - Identifying the relation field that connects them
-   - Selecting appropriate fields from both models
-   - Setting up filter criteria for the parent records
+    2. Guiding me through exporting related records:
+    - Using export_related_records_to_csv with parent and child models
+    - Identifying the relation field that connects them
+    - Selecting appropriate fields from both models
+    - Setting up filter criteria for the parent records
 
-3. Explaining the structure of the exported CSV file:
-   - How parent and child records are combined
-   - The meaning of metadata columns (_model, _record_type, etc.)
-   - How to interpret the prefixed fields (parent_*, child_*)
+    3. Explaining the structure of the exported CSV file:
+    - How parent and child records are combined
+    - The meaning of metadata columns (_model, _record_type, etc.)
+    - How to interpret the prefixed fields (parent_*, child_*)
 
-4. Helping me modify the exported data:
-   - Which fields are safe to modify
-   - How to handle special field types in both parent and child records
-   - Best practices for maintaining data integrity
+    4. Helping me modify the exported data:
+    - Which fields are safe to modify
+    - How to handle special field types in both parent and child records
+    - Best practices for maintaining data integrity
 
-5. Showing me how to import the modified data:
-   - Using import_related_records_from_csv
-   - Understanding how parent-child relationships are preserved
-   - Options for creating new records vs. updating existing ones
-   - Special handling for posted invoices (draft_only and reset_to_draft parameters)
-   - How to handle computed fields and restricted fields
+    5. Showing me how to import the modified data:
+    - Using import_related_records_from_csv
+    - Understanding how parent-child relationships are preserved
+    - Options for creating new records vs. updating existing ones
+    - Special handling for posted invoices (draft_only and reset_to_draft parameters)
+    - How to handle computed fields and restricted fields
 
-6. Demonstrating with a real example:
-   - Exporting invoices (account.move) with their lines (account.move.line)
-   - Modifying some fields in both the parent and child records
-   - Importing the data back while maintaining the relationships
+    6. Demonstrating with a real example:
+    - Exporting invoices (account.move) with their lines (account.move.line)
+    - Modifying some fields in both the parent and child records
+    - Importing the data back while maintaining the relationships
 
-7. Helping me understand and fix any import errors
+    7. Helping me understand and fix any import errors
 
-This approach is much more efficient than exporting and importing parent and child records separately, as it automatically maintains the relationships between them."""
+    This approach is much more efficient than exporting and importing parent and child records separately, as it automatically maintains the relationships between them."""
 
     # Tool for retrieving Odoo documentation
     @mcp.tool()
@@ -1993,17 +2471,24 @@ This approach is much more efficient than exporting and importing parent and chi
             processed_query = query
 
             # Check for tax-related queries
-            if any(keyword in query.lower() for keyword in ["tax", "taxes", "taxation"]):
+            if any(
+                keyword in query.lower() for keyword in ["tax", "taxes", "taxation"]
+            ):
                 logger.info("Detected tax-related query, enhancing search")
                 if "india" in query.lower() or "indian" in query.lower():
                     # For Indian tax queries, focus on GST and fiscal localization
-                    processed_query = f"Odoo 18 India fiscal localization GST tax {query}"
+                    processed_query = (
+                        f"Odoo 18 India fiscal localization GST tax {query}"
+                    )
                 else:
                     # For general tax queries
                     processed_query = f"Odoo 18 tax configuration {query}"
 
             # Check for localization-related queries
-            elif any(keyword in query.lower() for keyword in ["localization", "localisation", "country"]):
+            elif any(
+                keyword in query.lower()
+                for keyword in ["localization", "localisation", "country"]
+            ):
                 logger.info("Detected localization-related query, enhancing search")
                 if "india" in query.lower() or "indian" in query.lower():
                     processed_query = f"Odoo 18 India fiscal localization {query}"
@@ -2023,11 +2508,15 @@ This approach is much more efficient than exporting and importing parent and chi
                 logger.info(f"Processed query: '{processed_query}'")
 
             # Query the documentation with a higher max_results to get more options
-            results = odoo_docs_retriever_instance.query(processed_query, max_results=max_results)
+            results = odoo_docs_retriever_instance.query(
+                processed_query, max_results=max_results
+            )
 
             # If no results found, try with a more general query
             if "No relevant information found" in results:
-                logger.info(f"No results found for '{processed_query}', trying more general query")
+                logger.info(
+                    f"No results found for '{processed_query}', trying more general query"
+                )
 
                 # Create a more general query by removing specific terms
                 general_query = query.lower()
@@ -2038,7 +2527,9 @@ This approach is much more efficient than exporting and importing parent and chi
                 logger.info(f"General query: '{general_query}'")
 
                 # Try with the general query
-                results = odoo_docs_retriever_instance.query(general_query, max_results=max_results)
+                results = odoo_docs_retriever_instance.query(
+                    general_query, max_results=max_results
+                )
 
             return results
         except Exception as e:
@@ -2093,7 +2584,9 @@ This approach is much more efficient than exporting and importing parent and chi
                 try:
                     int_value = int(value)
                     output += "## Validation Result\n\n"
-                    output += f"✅ **Valid**: The value `{value}` is a valid integer.\n\n"
+                    output += (
+                        f"✅ **Valid**: The value `{value}` is a valid integer.\n\n"
+                    )
                     output += "## Import Format\n\n"
                     output += "Integer fields should be imported as numbers without decimal points.\n"
                 except ValueError:
@@ -2111,14 +2604,18 @@ This approach is much more efficient than exporting and importing parent and chi
                     output += "Float fields should be imported as numbers, optionally with decimal points.\n"
                 except ValueError:
                     output += "## Validation Result\n\n"
-                    output += f"❌ **Invalid**: The value `{value}` is not a valid float.\n\n"
+                    output += (
+                        f"❌ **Invalid**: The value `{value}` is not a valid float.\n\n"
+                    )
                     output += "## Suggested Fix\n\n"
                     output += "Use a number with or without decimal points. Do not use commas for thousands separators.\n"
 
             elif field_type == "boolean":
                 if value.lower() in ["true", "1", "yes", "y"]:
                     output += "## Validation Result\n\n"
-                    output += f"✅ **Valid**: The value `{value}` is interpreted as TRUE.\n\n"
+                    output += (
+                        f"✅ **Valid**: The value `{value}` is interpreted as TRUE.\n\n"
+                    )
                     output += "## Import Format\n\n"
                     output += "Boolean fields accept 'true', '1', 'yes', 'y' for TRUE and 'false', '0', 'no', 'n' for FALSE.\n"
                 elif value.lower() in ["false", "0", "no", "n"]:
@@ -2135,8 +2632,15 @@ This approach is much more efficient than exporting and importing parent and chi
             elif field_type == "date":
                 try:
                     import datetime
+
                     # Try different date formats
-                    for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d-%m-%Y", "%m-%d-%Y"]:
+                    for fmt in [
+                        "%Y-%m-%d",
+                        "%d/%m/%Y",
+                        "%m/%d/%Y",
+                        "%d-%m-%Y",
+                        "%m-%d-%Y",
+                    ]:
                         try:
                             date_value = datetime.datetime.strptime(value, fmt).date()
                             output += "## Validation Result\n\n"
@@ -2153,15 +2657,22 @@ This approach is much more efficient than exporting and importing parent and chi
                         output += "Use the format YYYY-MM-DD (e.g., 2023-05-15).\n"
                 except Exception:
                     output += "## Validation Result\n\n"
-                    output += f"❌ **Invalid**: The value `{value}` is not a valid date.\n\n"
+                    output += (
+                        f"❌ **Invalid**: The value `{value}` is not a valid date.\n\n"
+                    )
                     output += "## Suggested Fix\n\n"
                     output += "Use the format YYYY-MM-DD (e.g., 2023-05-15).\n"
 
             elif field_type == "datetime":
                 try:
                     import datetime
+
                     # Try different datetime formats
-                    for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%d/%m/%Y %H:%M:%S"]:
+                    for fmt in [
+                        "%Y-%m-%d %H:%M:%S",
+                        "%Y-%m-%dT%H:%M:%S",
+                        "%d/%m/%Y %H:%M:%S",
+                    ]:
                         try:
                             dt_value = datetime.datetime.strptime(value, fmt)
                             output += "## Validation Result\n\n"
@@ -2197,7 +2708,11 @@ This approach is much more efficient than exporting and importing parent and chi
                         output += "Selection fields should use the technical value, not the display label.\n"
                     else:
                         # Check if the value matches a label instead of a value
-                        matching_values = [opt[0] for opt in selection_options if opt[1].lower() == value.lower()]
+                        matching_values = [
+                            opt[0]
+                            for opt in selection_options
+                            if opt[1].lower() == value.lower()
+                        ]
 
                         if matching_values:
                             output += "## Validation Result\n\n"
@@ -2232,7 +2747,8 @@ This approach is much more efficient than exporting and importing parent and chi
                 except ValueError:
                     # If it's not a number, it might be a string representation like "[id, 'name']"
                     import re
-                    match = re.search(r'\[(\d+)', value)
+
+                    match = re.search(r"\[(\d+)", value)
 
                     if match:
                         extracted_id = match.group(1)
@@ -2269,10 +2785,17 @@ This approach is much more efficient than exporting and importing parent and chi
 
     # Tool for running the Odoo code agent
     @mcp.tool()
-    def run_odoo_code_agent_tool(query: str, use_gemini: bool = False, use_ollama: bool = False,
-                                feedback: Optional[str] = None, save_to_files: bool = False,
-                                output_dir: Optional[str] = None, wait_for_validation: bool = False,
-                                current_phase: Optional[str] = None, state_dict: Optional[Dict[str, Any]] = None) -> str:
+    def run_odoo_code_agent_tool(
+        query: str,
+        use_gemini: bool = False,
+        use_ollama: bool = False,
+        feedback: Optional[str] = None,
+        save_to_files: bool = False,
+        output_dir: Optional[str] = None,
+        wait_for_validation: bool = False,
+        current_phase: Optional[str] = None,
+        state_dict: Optional[Dict[str, Any]] = None,
+    ) -> str:
         """Generate Odoo 18 module code based on a natural language query.
 
         This tool uses the Odoo Code Agent to analyze requirements, plan, and generate
@@ -2325,6 +2848,7 @@ This approach is much more efficient than exporting and importing parent and chi
             # Simple check to see if Ollama might be available
             try:
                 import requests
+
                 response = requests.get("http://localhost:11434/api/version", timeout=2)
                 if response.status_code != 200:
                     logger.warning("Ollama server not available")
@@ -2340,7 +2864,9 @@ This approach is much more efficient than exporting and importing parent and chi
             if feedback:
                 logger.info(f"Feedback provided: {feedback[:100]}...")
             if save_to_files:
-                logger.info(f"Will save files to disk (output_dir: {output_dir or './generated_modules'})")
+                logger.info(
+                    f"Will save files to disk (output_dir: {output_dir or './generated_modules'})"
+                )
 
             result = run_odoo_code_agent(
                 query=query,
@@ -2355,7 +2881,7 @@ This approach is much more efficient than exporting and importing parent and chi
                 output_dir=output_dir,
                 wait_for_validation=wait_for_validation,
                 current_phase=current_phase,
-                state_dict=state_dict
+                state_dict=state_dict,
             )
 
             # Check if result is valid
@@ -2367,57 +2893,86 @@ This approach is much more efficient than exporting and importing parent and chi
             output = f"# Odoo Code Agent Results\n\n"
 
             # Add current phase and validation status
-            current_phase = result.get('current_phase', 'unknown')
-            requires_validation = result.get('requires_validation', False)
-            is_complete = result.get('is_complete', False)
+            current_phase = result.get("current_phase", "unknown")
+            requires_validation = result.get("requires_validation", False)
+            is_complete = result.get("is_complete", False)
+
+            # Ensure these values are included in the result data for the client
+            result["current_phase"] = current_phase
+            result["requires_validation"] = requires_validation
+            result["is_complete"] = is_complete
 
             # Add status information
             output += f"## Status\n\n"
             output += f"- **Current Phase**: {current_phase}\n"
-            output += f"- **Requires Validation**: {'Yes' if requires_validation else 'No'}\n"
+            output += (
+                f"- **Requires Validation**: {'Yes' if requires_validation else 'No'}\n"
+            )
             output += f"- **Is Complete**: {'Yes' if is_complete else 'No'}\n\n"
 
             # Add query
-            query_value = result.get('query', 'No query provided')
+            query_value = result.get("query", "No query provided")
             output += f"## Query\n\n{query_value}\n\n"
 
             # Add plan
-            plan_value = result.get('plan', '')
+            plan_value = result.get("plan", "")
             if plan_value:
+                # Make sure plan is included in the result data for the client
+                result["plan"] = plan_value
                 output += f"## Plan\n\n{plan_value}\n\n"
 
             # Add tasks
-            tasks_value = result.get('tasks', [])
+            tasks_value = result.get("tasks", [])
             if tasks_value:
+                # Make sure tasks are included in the result data for the client
+                result["tasks"] = tasks_value
                 output += f"## Tasks\n\n"
                 for i, task in enumerate(tasks_value, 1):
                     output += f"{i}. {task}\n"
                 output += "\n"
 
             # Add module information
-            module_name = result.get('module_name', '')
+            module_name = result.get("module_name", "")
             if module_name:
+                # Make sure module_name is included in the result data for the client
+                result["module_name"] = module_name
                 output += f"## Module Information\n\n"
                 output += f"- **Module Name**: {module_name}\n"
 
                 # Add module structure if available
-                module_structure = result.get('module_structure', {})
+                module_structure = result.get("module_structure", {})
                 if module_structure:
+                    # Make sure module_structure is included in the result data for the client
+                    result["module_structure"] = module_structure
                     output += f"- **Module Structure**:\n"
                     for path, info in module_structure.items():
                         output += f"  - {path}\n"
                 output += "\n"
 
             # Add files to create
-            files_to_create = result.get('files_to_create', [])
+            files_to_create = result.get("files_to_create", [])
             if files_to_create:
+                # Make sure files_to_create is included in the result data for the client
+                # Convert to a dictionary format for easier client-side handling
+                files_dict = {}
+                for file_info in files_to_create:
+                    if isinstance(file_info, dict):
+                        file_path = file_info.get("path", "unknown")
+                        file_content = file_info.get("content", "")
+                        files_dict[file_path] = file_content
+
+                # Store the files in a dictionary format in the result
+                result["files_to_create"] = files_dict
+
                 output += f"## Generated Files ({len(files_to_create)})\n\n"
-                for file_info in files_to_create[:5]:  # Limit to first 5 files to avoid too much text
+                for file_info in files_to_create[
+                    :5
+                ]:  # Limit to first 5 files to avoid too much text
                     if not isinstance(file_info, dict):
                         continue
 
-                    file_path = file_info.get('path', 'unknown')
-                    file_content = file_info.get('content', '')
+                    file_path = file_info.get("path", "unknown")
+                    file_content = file_info.get("content", "")
 
                     output += f"### {file_path}\n\n"
 
@@ -2437,9 +2992,9 @@ This approach is much more efficient than exporting and importing parent and chi
 
                     output += f"```{language}\n"
                     # Limit content to first 20 lines to avoid too much text
-                    content_lines = file_content.split('\n')[:20]
-                    output += '\n'.join(content_lines)
-                    if len(content_lines) < len(file_content.split('\n')):
+                    content_lines = file_content.split("\n")[:20]
+                    output += "\n".join(content_lines)
+                    if len(content_lines) < len(file_content.split("\n")):
                         output += "\n... (content truncated) ..."
                     output += "\n```\n\n"
 
@@ -2447,27 +3002,38 @@ This approach is much more efficient than exporting and importing parent and chi
                     output += f"*...and {len(files_to_create) - 5} more files*\n\n"
 
             # Add error if any
-            error_value = result.get('error', '')
+            error_value = result.get("error", "")
             if error_value:
+                # Make sure error is included in the result data for the client
+                result["error"] = error_value
                 output += f"## Error\n\n{error_value}\n\n"
 
             # Add feedback if any
-            feedback_value = result.get('feedback', '')
+            feedback_value = result.get("feedback", "")
             if feedback_value:
+                # Make sure feedback is included in the result data for the client
+                result["feedback"] = feedback_value
                 output += f"## Feedback\n\n{feedback_value}\n\n"
 
+            # Make sure history is included in the result data for the client
+            history = result.get("history", [])
+            if history:
+                result["history"] = history
+
             # Add information about saved files if applicable
-            save_result = result.get('save_result', {})
+            save_result = result.get("save_result", {})
             if save_result:
                 output += "## Files Saved to Disk\n\n"
-                if save_result.get('success', False):
-                    module_dir = save_result.get('module_dir', 'unknown')
-                    saved_count = save_result.get('saved_count', 0)
-                    output += f"✅ **Success**: {saved_count} files saved to directory:\n"
+                if save_result.get("success", False):
+                    module_dir = save_result.get("module_dir", "unknown")
+                    saved_count = save_result.get("saved_count", 0)
+                    output += (
+                        f"✅ **Success**: {saved_count} files saved to directory:\n"
+                    )
                     output += f"`{module_dir}`\n\n"
 
                     # List the first few saved files
-                    saved_files = save_result.get('saved_files', [])
+                    saved_files = save_result.get("saved_files", [])
                     if saved_files:
                         output += "**Files saved:**\n\n"
                         for i, file_path in enumerate(saved_files[:5]):
@@ -2476,13 +3042,13 @@ This approach is much more efficient than exporting and importing parent and chi
                             output += f"- *...and {len(saved_files) - 5} more files*\n"
                         output += "\n"
                 else:
-                    error = save_result.get('error', 'Unknown error')
+                    error = save_result.get("error", "Unknown error")
                     output += f"❌ **Error**: Failed to save files: {error}\n\n"
 
             # Add instructions for using the generated code
             output += "## Usage Instructions\n\n"
 
-            if save_result and save_result.get('success', False):
+            if save_result and save_result.get("success", False):
                 output += "To use the generated module:\n\n"
                 output += f"1. Copy the module directory from `{save_result.get('module_dir', 'generated_modules')}` to your Odoo addons path\n"
                 output += "2. Install the module in Odoo\n\n"
@@ -2500,8 +3066,11 @@ This approach is much more efficient than exporting and importing parent and chi
                 output += "- Continue the process by calling this tool again with the same parameters and `wait_for_validation=false`\n"
 
                 # Add state_dict for resuming
-                state_dict_value = result.get('state_dict')
+                state_dict_value = result.get("state_dict")
                 if state_dict_value:
+                    # Make sure state_dict is included in the result data for the client
+                    result["state_dict"] = state_dict_value
+
                     output += "\nTo resume the process later, you can use the following state_dict (truncated for readability):\n\n"
                     output += "```json\n"
                     output += "state_dict: <serialized state object>\n"
@@ -2510,7 +3079,12 @@ This approach is much more efficient than exporting and importing parent and chi
                 output += "- Provide feedback to refine the generated code by calling this tool again with the feedback parameter\n"
                 output += "- Save the generated files to disk by setting `save_to_files=true` when calling this tool\n"
 
-            return output
+            # Create a response object with both the formatted output and the structured data
+            response = {
+                "result": output,
+                "data": result  # Include the full result data for the client
+            }
+            return response
 
         except Exception as e:
             logger.error(f"Error running Odoo code agent: {str(e)}")
@@ -2518,15 +3092,35 @@ This approach is much more efficient than exporting and importing parent and chi
 
             # Provide more helpful error messages for common issues
             if "GEMINI_API_KEY" in error_message:
-                return "# Error: Gemini API Key\n\nGemini API key not found or invalid. Please set the GEMINI_API_KEY environment variable to use Gemini."
+                error_output = "# Error: Gemini API Key\n\nGemini API key not found or invalid. Please set the GEMINI_API_KEY environment variable to use Gemini."
+                return {
+                    "result": error_output,
+                    "data": {"success": False, "error": "Gemini API key not found or invalid"}
+                }
             elif "Connection refused" in error_message:
-                return "# Error: Connection Issue\n\nCould not connect to a required service. This could be the Odoo server or Ollama server if you're using it."
+                error_output = "# Error: Connection Issue\n\nCould not connect to a required service. This could be the Odoo server or Ollama server if you're using it."
+                return {
+                    "result": error_output,
+                    "data": {"success": False, "error": "Connection refused to a required service"}
+                }
             elif "ImportError" in error_message:
-                return "# Error: Missing Dependencies\n\nSome required dependencies are missing. Please make sure all dependencies are installed."
+                error_output = "# Error: Missing Dependencies\n\nSome required dependencies are missing. Please make sure all dependencies are installed."
+                return {
+                    "result": error_output,
+                    "data": {"success": False, "error": "Missing dependencies"}
+                }
             elif "TimeoutError" in error_message:
-                return "# Error: Timeout\n\nThe operation timed out. This could be due to slow network connection or the complexity of the request."
+                error_output = "# Error: Timeout\n\nThe operation timed out. This could be due to slow network connection or the complexity of the request."
+                return {
+                    "result": error_output,
+                    "data": {"success": False, "error": "Operation timed out"}
+                }
             else:
-                return f"# Error Running Odoo Code Agent\n\n{error_message}\n\nPlease check the logs for more details."
+                error_output = f"# Error Running Odoo Code Agent\n\n{error_message}\n\nPlease check the logs for more details."
+                return {
+                    "result": error_output,
+                    "data": {"success": False, "error": error_message}
+                }
 
     # Main entry point
     if __name__ == "__main__":
@@ -2536,6 +3130,7 @@ This approach is much more efficient than exporting and importing parent and chi
         except Exception as e:
             logger.error(f"Error running MCP server: {str(e)}")
             traceback.print_exc()
+
 
 except Exception as e:
     logger.error(f"Error during initialization: {str(e)}")

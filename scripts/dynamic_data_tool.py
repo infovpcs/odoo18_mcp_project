@@ -176,9 +176,23 @@ def import_model(args):
             if fm['name'] in field_info and 'selection' in field_info[fm['name']]:
                 selection_fields[fm['name']] = [s[0] for s in field_info[fm['name']]['selection']]
 
+    # Define model-specific unique fields for lookup
+    unique_fields = {
+        'res.partner': ['email', 'vat'],
+        'product.product': ['default_code', 'barcode'],
+        'product.template': ['default_code', 'barcode'],
+    }
+
+    # Get the match field for finding existing records
+    match_field = getattr(args, 'match_field', 'id')
+
+    # Determine if we should update existing records
+    update_existing = getattr(args, 'update', False)
+
     # counter for name updates
     counter = 1
-    success_count = 0
+    created_count = 0
+    updated_count = 0
     error_count = 0
 
     with open(args.input, newline='') as f:
@@ -260,15 +274,93 @@ def import_model(args):
                 error_count += 1
                 continue
 
+            # Check if record exists
+            existing_id = None
+
+            # First check by ID if available
+            if match_field in row and row[match_field]:
+                try:
+                    record_id = safe_int(row[match_field])
+                    if record_id:
+                        # Check if record with this ID exists
+                        existing_records = models.execute_kw(db, uid, pwd, args.model, 'search',
+                                                          [[('id', '=', record_id)]])
+                        if existing_records:
+                            existing_id = existing_records[0]
+                except Exception as e:
+                    print(f"Warning: Error checking for existing record by ID: {e}")
+
+            # If not found by ID, try other unique fields
+            if not existing_id:
+                model_unique_fields = unique_fields.get(args.model, [])
+                for field in model_unique_fields:
+                    if field in vals and vals[field]:
+                        try:
+                            existing_records = models.execute_kw(db, uid, pwd, args.model, 'search',
+                                                              [[(field, '=', vals[field])]])
+                            if existing_records:
+                                existing_id = existing_records[0]
+                                break
+                        except Exception as e:
+                            print(f"Warning: Error checking for existing record by {field}: {e}")
+
+            # For product.product, also check by product_tmpl_id and combination_indices
+            if not existing_id and args.model == 'product.product' and 'product_tmpl_id' in vals:
+                try:
+                    # Get the product template ID
+                    tmpl_id = vals['product_tmpl_id']
+                    if tmpl_id:
+                        # Search for products with this template
+                        existing_records = models.execute_kw(db, uid, pwd, 'product.product', 'search',
+                                                          [['&', ('product_tmpl_id', '=', tmpl_id),
+                                                             ('active', 'in', [True, False])]])
+                        if existing_records:
+                            # If there's only one variant or we're dealing with a simple product, use it
+                            if len(existing_records) == 1:
+                                existing_id = existing_records[0]
+                            # Otherwise, we need more criteria to identify the specific variant
+                            elif 'default_code' in vals and vals['default_code']:
+                                for record_id in existing_records:
+                                    product = models.execute_kw(db, uid, pwd, 'product.product', 'read',
+                                                             [[record_id]], {'fields': ['default_code']})
+                                    if product and product[0]['default_code'] == vals['default_code']:
+                                        existing_id = record_id
+                                        break
+                except Exception as e:
+                    print(f"Warning: Error checking for existing product by template ID: {e}")
+
             try:
-                rid = models.execute_kw(db, uid, pwd, args.model, 'create', [vals])
-                print(f"Created {args.model} {rid}")
-                success_count += 1
+                # Update or create record
+                if existing_id and update_existing:
+                    # Remove ID from vals if present to avoid errors
+                    if 'id' in vals:
+                        del vals['id']
+
+                    # For product.product, handle special fields
+                    if args.model == 'product.product':
+                        # Remove product_tmpl_id if present to avoid constraint errors
+                        if 'product_tmpl_id' in vals:
+                            del vals['product_tmpl_id']
+
+                        # Remove combination_indices if present
+                        if 'combination_indices' in vals:
+                            del vals['combination_indices']
+
+                    # Update existing record
+                    result = models.execute_kw(db, uid, pwd, args.model, 'write',
+                                             [[existing_id], vals])
+                    print(f"Updated {args.model} {existing_id}")
+                    updated_count += 1
+                else:
+                    # Create new record
+                    rid = models.execute_kw(db, uid, pwd, args.model, 'create', [vals])
+                    print(f"Created {args.model} {rid}")
+                    created_count += 1
             except Exception as e:
-                print(f"Error creating {args.model} in row {row_num}: {e}")
+                print(f"Error processing {args.model} in row {row_num}: {e}")
                 error_count += 1
 
-    print(f"Import summary: {success_count} records created, {error_count} errors")
+    print(f"Import summary: {created_count} records created, {updated_count} records updated, {error_count} errors")
     return
 
 def export_rel(args):

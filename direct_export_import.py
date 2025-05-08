@@ -310,12 +310,35 @@ def import_records(input_path, model_name, field_mapping=None, create_if_not_exi
     args.skip_invalid = skip_invalid
     args.name_prefix = name_prefix
     args.create_if_not_exists = create_if_not_exists
-    args.update_if_exists = update_if_exists
+    args.update = update_if_exists  # Set update flag for import_model
+    args.match_field = 'id'  # Default match field
 
     # Call the import_model function
+    created_count = 0
+    updated_count = 0
+    error_count = 0
+
     try:
         from scripts.dynamic_data_tool import import_model
-        import_model(args)
+        # Capture stdout to parse the import summary
+        import io
+        import sys
+        from contextlib import redirect_stdout
+
+        f = io.StringIO()
+        with redirect_stdout(f):
+            import_model(args)
+
+        output = f.getvalue()
+
+        # Parse the import summary to get counts
+        import re
+        summary_match = re.search(r"Import summary: (\d+) records created, (\d+) records updated, (\d+) errors", output)
+        if summary_match:
+            created_count = int(summary_match.group(1))
+            updated_count = int(summary_match.group(2))
+            error_count = int(summary_match.group(3))
+
         success = True
         error = None
     except Exception as e:
@@ -338,11 +361,11 @@ def import_records(input_path, model_name, field_mapping=None, create_if_not_exi
         "success": success,
         "error": error,
         "model_name": model_name,
-        "imported_records": total_records,
-        "updated_records": 0,  # We don't know how many were updated vs. created
+        "imported_records": created_count,
+        "updated_records": updated_count,
         "import_path": input_path,
         "field_mapping": field_mapping or {},
         "total_records": total_records,
-        "failed_records": 0,  # Placeholder
+        "failed_records": error_count,
         "validation_errors": []  # Placeholder
     }

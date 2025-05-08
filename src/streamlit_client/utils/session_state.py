@@ -34,7 +34,7 @@ class CodeAgentState:
     query: str = ""
     phase: AgentPhase = AgentPhase.ANALYSIS
     plan: str = ""
-    tasks: List[str] = field(default_factory=list)
+    tasks: List[Union[str, Dict[str, Any]]] = field(default_factory=list)
     module_name: str = ""
     files_to_create: Dict[str, str] = field(default_factory=dict)
     feedback: str = ""

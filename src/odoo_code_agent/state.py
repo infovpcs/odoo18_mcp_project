@@ -27,7 +27,7 @@ class AnalysisState(BaseModel):
 class PlanningState(BaseModel):
     """State for planning operations."""
     plan: str = ""
-    tasks: List[str] = Field(default_factory=list)
+    tasks: List[Union[str, Dict[str, Any]]] = Field(default_factory=list)
     planning_complete: bool = False
     context: Dict[str, Any] = Field(default_factory=dict)
     error: Optional[str] = None

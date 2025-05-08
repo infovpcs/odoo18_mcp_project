@@ -148,6 +148,8 @@ class GeminiClient:
         6. Ensure field types are valid Odoo field types
 
         Ensure the module name follows Odoo conventions (lowercase with underscores).
+
+        IMPORTANT: Return your response as a valid JSON object without any markdown formatting or code blocks.
         """
 
         try:
@@ -159,19 +161,158 @@ class GeminiClient:
             try:
                 # Try to parse the entire response as JSON
                 result = json.loads(response)
+                logger.info("Successfully parsed entire analysis response as JSON")
+                return result
             except json.JSONDecodeError:
-                # If that fails, try to extract JSON from the text
+                # If that fails, try to extract JSON from the text using multiple patterns
                 import re
-                json_match = re.search(r'```json\n(.*?)\n```', response, re.DOTALL)
-                if json_match:
-                    try:
-                        result = json.loads(json_match.group(1))
-                    except json.JSONDecodeError:
-                        return {"error": "Failed to parse JSON from response", "raw_response": response}
-                else:
-                    return {"error": "Failed to extract JSON from response", "raw_response": response}
 
-            return result
+                logger.info(f"JSON parsing failed for analysis, trying pattern matching. Response starts with: {response[:100]}...")
+
+                # Try different patterns to extract JSON
+                patterns = [
+                    r'```json\n([\s\S]*?)\n```',  # Standard markdown JSON block
+                    r'```\n([\s\S]*?)\n```',  # Generic code block
+                    r'```([\s\S]*?)```',  # Code block without language
+                    r'({[\s\S]*"module_name"[\s\S]*"models"[\s\S]*})',  # Look for specific JSON structure
+                    r'({[\s\S]*})'  # Any JSON-like structure as a last resort
+                ]
+
+                for i, pattern in enumerate(patterns):
+                    logger.info(f"Trying pattern {i+1} for analysis")
+                    json_match = re.search(pattern, response, re.DOTALL)
+                    if json_match:
+                        try:
+                            json_str = json_match.group(1).strip()
+                            logger.info(f"Found match with pattern {i+1}, extracted text starts with: {json_str[:100]}...")
+
+                            # Clean up the JSON string
+                            # Remove trailing commas in objects
+                            json_str = re.sub(r',\s*}', '}', json_str)
+                            # Remove trailing commas in arrays
+                            json_str = re.sub(r',\s*]', ']', json_str)
+                            # Fix any unescaped quotes in strings
+                            json_str = re.sub(r'(?<!\\)"(?=(.*?"[^:,{\[]*?[:,{\[]))', r'\"', json_str)
+
+                            # Try to parse the cleaned JSON
+                            try:
+                                result = json.loads(json_str)
+                                logger.info(f"Successfully parsed analysis JSON after cleanup with pattern {i+1}")
+                                return result
+                            except json.JSONDecodeError as e:
+                                logger.warning(f"JSON parsing still failed after cleanup: {str(e)}")
+
+                                # Try a more aggressive approach for the last pattern
+                                if i == len(patterns) - 1:
+                                    # Try to manually construct a valid JSON
+                                    logger.info("Trying manual JSON construction for analysis...")
+
+                                    # Extract module name
+                                    module_name_match = re.search(r'"module_name"\s*:\s*"([^"]+)"', json_str)
+                                    module_name = module_name_match.group(1) if module_name_match else "unknown_module"
+
+                                    # Extract module title
+                                    module_title_match = re.search(r'"module_title"\s*:\s*"([^"]+)"', json_str)
+                                    module_title = module_title_match.group(1) if module_title_match else "Unknown Module"
+
+                                    # Extract description
+                                    description_match = re.search(r'"description"\s*:\s*"([^"]+)"', json_str)
+                                    description = description_match.group(1) if description_match else ""
+
+                                    # Try to extract models
+                                    models = []
+                                    models_section = re.search(r'"models"\s*:\s*\[(.*?)\]', json_str, re.DOTALL)
+                                    if models_section:
+                                        # This is a simplified approach - in a real implementation, you'd want more robust parsing
+                                        model_blocks = re.finditer(r'{([^{}]*(?:{[^{}]*}[^{}]*)*)}', models_section.group(1))
+                                        for model_block in model_blocks:
+                                            model_text = model_block.group(0)
+
+                                            # Extract model name
+                                            model_name_match = re.search(r'"name"\s*:\s*"([^"]+)"', model_text)
+                                            model_name = model_name_match.group(1) if model_name_match else "unknown.model"
+
+                                            # Extract model description
+                                            model_desc_match = re.search(r'"description"\s*:\s*"([^"]+)"', model_text)
+                                            model_desc = model_desc_match.group(1) if model_desc_match else ""
+
+                                            # Extract fields
+                                            fields = []
+                                            fields_section = re.search(r'"fields"\s*:\s*\[(.*?)\]', model_text, re.DOTALL)
+                                            if fields_section:
+                                                field_blocks = re.finditer(r'{([^{}]*(?:{[^{}]*}[^{}]*)*)}', fields_section.group(1))
+                                                for field_block in field_blocks:
+                                                    field_text = field_block.group(0)
+
+                                                    # Extract field properties
+                                                    field_name_match = re.search(r'"name"\s*:\s*"([^"]+)"', field_text)
+                                                    field_type_match = re.search(r'"type"\s*:\s*"([^"]+)"', field_text)
+                                                    field_desc_match = re.search(r'"description"\s*:\s*"([^"]+)"', field_text)
+                                                    field_relation_match = re.search(r'"relation"\s*:\s*"([^"]+)"', field_text)
+
+                                                    field = {
+                                                        "name": field_name_match.group(1) if field_name_match else "unknown_field",
+                                                        "type": field_type_match.group(1) if field_type_match else "char",
+                                                        "description": field_desc_match.group(1) if field_desc_match else ""
+                                                    }
+
+                                                    if field_relation_match:
+                                                        field["relation"] = field_relation_match.group(1)
+
+                                                    fields.append(field)
+
+                                            models.append({
+                                                "name": model_name,
+                                                "description": model_desc,
+                                                "fields": fields
+                                            })
+
+                                    # Extract views
+                                    views_match = re.search(r'"views"\s*:\s*\[(.*?)\]', json_str, re.DOTALL)
+                                    views = []
+                                    if views_match:
+                                        views_text = views_match.group(1)
+                                        view_items = re.finditer(r'"([^"]*(?:\\.[^"]*)*)"', views_text)
+                                        for match in view_items:
+                                            views.append(match.group(1))
+
+                                    # Extract security
+                                    security_match = re.search(r'"security"\s*:\s*\[(.*?)\]', json_str, re.DOTALL)
+                                    security = []
+                                    if security_match:
+                                        security_text = security_match.group(1)
+                                        security_items = re.finditer(r'"([^"]*(?:\\.[^"]*)*)"', security_text)
+                                        for match in security_items:
+                                            security.append(match.group(1))
+
+                                    # Extract dependencies
+                                    dependencies_match = re.search(r'"dependencies"\s*:\s*\[(.*?)\]', json_str, re.DOTALL)
+                                    dependencies = []
+                                    if dependencies_match:
+                                        dependencies_text = dependencies_match.group(1)
+                                        dependency_items = re.finditer(r'"([^"]*(?:\\.[^"]*)*)"', dependencies_text)
+                                        for match in dependency_items:
+                                            dependencies.append(match.group(1))
+
+                                    result = {
+                                        "module_name": module_name,
+                                        "module_title": module_title,
+                                        "description": description,
+                                        "models": models,
+                                        "views": views,
+                                        "security": security,
+                                        "dependencies": dependencies
+                                    }
+
+                                    logger.info(f"Manually constructed analysis JSON with {len(models)} models")
+                                    return result
+                        except Exception as e:
+                            logger.warning(f"Error processing analysis match with pattern {i+1}: {str(e)}")
+                            continue
+
+                # If we get here, all patterns failed
+                logger.error(f"All JSON extraction patterns failed for analysis. Response: {response[:500]}...")
+                return {"error": "Failed to extract JSON from analysis response", "raw_response": response}
         except Exception as e:
             logger.error(f"Error analyzing requirements: {str(e)}")
             return {"error": f"Error analyzing requirements: {str(e)}"}
@@ -216,6 +357,8 @@ class GeminiClient:
         3. Include specific Odoo 18 technical considerations
         4. Mention any potential challenges and how to address them
         5. Consider testing and quality assurance steps
+
+        IMPORTANT: Return your response as a valid JSON object without any markdown formatting or code blocks.
         """
 
         try:
@@ -227,19 +370,94 @@ class GeminiClient:
             try:
                 # Try to parse the entire response as JSON
                 result = json.loads(response)
+                logger.info("Successfully parsed entire plan response as JSON")
+                return result
             except json.JSONDecodeError:
-                # If that fails, try to extract JSON from the text
+                # If that fails, try to extract JSON from the text using multiple patterns
                 import re
-                json_match = re.search(r'```json\n(.*?)\n```', response, re.DOTALL)
-                if json_match:
-                    try:
-                        result = json.loads(json_match.group(1))
-                    except json.JSONDecodeError:
-                        return {"error": "Failed to parse JSON from response", "raw_response": response}
-                else:
-                    return {"error": "Failed to extract JSON from response", "raw_response": response}
 
-            return result
+                logger.info(f"JSON parsing failed for plan, trying pattern matching. Response starts with: {response[:100]}...")
+
+                # Try different patterns to extract JSON
+                patterns = [
+                    r'```json\n([\s\S]*?)\n```',  # Standard markdown JSON block
+                    r'```\n([\s\S]*?)\n```',  # Generic code block
+                    r'```([\s\S]*?)```',  # Code block without language
+                    r'({[\s\S]*"plan"[\s\S]*"tasks"[\s\S]*})',  # Look for specific JSON structure
+                    r'({[\s\S]*})'  # Any JSON-like structure as a last resort
+                ]
+
+                for i, pattern in enumerate(patterns):
+                    logger.info(f"Trying pattern {i+1} for plan")
+                    json_match = re.search(pattern, response, re.DOTALL)
+                    if json_match:
+                        try:
+                            json_str = json_match.group(1).strip()
+                            logger.info(f"Found match with pattern {i+1}, extracted text starts with: {json_str[:100]}...")
+
+                            # Clean up the JSON string
+                            # Remove trailing commas in objects
+                            json_str = re.sub(r',\s*}', '}', json_str)
+                            # Remove trailing commas in arrays
+                            json_str = re.sub(r',\s*]', ']', json_str)
+                            # Fix any unescaped quotes in strings
+                            json_str = re.sub(r'(?<!\\)"(?=(.*?"[^:,{\[]*?[:,{\[]))', r'\"', json_str)
+
+                            # Try to parse the cleaned JSON
+                            try:
+                                result = json.loads(json_str)
+                                logger.info(f"Successfully parsed plan JSON after cleanup with pattern {i+1}")
+                                return result
+                            except json.JSONDecodeError as e:
+                                logger.warning(f"JSON parsing still failed after cleanup: {str(e)}")
+
+                                # Try a more aggressive approach for the last pattern
+                                if i == len(patterns) - 1:
+                                    # Try to manually construct a valid JSON
+                                    logger.info("Trying manual JSON construction for plan...")
+
+                                    # Extract plan
+                                    plan_match = re.search(r'"plan"\s*:\s*"([^"]+(?:\\.[^"]*)*)"', json_str)
+                                    plan_text = plan_match.group(1) if plan_match else "No plan available"
+
+                                    # Extract tasks
+                                    tasks = []
+                                    tasks_section = re.search(r'"tasks"\s*:\s*\[(.*?)\]', json_str, re.DOTALL)
+                                    if tasks_section:
+                                        tasks_text = tasks_section.group(1)
+                                        task_items = re.finditer(r'"([^"]*(?:\\.[^"]*)*)"', tasks_text)
+                                        for match in task_items:
+                                            tasks.append(match.group(1))
+
+                                    # Extract estimated time
+                                    time_match = re.search(r'"estimated_time"\s*:\s*"([^"]+)"', json_str)
+                                    estimated_time = time_match.group(1) if time_match else "Unknown"
+
+                                    # Extract technical considerations
+                                    considerations = []
+                                    considerations_section = re.search(r'"technical_considerations"\s*:\s*\[(.*?)\]', json_str, re.DOTALL)
+                                    if considerations_section:
+                                        considerations_text = considerations_section.group(1)
+                                        consideration_items = re.finditer(r'"([^"]*(?:\\.[^"]*)*)"', considerations_text)
+                                        for match in consideration_items:
+                                            considerations.append(match.group(1))
+
+                                    result = {
+                                        "plan": plan_text,
+                                        "tasks": tasks,
+                                        "estimated_time": estimated_time,
+                                        "technical_considerations": considerations
+                                    }
+
+                                    logger.info(f"Manually constructed plan JSON with {len(tasks)} tasks")
+                                    return result
+                        except Exception as e:
+                            logger.warning(f"Error processing plan match with pattern {i+1}: {str(e)}")
+                            continue
+
+                # If we get here, all patterns failed
+                logger.error(f"All JSON extraction patterns failed for plan. Response: {response[:500]}...")
+                return {"error": "Failed to extract JSON from plan response", "raw_response": response}
         except Exception as e:
             logger.error(f"Error creating plan: {str(e)}")
             return {"error": f"Error creating plan: {str(e)}"}
@@ -273,14 +491,28 @@ class GeminiClient:
         }}
 
         Include all necessary files for a complete Odoo module:
-        1. __init__.py files
-        2. __manifest__.py with proper dependencies
-        3. Model definitions
-        4. View definitions
-        5. Security files (ir.model.access.csv)
+        1. __init__.py files (both at module root and in subdirectories)
+        2. __manifest__.py with proper dependencies, data files, and security files
+        3. Model definitions with all fields specified in the analysis
+        4. View definitions (form, list, kanban, etc.) as specified in the analysis
+        5. Security files (ir.model.access.csv and security rules if needed)
         6. Demo data if applicable
 
-        Follow Odoo 18 best practices and coding standards.
+        IMPORTANT REQUIREMENTS:
+        1. Follow the plan EXACTLY as outlined above
+        2. Implement ALL models and fields from the analysis
+        3. Create ALL views mentioned in the analysis
+        4. Include proper security settings
+        5. Use Odoo 18 best practices and coding standards
+        6. Ensure all files are properly referenced in __manifest__.py
+        7. Use proper inheritance patterns if extending existing models
+        8. Include docstrings and comments for clarity
+        9. Implement constraints, computed fields, and methods as needed
+        10. Follow proper naming conventions for technical names
+
+        Your code must be complete and functional, ready to be installed in an Odoo 18 instance.
+
+        IMPORTANT: Return your response as a valid JSON object without any markdown formatting or code blocks.
         """
 
         try:
@@ -292,19 +524,125 @@ class GeminiClient:
             try:
                 # Try to parse the entire response as JSON
                 result = json.loads(response)
+                logger.info("Successfully parsed entire response as JSON")
+                return result
             except json.JSONDecodeError:
-                # If that fails, try to extract JSON from the text
+                # If that fails, try to extract JSON from the text using multiple patterns
                 import re
-                json_match = re.search(r'```json\n(.*?)\n```', response, re.DOTALL)
-                if json_match:
-                    try:
-                        result = json.loads(json_match.group(1))
-                    except json.JSONDecodeError:
-                        return {"error": "Failed to parse JSON from response", "raw_response": response}
-                else:
+
+                logger.info(f"JSON parsing failed, trying pattern matching. Response starts with: {response[:100]}...")
+
+                # Try different patterns to extract JSON
+                patterns = [
+                    r'```json\n([\s\S]*?)\n```',  # Standard markdown JSON block
+                    r'```\n([\s\S]*?)\n```',  # Generic code block
+                    r'```([\s\S]*?)```',  # Code block without language
+                    r'({[\s\S]*"module_name"[\s\S]*"files"[\s\S]*})',  # Look for specific JSON structure
+                    r'({[\s\S]*})'  # Any JSON-like structure as a last resort
+                ]
+
+                for i, pattern in enumerate(patterns):
+                    logger.info(f"Trying pattern {i+1}")
+                    json_match = re.search(pattern, response, re.DOTALL)
+                    if json_match:
+                        try:
+                            json_str = json_match.group(1).strip()
+                            logger.info(f"Found match with pattern {i+1}, extracted text starts with: {json_str[:100]}...")
+
+                            # Clean up the JSON string
+                            # Remove trailing commas in objects
+                            json_str = re.sub(r',\s*}', '}', json_str)
+                            # Remove trailing commas in arrays
+                            json_str = re.sub(r',\s*]', ']', json_str)
+                            # Fix any unescaped quotes in strings
+                            json_str = re.sub(r'(?<!\\)"(?=(.*?"[^:,{\[]*?[:,{\[]))', r'\"', json_str)
+
+                            # Try to parse the cleaned JSON
+                            try:
+                                result = json.loads(json_str)
+                                logger.info(f"Successfully parsed JSON after cleanup with pattern {i+1}")
+                                return result
+                            except json.JSONDecodeError as e:
+                                logger.warning(f"JSON parsing still failed after cleanup: {str(e)}")
+
+                                # Try a more aggressive approach for the last pattern
+                                if i == len(patterns) - 1:
+                                    # Try to manually construct a valid JSON
+                                    logger.info("Trying manual JSON construction...")
+
+                                    # Extract module name
+                                    module_name_match = re.search(r'"module_name"\s*:\s*"([^"]+)"', json_str)
+                                    module_name = module_name_match.group(1) if module_name_match else "unknown_module"
+
+                                    # Extract files
+                                    files = []
+                                    file_matches = re.finditer(r'"path"\s*:\s*"([^"]+)"[^}]*"content"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', json_str, re.DOTALL)
+
+                                    for match in file_matches:
+                                        path = match.group(1)
+                                        content = match.group(2)
+                                        # Unescape content
+                                        content = content.replace('\\"', '"').replace('\\n', '\n').replace('\\t', '\t')
+                                        files.append({"path": path, "content": content})
+
+                                    if files:
+                                        result = {
+                                            "module_name": module_name,
+                                            "files": files
+                                        }
+                                        logger.info(f"Manually constructed JSON with {len(files)} files")
+                                        return result
+                        except Exception as e:
+                            logger.warning(f"Error processing match with pattern {i+1}: {str(e)}")
+                            continue
+
+                # If we get here, all patterns failed
+                logger.error(f"All JSON extraction patterns failed. Response: {response[:500]}...")
+
+                # Last resort: try to manually extract module_name and files
+                try:
+                    logger.info("Attempting last resort manual extraction...")
+
+                    # Extract module name
+                    module_name_match = re.search(r'"module_name"\s*:\s*"([^"]+)"', response)
+                    module_name = module_name_match.group(1) if module_name_match else "extracted_module"
+
+                    # Extract file paths and contents
+                    files = []
+
+                    # Find all path/content pairs
+                    path_content_pairs = re.finditer(r'"path"\s*:\s*"([^"]+)"[^}]*"content"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', response, re.DOTALL)
+
+                    for match in path_content_pairs:
+                        path = match.group(1)
+                        content = match.group(2)
+                        # Unescape content
+                        content = content.replace('\\"', '"').replace('\\n', '\n').replace('\\t', '\t')
+                        files.append({"path": path, "content": content})
+
+                    if not files:
+                        # Try another approach - look for file blocks
+                        file_blocks = re.finditer(r'```(?:python|xml|csv)?\s*(?:(\S+))\s*\n(.*?)```', response, re.DOTALL)
+                        for match in file_blocks:
+                            path = match.group(1)
+                            content = match.group(2)
+                            if path and content:
+                                files.append({"path": f"{module_name}/{path}", "content": content})
+
+                    if files:
+                        result = {
+                            "module_name": module_name,
+                            "files": files
+                        }
+                        logger.info(f"Last resort extraction successful: found {len(files)} files")
+                        return result
+                    else:
+                        # If we still couldn't extract files, return the error
+                        return {"error": "Failed to extract JSON from response", "raw_response": response}
+                except Exception as e:
+                    logger.error(f"Last resort extraction failed: {str(e)}")
                     return {"error": "Failed to extract JSON from response", "raw_response": response}
 
-            return result
         except Exception as e:
             logger.error(f"Error generating module code: {str(e)}")
             return {"error": f"Error generating module code: {str(e)}"}
@@ -332,6 +670,10 @@ class GeminiClient:
 
         USER FEEDBACK: {feedback}
 
+        First, determine if the feedback indicates that the code needs to be completely regenerated or just modified.
+        If the feedback suggests a complete regeneration is needed, create entirely new code following the analysis and plan.
+        If the feedback suggests modifications, update the existing code to address the specific issues.
+
         Generate the updated module code in JSON format with the following structure:
         {{
             "module_name": "technical_name",
@@ -344,10 +686,25 @@ class GeminiClient:
             "changes": [
                 "Description of change 1",
                 "Description of change 2"
-            ]
+            ],
+            "regenerated": true/false
         }}
 
-        Follow Odoo 18 best practices and coding standards.
+        IMPORTANT REQUIREMENTS:
+        1. If regenerating, follow the plan EXACTLY as outlined above
+        2. Implement ALL models and fields from the analysis
+        3. Create ALL views mentioned in the analysis
+        4. Include proper security settings
+        5. Use Odoo 18 best practices and coding standards
+        6. Ensure all files are properly referenced in __manifest__.py
+        7. Use proper inheritance patterns if extending existing models
+        8. Include docstrings and comments for clarity
+        9. Implement constraints, computed fields, and methods as needed
+        10. Follow proper naming conventions for technical names
+
+        Your code must be complete and functional, ready to be installed in an Odoo 18 instance.
+
+        IMPORTANT: Return your response as a valid JSON object without any markdown formatting or code blocks.
         """
 
         try:
@@ -359,19 +716,160 @@ class GeminiClient:
             try:
                 # Try to parse the entire response as JSON
                 result = json.loads(response)
+                logger.info("Successfully parsed entire feedback response as JSON")
+                return result
             except json.JSONDecodeError:
-                # If that fails, try to extract JSON from the text
+                # If that fails, try to extract JSON from the text using multiple patterns
                 import re
-                json_match = re.search(r'```json\n(.*?)\n```', response, re.DOTALL)
-                if json_match:
-                    try:
-                        result = json.loads(json_match.group(1))
-                    except json.JSONDecodeError:
-                        return {"error": "Failed to parse JSON from response", "raw_response": response}
-                else:
-                    return {"error": "Failed to extract JSON from response", "raw_response": response}
 
-            return result
+                logger.info(f"JSON parsing failed for feedback, trying pattern matching. Response starts with: {response[:100]}...")
+
+                # Try different patterns to extract JSON
+                patterns = [
+                    r'```json\n([\s\S]*?)\n```',  # Standard markdown JSON block
+                    r'```\n([\s\S]*?)\n```',  # Generic code block
+                    r'```([\s\S]*?)```',  # Code block without language
+                    r'({[\s\S]*"module_name"[\s\S]*"files"[\s\S]*})',  # Look for specific JSON structure
+                    r'({[\s\S]*"changes"[\s\S]*})',  # Look for changes structure
+                    r'({[\s\S]*})'  # Any JSON-like structure as a last resort
+                ]
+
+                for i, pattern in enumerate(patterns):
+                    logger.info(f"Trying pattern {i+1} for feedback")
+                    json_match = re.search(pattern, response, re.DOTALL)
+                    if json_match:
+                        try:
+                            json_str = json_match.group(1).strip()
+                            logger.info(f"Found match with pattern {i+1}, extracted text starts with: {json_str[:100]}...")
+
+                            # Clean up the JSON string
+                            # Remove trailing commas in objects
+                            json_str = re.sub(r',\s*}', '}', json_str)
+                            # Remove trailing commas in arrays
+                            json_str = re.sub(r',\s*]', ']', json_str)
+                            # Fix any unescaped quotes in strings
+                            json_str = re.sub(r'(?<!\\)"(?=(.*?"[^:,{\[]*?[:,{\[]))', r'\"', json_str)
+
+                            # Try to parse the cleaned JSON
+                            try:
+                                result = json.loads(json_str)
+                                logger.info(f"Successfully parsed feedback JSON after cleanup with pattern {i+1}")
+                                return result
+                            except json.JSONDecodeError as e:
+                                logger.warning(f"JSON parsing still failed after cleanup: {str(e)}")
+
+                                # Try a more aggressive approach for the last pattern
+                                if i == len(patterns) - 1:
+                                    # Try to manually construct a valid JSON
+                                    logger.info("Trying manual JSON construction for feedback...")
+
+                                    # Extract module name
+                                    module_name_match = re.search(r'"module_name"\s*:\s*"([^"]+)"', json_str)
+                                    module_name = module_name_match.group(1) if module_name_match else code.get("module_name", "unknown_module")
+
+                                    # Extract files
+                                    files = []
+                                    file_matches = re.finditer(r'"path"\s*:\s*"([^"]+)"[^}]*"content"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', json_str, re.DOTALL)
+
+                                    for match in file_matches:
+                                        path = match.group(1)
+                                        content = match.group(2)
+                                        # Unescape content
+                                        content = content.replace('\\"', '"').replace('\\n', '\n').replace('\\t', '\t')
+                                        files.append({"path": path, "content": content})
+
+                                    # Extract changes
+                                    changes = []
+                                    changes_match = re.search(r'"changes"\s*:\s*\[(.*?)\]', json_str, re.DOTALL)
+                                    if changes_match:
+                                        changes_str = changes_match.group(1)
+                                        change_items = re.finditer(r'"([^"]*(?:\\.[^"]*)*)"', changes_str)
+                                        for match in change_items:
+                                            changes.append(match.group(1))
+
+                                    # Determine if regenerated
+                                    regenerated = False
+                                    regenerated_match = re.search(r'"regenerated"\s*:\s*(true|false)', json_str)
+                                    if regenerated_match:
+                                        regenerated = regenerated_match.group(1) == "true"
+
+                                    if files:
+                                        result = {
+                                            "module_name": module_name,
+                                            "files": files,
+                                            "changes": changes,
+                                            "regenerated": regenerated
+                                        }
+                                        logger.info(f"Manually constructed feedback JSON with {len(files)} files and {len(changes)} changes")
+                                        return result
+                        except Exception as e:
+                            logger.warning(f"Error processing feedback match with pattern {i+1}: {str(e)}")
+                            continue
+
+                # If we get here, all patterns failed
+                logger.error(f"All JSON extraction patterns failed for feedback. Response: {response[:500]}...")
+
+                # Last resort: try to manually extract module_name and files
+                try:
+                    logger.info("Attempting last resort manual extraction for feedback...")
+
+                    # Extract module name
+                    module_name_match = re.search(r'"module_name"\s*:\s*"([^"]+)"', response)
+                    module_name = module_name_match.group(1) if module_name_match else code.get("module_name", "extracted_module")
+
+                    # Extract file paths and contents
+                    files = []
+
+                    # Find all path/content pairs
+                    path_content_pairs = re.finditer(r'"path"\s*:\s*"([^"]+)"[^}]*"content"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', response, re.DOTALL)
+
+                    for match in path_content_pairs:
+                        path = match.group(1)
+                        content = match.group(2)
+                        # Unescape content
+                        content = content.replace('\\"', '"').replace('\\n', '\n').replace('\\t', '\t')
+                        files.append({"path": path, "content": content})
+
+                    if not files:
+                        # Try another approach - look for file blocks
+                        file_blocks = re.finditer(r'```(?:python|xml|csv)?\s*(?:(\S+))\s*\n(.*?)```', response, re.DOTALL)
+                        for match in file_blocks:
+                            path = match.group(1)
+                            content = match.group(2)
+                            if path and content:
+                                files.append({"path": f"{module_name}/{path}", "content": content})
+
+                    # Extract changes
+                    changes = []
+                    changes_match = re.search(r'"changes"\s*:\s*\[(.*?)\]', response, re.DOTALL)
+                    if changes_match:
+                        changes_str = changes_match.group(1)
+                        change_items = re.finditer(r'"([^"]*(?:\\.[^"]*)*)"', changes_str)
+                        for match in change_items:
+                            changes.append(match.group(1))
+
+                    # If no changes found, try to extract from text
+                    if not changes:
+                        changes_section = re.search(r'Changes:(.*?)(?:Files:|$)', response, re.DOTALL)
+                        if changes_section:
+                            changes_text = changes_section.group(1)
+                            changes = [line.strip() for line in changes_text.split('\n') if line.strip()]
+
+                    if files:
+                        result = {
+                            "module_name": module_name,
+                            "files": files,
+                            "changes": changes,
+                            "regenerated": len(files) > 0
+                        }
+                        logger.info(f"Last resort extraction successful for feedback: found {len(files)} files and {len(changes)} changes")
+                        return result
+                    else:
+                        # If we still couldn't extract files, return the error
+                        return {"error": "Failed to extract JSON from feedback response", "raw_response": response}
+                except Exception as e:
+                    logger.error(f"Last resort extraction failed for feedback: {str(e)}")
+                    return {"error": "Failed to extract JSON from feedback response", "raw_response": response}
         except Exception as e:
             logger.error(f"Error processing feedback: {str(e)}")
             return {"error": f"Error processing feedback: {str(e)}"}

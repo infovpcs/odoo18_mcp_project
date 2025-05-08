@@ -40,6 +40,11 @@ dependencies = [
     "langgraph>=0.0.15",
     "google-generativeai>=0.3.0",  # For Gemini integration
     "ollama>=0.1.0",  # For Ollama integration
+    "ipython>=8.12.0",  # For IPython.display
+    "graphviz>=0.20.1",  # For graph visualization
+    "pygraphviz>=1.10",  # For advanced graph visualization
+    "mermaid-magic>=0.1.0",  # For mermaid diagram support
+    "ipykernel==6.29.5", # For Jupyter notebook support
 ]
 
 [project.optional-dependencies]
@@ -57,6 +62,11 @@ streamlit = [
     "streamlit>=1.30.0",
     "streamlit-extras>=0.3.0",
     "mcp>=1.7.0",
+    "langgraph>=0.0.15",
+    "ipython>=8.12.0",
+    "graphviz>=0.20.1",
+    "pygraphviz>=1.10",
+    "mermaid-magic>=0.1.0",
 ]
 
 [project.urls]

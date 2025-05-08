@@ -1,0 +1,22 @@
+name: New model
+version: 0.0.1
+schema: v1
+models:
+  - provider: ollama
+    model: deepseek-r1
+    name: DeepSeek R1
+    roles:
+      - chat
+      - edit
+  - provider: ollama
+    model: qweb2.5-coder:7b
+    name: QWeb 2.5 Coder 7B
+    roles:
+      - autocomplete
+  - provider: anthropic
+    model: claude-3-7-sonnet-20250219
+    apiKey: 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
+    name: Claude 3.7 Sonnet 20250219
+    roles:
+      - chat
+      - edit

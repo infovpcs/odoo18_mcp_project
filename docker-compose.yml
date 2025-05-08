@@ -26,6 +26,9 @@ services:
       - MCP_PORT=8000
       - MCP_DEBUG=${MCP_DEBUG:-false}
       - MCP_LOG_LEVEL=${MCP_LOG_LEVEL:-INFO}
+      - ODOO_DOCS_DIR=./odoo_docs
+      - ODOO_INDEX_DIR=./odoo_docs_index
+      - ODOO_DB_PATH=./odoo_docs_index/embeddings.db
     volumes:
       - ./logs:/app/logs
       - mcp_data:/app/data

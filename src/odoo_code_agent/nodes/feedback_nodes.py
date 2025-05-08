@@ -76,8 +76,16 @@ def process_feedback(state: OdooCodeAgentState, feedback: Optional[str] = None) 
 
         # Extract any specific changes required from the feedback
         if feedback:
+            # Check if feedback indicates a need for regeneration
+            regeneration_keywords = [
+                "regenerate", "redo", "start over", "try again", "not according to",
+                "doesn't match", "doesn't follow", "incorrect", "wrong", "missing",
+                "incomplete", "do it again", "from scratch"
+            ]
+
+            needs_regeneration = any(keyword in feedback.lower() for keyword in regeneration_keywords)
+
             # Simple parsing of feedback for changes
-            # In a real implementation, this would use an LLM to extract structured changes
             lines = feedback.split('\n')
             changes = []
 
@@ -93,6 +101,17 @@ def process_feedback(state: OdooCodeAgentState, feedback: Optional[str] = None) 
 
                 # Add to history
                 state.history.append(f"Extracted {len(changes)} change requests from feedback")
+
+            if needs_regeneration:
+                state.history.append("Feedback indicates need for regeneration")
+
+                # If we're in the second feedback phase, go back to coding
+                if state.phase == AgentPhase.HUMAN_FEEDBACK_2:
+                    state.phase = AgentPhase.CODING
+                    state.current_step = "generate_code"
+                    state.coding_state.coding_complete = False
+                    logger.info("Regeneration requested, going back to code generation")
+                    return state
 
         # Determine the next phase based on the current phase
         if state.phase == AgentPhase.HUMAN_FEEDBACK_1:

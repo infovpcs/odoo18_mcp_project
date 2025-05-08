@@ -1,6 +1,6 @@
 # Odoo 18 MCP Integration (18.0 Branch)
 
-Last Updated: 2025-05-23
+Last Updated: 2025-05-24
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Odoo 18.0](https://img.shields.io/badge/odoo-18.0-green.svg)](https://www.odoo.com/)
@@ -2101,10 +2101,20 @@ The Streamlit client uses a sophisticated asynchronous polling mechanism to hand
    - Code agent: 30 polling attempts with 3-second intervals
    - Documentation retrieval: 10 polling attempts with 2-second intervals
    - Export/import operations: 15 polling attempts with 2-second intervals
-5. **Progress Indicators**: While polling, the client shows progress indicators to provide feedback to the user
-6. **Timeout Handling**: If the server doesn't respond within a specified timeout, the client shows an error message
-7. **Fallback Messages**: If polling completes without receiving data, the client shows a helpful message
-8. **Error Recovery**: The client can recover from certain error conditions and continue polling
+5. **Intelligent Timeout Calculation**: Timeout values are automatically calculated based on query complexity:
+   - Simple queries: 60 seconds
+   - Medium complexity: 120-180 seconds
+   - High complexity: 180-300 seconds
+6. **Optimized Polling Intervals**: Polling intervals are optimized for different tool types:
+   - Advanced search: 3-second intervals (more complex queries)
+   - Code agent: 3-second intervals (complex code generation)
+   - Documentation retrieval: 2-second intervals (medium complexity)
+   - Export/import operations: 2-second intervals (medium complexity)
+7. **Progress Indicators**: While polling, the client shows progress indicators to provide feedback to the user
+8. **Enhanced Timeout Handling**: If the server doesn't respond within a specified timeout, the client shows a detailed error message with troubleshooting suggestions
+9. **Improved Fallback Messages**: If polling completes without receiving data, the client shows a helpful message with specific suggestions based on the tool type
+10. **Enhanced Error Recovery**: The client can recover from network errors, timeouts, and other issues to continue polling
+11. **Detailed Logging**: Comprehensive logging for debugging polling issues
 
 This mechanism ensures that the client can handle operations that take a long time to complete, such as complex searches or code generation, while providing a responsive user experience.
 
@@ -2143,8 +2153,12 @@ We've significantly improved the asynchronous polling mechanism to better handle
 1. **Tool-Specific Configurations**: Different tools now have customized polling configurations based on their complexity
 2. **Request Tracking**: Each request is now assigned a unique ID for better tracking
 3. **Improved Progress Indicators**: More detailed progress indicators during polling
-4. **Better Timeout Handling**: More intelligent timeout handling with helpful messages
-5. **Enhanced Error Recovery**: Better recovery from network errors and timeouts
+4. **Intelligent Timeout Calculation**: Timeout values are automatically calculated based on query complexity
+5. **Optimized Polling Intervals**: Polling intervals are optimized for different tool types
+6. **Enhanced Timeout Handling**: More detailed error messages with troubleshooting suggestions
+7. **Improved Fallback Messages**: Tool-specific helpful messages when polling completes without data
+8. **Enhanced Error Recovery**: Better recovery from network errors, timeouts, and other issues
+9. **Detailed Logging**: Comprehensive logging for debugging polling issues
 
 #### Improved Query Processing
 
@@ -2175,6 +2189,60 @@ The Odoo 18 Code Agent is a specialized agent that helps with generating Odoo 18
 6. **Finalization Phase**: Finalizes the code based on feedback
 
 The agent can use Google Gemini or Ollama as fallback models if needed.
+
+### Code Agent Graph Visualization
+
+The Odoo Code Agent workflow can be visualized using LangGraph's graph visualization capabilities. This provides a clear understanding of the agent's workflow and how the different phases and steps are connected.
+
+#### Dependencies for Graph Visualization
+
+To use the graph visualization features, you need to install the following dependencies:
+
+```bash
+# Install graph visualization dependencies
+pip install ipython>=8.12.0 graphviz>=0.20.1 pygraphviz>=1.10 mermaid-magic>=0.1.0
+```
+
+On macOS, you may need to install graphviz using Homebrew:
+
+```bash
+brew install graphviz
+```
+
+On Ubuntu/Debian, you can install graphviz using apt:
+
+```bash
+sudo apt-get install graphviz libgraphviz-dev pkg-config
+```
+
+#### Visualizing the Graph in Jupyter Notebook
+
+You can visualize the Odoo Code Agent graph in a Jupyter notebook using the following code:
+
+```python
+from IPython.display import Image, display
+from langgraph.graph import StateGraph, END
+from src.odoo_code_agent.state import OdooCodeAgentState, AgentPhase
+
+# Create the graph
+graph = create_code_agent_graph()  # Function that creates the graph structure
+
+# Display the graph
+display(Image(graph.get_graph().draw_mermaid_png()))
+```
+
+The project includes a Jupyter notebook (`code_agent_graph_demo.ipynb`) that demonstrates how to create and display the graph.
+
+#### Visualizing the Graph in Streamlit
+
+The Streamlit client includes a dedicated page for visualizing the Odoo Code Agent graph. You can access it by clicking on the "Code Agent Graph" button in the navigation sidebar.
+
+The graph visualization page includes:
+- A visual representation of the agent workflow
+- A detailed explanation of each phase and step
+- Information about the current state of the agent
+
+This visualization helps you understand how the Odoo Code Agent works and how the different phases and steps are connected.
 
 ### Google Gemini Integration
 

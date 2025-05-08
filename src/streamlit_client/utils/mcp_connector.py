@@ -134,7 +134,7 @@ class MCPConnector:
         """
         try:
             payload = {
-                "tool": tool_name,
+                "tool": tool_name,  # Use "tool" as the parameter name for the standalone_mcp_server.py
                 "params": params
             }
 
@@ -181,6 +181,24 @@ class MCPConnector:
             total_data_length = data_length + result_length
 
             logger.info(f"Initial response from {tool_name}: success={result.get('success', False)}, data_length={data_length}, result_length={result_length}")
+
+            # For the Odoo code agent tool, check if the response contains structured data
+            if tool_name == "run_odoo_code_agent_tool" and "result" in result:
+                try:
+                    # Try to parse the result as JSON
+                    result_data = json.loads(result["result"]) if isinstance(result["result"], str) else result["result"]
+                    if isinstance(result_data, dict) and "data" in result_data:
+                        # Extract the data from the result
+                        data = result_data["data"]
+                        # Update the result with the data
+                        result["data"] = data
+                        # Set success to True
+                        result["success"] = True
+                        logger.info(f"Extracted data from result for Odoo code agent: {len(str(data))} bytes")
+                except (json.JSONDecodeError, TypeError, KeyError) as e:
+                    # If the result is not a valid JSON object or doesn't have the expected structure
+                    logger.info(f"Could not extract structured data from result: {str(e)}")
+                    pass
 
             # If the result already has data in either field, return it immediately
             if total_data_length > 0:
@@ -305,7 +323,7 @@ class MCPConnector:
         """
         try:
             payload = {
-                "tool": tool_name,
+                "tool": tool_name,  # Use "tool" as the parameter name for the standalone_mcp_server.py
                 "params": params
             }
 
@@ -361,6 +379,24 @@ class MCPConnector:
                             poll_result = poll_response.json()
                             poll_data_length = len(str(poll_result.get('data', '')))
                             logger.info(f"Poll response from {tool_name}: success={poll_result.get('success', False)}, data_length={poll_data_length}")
+
+                            # For the Odoo code agent tool, check if the response contains structured data
+                            if tool_name == "run_odoo_code_agent_tool" and "result" in poll_result:
+                                try:
+                                    # Try to parse the result as JSON
+                                    result_data = json.loads(poll_result["result"]) if isinstance(poll_result["result"], str) else poll_result["result"]
+                                    if isinstance(result_data, dict) and "data" in result_data:
+                                        # Extract the data from the result
+                                        data = result_data["data"]
+                                        # Update the result with the data
+                                        poll_result["data"] = data
+                                        # Set success to True
+                                        poll_result["success"] = True
+                                        logger.info(f"Extracted data from poll result for Odoo code agent: {len(str(data))} bytes")
+                                except (json.JSONDecodeError, TypeError, KeyError) as e:
+                                    # If the result is not a valid JSON object or doesn't have the expected structure
+                                    logger.info(f"Could not extract structured data from poll result: {str(e)}")
+                                    pass
 
                             # If we got data, return the result
                             if poll_data_length > 0:
@@ -474,63 +510,7 @@ class MCPConnector:
             poll_interval=2
         )
 
-    def run_odoo_code_agent(self, query: str, use_gemini: bool = False,
-                           use_ollama: bool = False, feedback: Optional[str] = None,
-                           save_to_files: bool = False, output_dir: Optional[str] = None,
-                           wait_for_validation: bool = False, current_phase: Optional[str] = None,
-                           state_dict: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Run the Odoo code agent.
 
-        Args:
-            query: The natural language query describing the module to create
-            use_gemini: Whether to use Google Gemini as a fallback
-            use_ollama: Whether to use Ollama as a fallback
-            feedback: Optional feedback to incorporate
-            save_to_files: Whether to save the generated files to disk
-            output_dir: Directory to save the generated files to
-            wait_for_validation: Whether to wait for human validation at validation points
-            current_phase: The current phase to resume from (if continuing execution)
-            state_dict: Serialized state to resume from (if continuing execution)
-
-        Returns:
-            Code generation results
-        """
-        params = {
-            "query": query,
-            "use_gemini": use_gemini,
-            "use_ollama": use_ollama,
-            "wait_for_validation": wait_for_validation
-        }
-
-        if feedback:
-            params["feedback"] = feedback
-
-        if save_to_files:
-            params["save_to_files"] = save_to_files
-
-        if output_dir:
-            params["output_dir"] = output_dir
-
-        if current_phase:
-            params["current_phase"] = current_phase
-
-        if state_dict:
-            params["state_dict"] = state_dict
-
-        # Log the query for debugging
-        logger.info(f"Running Odoo code agent with query: {query}")
-        logger.info(f"Wait for validation: {wait_for_validation}, Current phase: {current_phase}")
-
-        # Code generation is a complex operation that can take a long time
-        # Use a very long timeout (5 minutes) and extensive polling
-        return self.call_tool(
-            "run_odoo_code_agent_tool",
-            params,
-            timeout=300,
-            use_polling=True,
-            max_polls=30,  # Try up to 30 times (90 seconds of polling)
-            poll_interval=3  # Wait 3 seconds between polls
-        )
 
     def export_records_to_csv(self, model_name: str, fields: Optional[List[str]] = None,
                              filter_domain: Optional[str] = None, limit: int = 1000,
@@ -735,7 +715,9 @@ class MCPConnector:
 
     def run_odoo_code_agent(self, query: str, use_gemini: bool = False,
                            use_ollama: bool = False, feedback: Optional[str] = None,
-                           save_to_files: bool = False, output_dir: Optional[str] = None) -> Dict[str, Any]:
+                           save_to_files: bool = False, output_dir: Optional[str] = None,
+                           wait_for_validation: bool = False, current_phase: Optional[str] = None,
+                           state_dict: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Run the Odoo code agent.
 
         Args:
@@ -745,6 +727,9 @@ class MCPConnector:
             feedback: Optional feedback to incorporate
             save_to_files: Whether to save the generated files to disk
             output_dir: Directory to save the generated files to
+            wait_for_validation: Whether to wait for human validation at validation points
+            current_phase: The current phase to resume from (if continuing execution)
+            state_dict: Serialized state to resume from (if continuing execution)
 
         Returns:
             Code generation results
@@ -764,8 +749,18 @@ class MCPConnector:
         if output_dir:
             params["output_dir"] = output_dir
 
+        if wait_for_validation:
+            params["wait_for_validation"] = wait_for_validation
+
+        if current_phase:
+            params["current_phase"] = current_phase
+
+        if state_dict:
+            params["state_dict"] = state_dict
+
         # Log the query for debugging
         logger.info(f"Running Odoo code agent with query: {query}")
+        logger.info(f"Wait for validation: {wait_for_validation}, Current phase: {current_phase}")
 
         # The tool-specific settings are now handled in _http_call_tool
         return self.call_tool("run_odoo_code_agent_tool", params)

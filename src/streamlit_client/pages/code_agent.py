@@ -162,10 +162,30 @@ def render_requirements_tab(session_state: SessionState, mcp_connector: MCPConne
             progress_placeholder.empty()
             status_placeholder.empty()
 
+            # Log the result for debugging
+            logger.info(f"Result from run_odoo_code_agent: {json.dumps(result, indent=2)}")
+
             if result.get("success", False):
                 # Update session state with the result
                 data = result.get("data", {})
 
+                # Log the data for debugging
+                logger.info(f"Data from result: {json.dumps(data, indent=2)}")
+
+                # Check if the result contains a 'result' field that might be a JSON string
+                if not data and "result" in result:
+                    try:
+                        # Try to parse the result as JSON
+                        result_data = json.loads(result["result"]) if isinstance(result["result"], str) else result["result"]
+                        if isinstance(result_data, dict) and "data" in result_data:
+                            # Extract the data from the result
+                            data = result_data["data"]
+                            logger.info(f"Extracted data from result: {json.dumps(data, indent=2)}")
+                    except (json.JSONDecodeError, TypeError, KeyError) as e:
+                        # If the result is not a valid JSON object or doesn't have the expected structure
+                        logger.info(f"Could not extract structured data from result: {str(e)}")
+
+                # Update session state with the data
                 session_state.code_agent.plan = data.get("plan", "")
                 session_state.code_agent.tasks = data.get("tasks", [])
                 session_state.code_agent.module_name = data.get("module_name", "")
@@ -176,6 +196,9 @@ def render_requirements_tab(session_state: SessionState, mcp_connector: MCPConne
                 session_state.code_agent.state_dict = data.get("state_dict")
                 session_state.code_agent.requires_validation = data.get("requires_validation", False)
                 session_state.code_agent.current_step = data.get("current_step")
+
+                # Log the session state for debugging
+                logger.info(f"Updated session state: plan={bool(session_state.code_agent.plan)}, tasks={len(session_state.code_agent.tasks)}, module_name={session_state.code_agent.module_name}")
 
                 # Get the current phase from the result
                 current_phase = data.get("current_phase", "planning")
@@ -230,7 +253,21 @@ def render_planning_tab(session_state: SessionState, mcp_connector: MCPConnector
         if session_state.code_agent.tasks:
             st.subheader("Implementation Tasks")
             for i, task in enumerate(session_state.code_agent.tasks, 1):
-                st.markdown(f"{i}. {task}")
+                if isinstance(task, dict):
+                    # If task is a dictionary, format it nicely
+                    task_name = task.get('task_name', f"Task {i}")
+                    task_desc = task.get('description', '')
+                    st.markdown(f"**{i}. {task_name}**")
+                    if task_desc:
+                        st.markdown(f"   *{task_desc}*")
+
+                    # Display steps if available
+                    if 'steps' in task and task['steps']:
+                        for step in task['steps']:
+                            st.markdown(f"   - {step}")
+                else:
+                    # If task is a string, display it directly
+                    st.markdown(f"{i}. {task}")
 
         # Feedback form
         st.subheader("Feedback")
@@ -300,10 +337,30 @@ def handle_planning_feedback(session_state: SessionState, mcp_connector: MCPConn
         progress_placeholder.empty()
         status_placeholder.empty()
 
+        # Log the result for debugging
+        logger.info(f"Result from run_odoo_code_agent (feedback): {json.dumps(result, indent=2)}")
+
         if result.get("success", False):
             # Update session state with the result
             data = result.get("data", {})
 
+            # Log the data for debugging
+            logger.info(f"Data from result (feedback): {json.dumps(data, indent=2)}")
+
+            # Check if the result contains a 'result' field that might be a JSON string
+            if not data and "result" in result:
+                try:
+                    # Try to parse the result as JSON
+                    result_data = json.loads(result["result"]) if isinstance(result["result"], str) else result["result"]
+                    if isinstance(result_data, dict) and "data" in result_data:
+                        # Extract the data from the result
+                        data = result_data["data"]
+                        logger.info(f"Extracted data from result (feedback): {json.dumps(data, indent=2)}")
+                except (json.JSONDecodeError, TypeError, KeyError) as e:
+                    # If the result is not a valid JSON object or doesn't have the expected structure
+                    logger.info(f"Could not extract structured data from result (feedback): {str(e)}")
+
+            # Update session state with the data
             session_state.code_agent.files_to_create = data.get("files_to_create", {})
             session_state.code_agent.history = data.get("history", [])
 
@@ -311,6 +368,9 @@ def handle_planning_feedback(session_state: SessionState, mcp_connector: MCPConn
             session_state.code_agent.state_dict = data.get("state_dict")
             session_state.code_agent.requires_validation = data.get("requires_validation", False)
             session_state.code_agent.current_step = data.get("current_step")
+
+            # Log the session state for debugging
+            logger.info(f"Updated session state (feedback): files_to_create={len(session_state.code_agent.files_to_create)}, requires_validation={session_state.code_agent.requires_validation}")
 
             # Get the current phase from the result
             current_phase = data.get("current_phase", "coding")
@@ -431,10 +491,30 @@ def handle_code_feedback(session_state: SessionState, mcp_connector: MCPConnecto
         progress_placeholder.empty()
         status_placeholder.empty()
 
+        # Log the result for debugging
+        logger.info(f"Result from run_odoo_code_agent (code feedback): {json.dumps(result, indent=2)}")
+
         if result.get("success", False):
             # Update session state with the result
             data = result.get("data", {})
 
+            # Log the data for debugging
+            logger.info(f"Data from result (code feedback): {json.dumps(data, indent=2)}")
+
+            # Check if the result contains a 'result' field that might be a JSON string
+            if not data and "result" in result:
+                try:
+                    # Try to parse the result as JSON
+                    result_data = json.loads(result["result"]) if isinstance(result["result"], str) else result["result"]
+                    if isinstance(result_data, dict) and "data" in result_data:
+                        # Extract the data from the result
+                        data = result_data["data"]
+                        logger.info(f"Extracted data from result (code feedback): {json.dumps(data, indent=2)}")
+                except (json.JSONDecodeError, TypeError, KeyError) as e:
+                    # If the result is not a valid JSON object or doesn't have the expected structure
+                    logger.info(f"Could not extract structured data from result (code feedback): {str(e)}")
+
+            # Update session state with the data
             session_state.code_agent.files_to_create = data.get("files_to_create", {})
             session_state.code_agent.history = data.get("history", [])
 
@@ -442,6 +522,9 @@ def handle_code_feedback(session_state: SessionState, mcp_connector: MCPConnecto
             session_state.code_agent.state_dict = data.get("state_dict")
             session_state.code_agent.requires_validation = data.get("requires_validation", False)
             session_state.code_agent.current_step = data.get("current_step")
+
+            # Log the session state for debugging
+            logger.info(f"Updated session state (code feedback): files_to_create={len(session_state.code_agent.files_to_create)}, requires_validation={session_state.code_agent.requires_validation}")
 
             # Get the current phase from the result
             current_phase = data.get("current_phase", "finalization")

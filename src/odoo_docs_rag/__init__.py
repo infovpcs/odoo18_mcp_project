@@ -10,4 +10,17 @@ from .docs_retriever import OdooDocsRetriever
 from .docs_processor import OdooDocsProcessor
 from .embedding_engine import EmbeddingEngine
 
-__all__ = ["OdooDocsRetriever", "OdooDocsProcessor", "EmbeddingEngine"]
+from .db_storage import EmbeddingDatabase
+
+__all__ = [
+    "OdooDocsRetriever",
+    "OdooDocsProcessor",
+    "EmbeddingEngine",
+    "EmbeddingDatabase",
+]
+
+# Import the patch to use existing embeddings
+try:
+    from . import patch
+except ImportError:
+    pass

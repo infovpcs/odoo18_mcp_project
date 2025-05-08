@@ -108,8 +108,27 @@ def generate_code(state: OdooCodeAgentState) -> OdooCodeAgentState:
     try:
         # Get the module name, analysis, and plan
         module_name = state.coding_state.module_name
+
+        # Get the full analysis context
         analysis = state.analysis_state.context.get("analysis", {})
+        if not analysis:
+            logger.warning("Analysis context is empty, attempting to extract from analysis_state")
+            # Try to get analysis directly from the analysis state
+            analysis = getattr(state.analysis_state, "analysis", {})
+
+        # Get the full plan context
         plan_result = state.planning_state.context.get("plan_result", {})
+        if not plan_result:
+            logger.warning("Plan context is empty, attempting to extract from planning_state")
+            # Try to get plan directly from the planning state
+            plan_result = {
+                "plan": state.planning_state.plan,
+                "tasks": state.planning_state.tasks
+            }
+
+        # Log the analysis and plan for debugging
+        logger.info(f"Analysis for code generation: {str(analysis)[:200]}...")
+        logger.info(f"Plan for code generation: {str(plan_result)[:200]}...")
 
         # Use Gemini to generate code if available and enabled
         if state.use_gemini:
@@ -121,6 +140,65 @@ def generate_code(state: OdooCodeAgentState) -> OdooCodeAgentState:
 
             if "error" in code_result:
                 logger.error(f"Gemini code generation error: {code_result['error']}")
+
+                # Check if we have a raw response that we can try to parse manually
+                if "raw_response" in code_result:
+                    logger.info("Attempting to manually extract code from raw response")
+                    raw_response = code_result["raw_response"]
+
+                    # Try to extract module name and files from the raw response
+                    try:
+                        import re
+
+                        # Extract module name
+                        module_name_match = re.search(r'"module_name"\s*:\s*"([^"]+)"', raw_response)
+                        extracted_module_name = module_name_match.group(1) if module_name_match else state.coding_state.module_name
+
+                        # Extract file blocks
+                        files = []
+
+                        # Try to find file blocks in JSON format
+                        file_blocks = re.finditer(r'"path"\s*:\s*"([^"]+)"[^}]*"content"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', raw_response, re.DOTALL)
+                        for match in file_blocks:
+                            path = match.group(1)
+                            content = match.group(2)
+                            # Unescape content
+                            content = content.replace('\\"', '"').replace('\\n', '\n').replace('\\t', '\t')
+                            files.append({"path": path, "content": content})
+
+                        # If no files found, try to find code blocks with filenames
+                        if not files:
+                            file_blocks = re.finditer(r'```(?:python|xml|csv)?\s*(?:(\S+))\s*\n(.*?)```', raw_response, re.DOTALL)
+                            for match in file_blocks:
+                                path = match.group(1)
+                                content = match.group(2)
+                                if path and content:
+                                    files.append({"path": f"{extracted_module_name}/{path}", "content": content})
+
+                        if files:
+                            logger.info(f"Successfully extracted {len(files)} files from raw response")
+
+                            # Update the module name
+                            state.coding_state.module_name = extracted_module_name
+
+                            # Update the files
+                            state.coding_state.files_to_create = files
+
+                            # Add to history
+                            state.history.append(f"Code extracted from raw response with {len(files)} files")
+
+                            # Mark as complete
+                            state.coding_state.coding_complete = True
+                            state.current_step = "complete_coding"
+
+                            logger.info(f"Code extracted successfully with {len(files)} files")
+                            return state
+                        else:
+                            logger.error("Failed to extract files from raw response")
+                    except Exception as e:
+                        logger.error(f"Error extracting code from raw response: {str(e)}")
+
+                # If we couldn't extract code from the raw response, set error and return
                 state.coding_state.error = code_result["error"]
                 state.current_step = "error"
                 return state
@@ -128,10 +206,16 @@ def generate_code(state: OdooCodeAgentState) -> OdooCodeAgentState:
             # Update the module name if provided by Gemini
             if "module_name" in code_result:
                 state.coding_state.module_name = code_result["module_name"]
+                logger.info(f"Using module name from Gemini: {code_result['module_name']}")
 
             # Store the files to create
             if "files" in code_result:
                 state.coding_state.files_to_create = code_result["files"]
+                logger.info(f"Generated {len(code_result['files'])} files")
+
+                # Log the first few files for debugging
+                for i, file in enumerate(code_result["files"][:3]):
+                    logger.info(f"File {i+1}: {file.get('path', 'unknown')} - {len(file.get('content', ''))} bytes")
 
             # Add to history
             state.history.append(f"Code generated with {len(state.coding_state.files_to_create)} files")
@@ -429,8 +513,85 @@ def finalize_code(state: OdooCodeAgentState) -> OdooCodeAgentState:
 
             if "error" in updated_code:
                 logger.error(f"Gemini feedback processing error: {updated_code['error']}")
-                state.coding_state.error = updated_code["error"]
-                state.current_step = "error"
+
+                # Check if we have a raw response that we can try to parse manually
+                if "raw_response" in updated_code:
+                    logger.info("Attempting to manually extract code from raw feedback response")
+                    raw_response = updated_code["raw_response"]
+
+                    # Try to extract module name, files, and changes from the raw response
+                    try:
+                        import re
+
+                        # Extract module name
+                        module_name_match = re.search(r'"module_name"\s*:\s*"([^"]+)"', raw_response)
+                        extracted_module_name = module_name_match.group(1) if module_name_match else state.coding_state.module_name
+
+                        # Extract file blocks
+                        files = []
+
+                        # Try to find file blocks in JSON format
+                        file_blocks = re.finditer(r'"path"\s*:\s*"([^"]+)"[^}]*"content"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', raw_response, re.DOTALL)
+                        for match in file_blocks:
+                            path = match.group(1)
+                            content = match.group(2)
+                            # Unescape content
+                            content = content.replace('\\"', '"').replace('\\n', '\n').replace('\\t', '\t')
+                            files.append({"path": path, "content": content})
+
+                        # If no files found, try to find code blocks with filenames
+                        if not files:
+                            file_blocks = re.finditer(r'```(?:python|xml|csv)?\s*(?:(\S+))\s*\n(.*?)```', raw_response, re.DOTALL)
+                            for match in file_blocks:
+                                path = match.group(1)
+                                content = match.group(2)
+                                if path and content:
+                                    files.append({"path": f"{extracted_module_name}/{path}", "content": content})
+
+                        # Extract changes
+                        changes = []
+                        changes_match = re.search(r'"changes"\s*:\s*\[(.*?)\]', raw_response, re.DOTALL)
+                        if changes_match:
+                            changes_text = changes_match.group(1)
+                            change_items = re.finditer(r'"([^"]*(?:\\.[^"]*)*)"', changes_text)
+                            for match in change_items:
+                                changes.append(match.group(1))
+
+                        # If no changes found in JSON format, try to extract from text
+                        if not changes:
+                            changes_section = re.search(r'Changes:(.*?)(?:Files:|$)', raw_response, re.DOTALL)
+                            if changes_section:
+                                changes_text = changes_section.group(1)
+                                changes = [line.strip() for line in changes_text.split('\n') if line.strip()]
+
+                        if files:
+                            logger.info(f"Successfully extracted {len(files)} files from raw feedback response")
+
+                            # Update the module name
+                            state.coding_state.module_name = extracted_module_name
+
+                            # Update the files
+                            state.coding_state.files_to_create = files
+
+                            # Add changes to history
+                            if changes:
+                                state.history.append(f"Applied {len(changes)} changes based on feedback (extracted from raw response)")
+                                for change in changes:
+                                    state.history.append(f"- {change}")
+                            else:
+                                state.history.append("Processed feedback (extracted from raw response)")
+
+                            logger.info(f"Feedback processed successfully (extracted from raw response)")
+                            return state
+                        else:
+                            logger.error("Failed to extract files from raw feedback response")
+                    except Exception as e:
+                        logger.error(f"Error extracting code from raw feedback response: {str(e)}")
+
+                # If we couldn't extract code from the raw response, continue with the current code
+                logger.warning("Using existing code due to feedback processing error")
+                state.history.append("Feedback processing failed, using existing code")
+                state.current_step = "complete"
                 return state
 
             # Update the module name if provided

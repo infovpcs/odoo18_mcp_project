@@ -76,6 +76,10 @@ def initialize_ollama() -> bool:
     """
     Initialize the Ollama model using direct HTTP API calls.
 
+    This function checks if the Ollama server is running and if the qwen2.5-coder:7b model is available.
+    To install Ollama, follow the instructions at https://github.com/ollama/ollama
+    To download the model, run: ollama pull qwen2.5-coder:7b
+
     Returns:
         True if initialization was successful, False otherwise
     """
@@ -104,7 +108,7 @@ def initialize_ollama() -> bool:
             response = requests.post(
                 "http://localhost:11434/api/chat",
                 json={
-                    "model": "deepseek-r1",
+                    "model": "qwen2.5-coder:7b",
                     "messages": [
                         {
                             "role": "user",
@@ -174,6 +178,9 @@ def generate_with_ollama(prompt: str) -> Optional[str]:
     """
     Generate text using Ollama model via direct HTTP API calls.
 
+    This function uses the qwen2.5-coder:7b model for code generation.
+    The model is particularly good at generating code and understanding programming concepts.
+
     Args:
         prompt: The prompt to send to the model
 
@@ -197,7 +204,7 @@ def generate_with_ollama(prompt: str) -> Optional[str]:
         response = requests.post(
             "http://localhost:11434/api/chat",
             json={
-                "model": "deepseek-r1",
+                "model": "qwen2.5-coder:7b",
                 "messages": [
                     {
                         "role": "user",

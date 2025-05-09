@@ -61,7 +61,8 @@ class GeminiClient:
         temperature: float = 0.7,
         max_output_tokens: int = 8192,
         top_p: float = 0.95,
-        top_k: int = 40
+        top_k: int = 40,
+        max_retries: int = 3
     ) -> Optional[str]:
         """Generate text using the Gemini model.
 
@@ -71,6 +72,7 @@ class GeminiClient:
             max_output_tokens: Maximum number of tokens to generate
             top_p: Nucleus sampling parameter
             top_k: Top-k sampling parameter
+            max_retries: Maximum number of retry attempts if API call fails or times out
 
         Returns:
             Generated text or None if an error occurs
@@ -79,56 +81,92 @@ class GeminiClient:
             logger.warning("Gemini API is not available")
             return None
 
-        try:
-            generation_config = {
-                "temperature": temperature,
-                "top_p": top_p,
-                "top_k": top_k,
-                "max_output_tokens": max_output_tokens,
-            }
+        # Initialize retry counter
+        retry_count = 0
+        last_error = None
 
-            # Add a timeout to prevent hanging
-            import threading
-            import time
+        # Retry loop
+        while retry_count < max_retries:
+            try:
+                # If this is a retry, log it
+                if retry_count > 0:
+                    logger.info(f"Retry attempt {retry_count}/{max_retries} for Gemini API call")
 
-            response = None
-            error = None
+                generation_config = {
+                    "temperature": temperature,
+                    "top_p": top_p,
+                    "top_k": top_k,
+                    "max_output_tokens": max_output_tokens,
+                }
 
-            def generate_with_timeout():
-                nonlocal response, error
-                try:
-                    response = self.model.generate_content(
-                        prompt,
-                        generation_config=generation_config
-                    )
-                except Exception as e:
-                    error = e
+                # Add a timeout to prevent hanging
+                import threading
+                import time
 
-            # Start generation in a separate thread
-            thread = threading.Thread(target=generate_with_timeout)
-            thread.start()
+                response = None
+                error = None
 
-            # Wait for the thread to complete with a timeout
-            thread.join(timeout=30)  # 30 second timeout
+                def generate_with_timeout():
+                    nonlocal response, error
+                    try:
+                        response = self.model.generate_content(
+                            prompt,
+                            generation_config=generation_config
+                        )
+                    except Exception as e:
+                        error = e
 
-            # Check if the thread is still running (timed out)
-            if thread.is_alive():
-                logger.error("Gemini API call timed out after 30 seconds")
-                return None
+                # Start generation in a separate thread
+                thread = threading.Thread(target=generate_with_timeout)
+                thread.start()
 
-            # Check if there was an error
-            if error:
-                raise error
+                # Wait for the thread to complete with a timeout
+                # Increase timeout slightly on each retry
+                timeout_seconds = 30 + (retry_count * 10)  # 30s, 40s, 50s
+                thread.join(timeout=timeout_seconds)
 
-            # Check if we got a response
-            if not response:
-                logger.error("No response from Gemini API")
-                return None
+                # Check if the thread is still running (timed out)
+                if thread.is_alive():
+                    logger.warning(f"Gemini API call timed out after {timeout_seconds} seconds (attempt {retry_count+1}/{max_retries})")
+                    # Don't wait for the thread to complete, just move on to the next retry
+                    retry_count += 1
+                    last_error = TimeoutError(f"API call timed out after {timeout_seconds} seconds")
+                    # Add a small delay before retrying
+                    time.sleep(2)
+                    continue
 
-            return response.text
-        except Exception as e:
-            logger.error(f"Error generating text with Gemini: {str(e)}")
-            return None
+                # Check if there was an error
+                if error:
+                    last_error = error
+                    logger.warning(f"Gemini API call failed with error: {str(error)} (attempt {retry_count+1}/{max_retries})")
+                    retry_count += 1
+                    # Add a small delay before retrying
+                    time.sleep(2)
+                    continue
+
+                # Check if we got a response
+                if not response:
+                    last_error = ValueError("No response from Gemini API")
+                    logger.warning(f"No response from Gemini API (attempt {retry_count+1}/{max_retries})")
+                    retry_count += 1
+                    # Add a small delay before retrying
+                    time.sleep(2)
+                    continue
+
+                # If we got here, the call was successful
+                logger.info(f"Gemini API call successful{' after ' + str(retry_count) + ' retries' if retry_count > 0 else ''}")
+                return response.text
+
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Error generating text with Gemini: {str(e)} (attempt {retry_count+1}/{max_retries})")
+                retry_count += 1
+                # Add a small delay before retrying
+                time.sleep(2)
+
+        # If we get here, all retries failed
+        logger.error(f"All {max_retries} attempts to call Gemini API failed. Last error: {str(last_error)}")
+        return None
 
     def analyze_requirements(self, query: str, context: str = "") -> Dict[str, Any]:
         """Analyze the requirements from a user query.

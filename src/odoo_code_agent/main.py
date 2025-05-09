@@ -14,7 +14,7 @@ from typing import Dict, Any, Optional, List, Callable
 from .state import OdooCodeAgentState, AgentPhase
 from .utils import documentation_helper, odoo_connector
 from .utils.file_saver import save_module_files
-from .nodes import analysis_nodes, planning_nodes, coding_nodes, feedback_nodes
+from .nodes import analysis_nodes, planning_nodes, coding_nodes, feedback_nodes, review_nodes
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -43,6 +43,11 @@ NODE_MAPPING = {
     "setup_module_structure": coding_nodes.setup_module_structure,
     "generate_code": coding_nodes.generate_code,
     "complete_coding": coding_nodes.complete_coding,
+
+    # Code Review phase
+    "start_code_review": review_nodes.start_code_review,
+    "review_code_completeness": review_nodes.review_code_completeness,
+    "regenerate_incomplete_files": review_nodes.regenerate_incomplete_files,
 
     # Finalization phase
     "finalize_code": coding_nodes.finalize_code,
@@ -136,6 +141,8 @@ def run_odoo_code_agent(
                     state.current_step = "request_feedback"
                 elif state.phase == AgentPhase.CODING:
                     state.current_step = "setup_module_structure"
+                elif state.phase == AgentPhase.CODE_REVIEW:
+                    state.current_step = "start_code_review"
                 elif state.phase == AgentPhase.HUMAN_FEEDBACK_2:
                     state.current_step = "request_feedback"
                 elif state.phase == AgentPhase.FINALIZATION:
@@ -186,9 +193,14 @@ def run_odoo_code_agent(
                 logger.info("Stopping at first human validation point (after planning)")
                 break
 
-            # If we just completed coding and are at the second human feedback point
+            # If we just completed coding and are at the code review point
+            if state.phase == AgentPhase.CODE_REVIEW and state.current_step == "start_code_review":
+                logger.info("Stopping at code review point (after coding)")
+                break
+
+            # If we just completed code review and are at the second human feedback point
             if state.phase == AgentPhase.HUMAN_FEEDBACK_2 and state.current_step == "request_feedback":
-                logger.info("Stopping at second human validation point (after coding)")
+                logger.info("Stopping at second human validation point (after code review)")
                 break
 
     # Check if we reached the maximum number of steps

@@ -479,7 +479,7 @@ def generate_code(state: OdooCodeAgentState) -> OdooCodeAgentState:
 
 def complete_coding(state: OdooCodeAgentState) -> OdooCodeAgentState:
     """
-    Complete the coding phase and transition to human feedback.
+    Complete the coding phase and transition to code review.
 
     Args:
         state: The current agent state
@@ -487,8 +487,8 @@ def complete_coding(state: OdooCodeAgentState) -> OdooCodeAgentState:
     Returns:
         Updated agent state
     """
-    state.phase = AgentPhase.HUMAN_FEEDBACK_2
-    state.current_step = "request_feedback"
+    state.phase = AgentPhase.CODE_REVIEW
+    state.current_step = "start_code_review"
 
     return state
 

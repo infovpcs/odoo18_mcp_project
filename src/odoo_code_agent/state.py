@@ -10,6 +10,7 @@ class AgentPhase(str, Enum):
     PLANNING = "planning"
     HUMAN_FEEDBACK_1 = "human_feedback_1"
     CODING = "coding"
+    CODE_REVIEW = "code_review"
     HUMAN_FEEDBACK_2 = "human_feedback_2"
     FINALIZATION = "finalization"
 
@@ -39,6 +40,9 @@ class CodingState(BaseModel):
     module_structure: Dict[str, Any] = Field(default_factory=dict)
     files_to_create: List[Dict[str, Any]] = Field(default_factory=list)
     files_created: List[str] = Field(default_factory=list)
+    incomplete_files: List[Dict[str, Any]] = Field(default_factory=list)
+    regenerated_files: List[Dict[str, Any]] = Field(default_factory=list)
+    review_complete: bool = False
     coding_complete: bool = False
     error: Optional[str] = None
 
@@ -74,7 +78,7 @@ class OdooCodeAgentState(BaseModel):
             return self.analysis_state
         elif self.phase == AgentPhase.PLANNING:
             return self.planning_state
-        elif self.phase in [AgentPhase.CODING, AgentPhase.FINALIZATION]:
+        elif self.phase in [AgentPhase.CODING, AgentPhase.CODE_REVIEW, AgentPhase.FINALIZATION]:
             return self.coding_state
         return self.feedback_state
 

@@ -800,13 +800,25 @@ def handle_planning_feedback(session_state: SessionState, mcp_connector: MCPConn
             try:
                 session_state.code_agent.phase = AgentPhase(current_phase)
             except ValueError:
-                session_state.code_agent.phase = AgentPhase.CODING
+                # Default to CODE_REVIEW phase after processing planning feedback
+                session_state.code_agent.phase = AgentPhase.CODE_REVIEW
 
             # Show a success message
             st.success("Feedback processed successfully!")
 
-            # Add a message to the chat based on the validation status
-            if session_state.code_agent.requires_validation:
+            # Add a message to the chat based on the phase and validation status
+            if session_state.code_agent.phase == AgentPhase.CODE_REVIEW:
+                session_state.add_chat_message(
+                    "assistant",
+                    f"I've processed your feedback and generated code for the '{session_state.code_agent.module_name}' module. "
+                    f"I'm now reviewing the code for completeness and will automatically regenerate any incomplete files. "
+                    f"Please check the Code Generation tab to monitor the review progress."
+                )
+
+                # Automatically continue with code review
+                st.info("Starting code review process...")
+                handle_code_review(session_state, mcp_connector)
+            elif session_state.code_agent.requires_validation:
                 session_state.add_chat_message(
                     "assistant",
                     f"I've processed your feedback and generated code for the '{session_state.code_agent.module_name}' module. "
@@ -846,16 +858,180 @@ def render_code_generation_tab(session_state: SessionState, mcp_connector: MCPCo
         # Display the number of files
         st.info(f"Generated {len(session_state.code_agent.files_to_create)} files for the '{session_state.code_agent.module_name}' module.")
 
-        # Feedback form
-        st.subheader("Feedback")
-        render_feedback_form(
-            session_state,
-            on_submit=lambda feedback: handle_code_feedback(session_state, mcp_connector, feedback),
-            key_prefix="code_feedback",
-            placeholder="Provide feedback on the generated code..."
-        )
+        # Display code review status if in CODE_REVIEW phase
+        if session_state.code_agent.phase == AgentPhase.CODE_REVIEW:
+            st.subheader("Code Review in Progress")
+            st.markdown("""
+            The code agent is currently reviewing the generated code for completeness.
+            This process will automatically regenerate any incomplete files before presenting them for your feedback.
+            """)
+
+            # Show progress indicator
+            st.spinner("Reviewing code for completeness...")
+
+        # Display incomplete files if any
+        if session_state.code_agent.incomplete_files:
+            with st.expander("Incomplete Files Detected", expanded=True):
+                st.warning(f"Found {len(session_state.code_agent.incomplete_files)} incomplete files that need to be regenerated.")
+
+                for i, file in enumerate(session_state.code_agent.incomplete_files):
+                    file_path = file.get("path", "unknown")
+                    file_type = file.get("file_type", "unknown")
+                    reason = file.get("reason", "Unknown reason")
+
+                    st.markdown(f"**{i+1}. {file_path}** ({file_type})")
+                    st.markdown(f"   - Reason: {reason}")
+
+        # Display regenerated files if any
+        if session_state.code_agent.regenerated_files:
+            with st.expander("Regenerated Files", expanded=True):
+                st.success(f"Successfully regenerated {len(session_state.code_agent.regenerated_files)} files.")
+
+                for i, file in enumerate(session_state.code_agent.regenerated_files):
+                    file_path = file.get("path", "unknown")
+                    reason = file.get("reason", "Unknown reason")
+
+                    st.markdown(f"**{i+1}. {file_path}**")
+                    st.markdown(f"   - Original issue: {reason}")
+
+        # Only show feedback form if not in CODE_REVIEW phase or if review is complete
+        if session_state.code_agent.phase != AgentPhase.CODE_REVIEW or session_state.code_agent.review_complete:
+            # Feedback form
+            st.subheader("Feedback")
+            render_feedback_form(
+                session_state,
+                on_submit=lambda feedback: handle_code_feedback(session_state, mcp_connector, feedback),
+                key_prefix="code_feedback",
+                placeholder="Provide feedback on the generated code..."
+            )
+        elif session_state.code_agent.phase == AgentPhase.CODE_REVIEW and not session_state.code_agent.review_complete:
+            st.info("Code review is in progress. Please wait for the review to complete before providing feedback.")
     else:
         st.info("No code generated yet. Please complete the planning in the Planning tab.")
+
+def handle_code_review(session_state: SessionState, mcp_connector: MCPConnector) -> None:
+    """Handle the code review phase.
+
+    Args:
+        session_state: Session state
+        mcp_connector: MCP connector
+    """
+    # Show a spinner and progress bar while processing
+    with st.spinner("Reviewing code for completeness..."):
+        # Create a progress bar
+        progress_placeholder = st.empty()
+        progress_bar = progress_placeholder.progress(0)
+
+        # Show a status message
+        status_placeholder = st.empty()
+        status_placeholder.info("Phase 1/3: Analyzing code completeness...")
+
+        # Update progress bar to simulate progress
+        for i in range(33):
+            progress_bar.progress(i)
+            time.sleep(0.05)
+
+        status_placeholder.info("Phase 2/3: Identifying incomplete files...")
+
+        for i in range(33, 66):
+            progress_bar.progress(i)
+            time.sleep(0.05)
+
+        status_placeholder.info("Phase 3/3: Regenerating incomplete files...")
+
+        # Call the MCP tool to continue the code review process
+        result = mcp_connector.run_odoo_code_agent(
+            query=session_state.code_agent.query,
+            use_gemini=session_state.code_agent.use_gemini,
+            use_ollama=session_state.code_agent.use_ollama,
+            no_llm=session_state.code_agent.no_llm,
+            feedback=None,  # No feedback needed for code review
+            save_to_files=session_state.code_agent.save_to_files,
+            output_dir=session_state.code_agent.output_dir,
+            wait_for_validation=True,  # Stop at the second validation point
+            current_phase=AgentPhase.CODE_REVIEW.value,  # Continue from the code review phase
+            state_dict=session_state.code_agent.state_dict  # Pass the saved state
+        )
+
+        # Complete the progress bar
+        for i in range(66, 101):
+            progress_bar.progress(i)
+            time.sleep(0.03)
+
+        # Clear the placeholders
+        progress_placeholder.empty()
+        status_placeholder.empty()
+
+        # Log the result for debugging
+        logger.info(f"Result from run_odoo_code_agent (code review): {json.dumps(result, indent=2)}")
+
+        if result.get("success", False):
+            # Update session state with the result
+            data = result.get("data", {})
+
+            # Log the data for debugging
+            logger.info(f"Data from result (code review): {json.dumps(data, indent=2)}")
+
+            # Check if the result contains a 'result' field that might be a JSON string
+            if not data and "result" in result:
+                try:
+                    # Try to parse the result as JSON
+                    result_data = json.loads(result["result"]) if isinstance(result["result"], str) else result["result"]
+                    if isinstance(result_data, dict) and "data" in result_data:
+                        # Extract the data from the result
+                        data = result_data["data"]
+                        logger.info(f"Extracted data from result (code review): {json.dumps(data, indent=2)}")
+                except (json.JSONDecodeError, TypeError, KeyError) as e:
+                    # If the result is not a valid JSON object or doesn't have the expected structure
+                    logger.info(f"Could not extract structured data from result (code review): {str(e)}")
+
+            # Update session state with the data
+            session_state.code_agent.files_to_create = data.get("files_to_create", {})
+            session_state.code_agent.history = data.get("history", [])
+
+            # Extract incomplete and regenerated files if available
+            if "state_dict" in data and isinstance(data["state_dict"], dict):
+                coding_state = data["state_dict"].get("coding_state", {})
+                session_state.code_agent.incomplete_files = coding_state.get("incomplete_files", [])
+                session_state.code_agent.regenerated_files = coding_state.get("regenerated_files", [])
+                session_state.code_agent.review_complete = coding_state.get("review_complete", False)
+
+            # Store the state information for resuming later
+            session_state.code_agent.state_dict = data.get("state_dict")
+            session_state.code_agent.requires_validation = data.get("requires_validation", False)
+            session_state.code_agent.current_step = data.get("current_step")
+
+            # Get the current phase from the result
+            current_phase = data.get("current_phase", "human_feedback_2")
+            try:
+                session_state.code_agent.phase = AgentPhase(current_phase)
+            except ValueError:
+                session_state.code_agent.phase = AgentPhase.HUMAN_FEEDBACK_2
+
+            # Show a success message
+            st.success("Code review completed successfully!")
+
+            # Add a message to the chat
+            if session_state.code_agent.incomplete_files:
+                session_state.add_chat_message(
+                    "assistant",
+                    f"I've reviewed the code and found {len(session_state.code_agent.incomplete_files)} incomplete files. "
+                    f"I've regenerated these files to ensure the module is complete. "
+                    f"Please review the updated code in the Code Generation tab and provide feedback to continue."
+                )
+            else:
+                session_state.add_chat_message(
+                    "assistant",
+                    f"I've reviewed the code and found no incomplete files. "
+                    f"The module is ready for your review. "
+                    f"Please check the Code Generation tab and provide feedback to continue."
+                )
+        else:
+            # Show an error message
+            error_msg = result.get("error", "Unknown error")
+            session_state.code_agent.error = error_msg
+            st.error(f"Error during code review: {error_msg}")
+
 
 def handle_code_feedback(session_state: SessionState, mcp_connector: MCPConnector, feedback: str) -> None:
     """Handle feedback on the code.

@@ -25,6 +25,7 @@ class AgentPhase(str, Enum):
     PLANNING = "planning"
     HUMAN_FEEDBACK_1 = "human_feedback_1"
     CODING = "coding"
+    CODE_REVIEW = "code_review"
     HUMAN_FEEDBACK_2 = "human_feedback_2"
     FINALIZATION = "finalization"
 
@@ -56,6 +57,9 @@ class CodeAgentState:
     detailed_model_info: Dict[str, Any] = field(default_factory=dict)  # Detailed information about Odoo models
     analysis_result: Optional[Dict[str, Any]] = None  # Result of the analysis phase
     proposed_models: List[Dict[str, Any]] = field(default_factory=list)  # Models proposed for the module
+    incomplete_files: List[Dict[str, Any]] = field(default_factory=list)  # Files that need to be regenerated
+    regenerated_files: List[Dict[str, Any]] = field(default_factory=list)  # Files that have been regenerated
+    review_complete: bool = False  # Whether the code review is complete
 
 @dataclass
 class ExportImportState:

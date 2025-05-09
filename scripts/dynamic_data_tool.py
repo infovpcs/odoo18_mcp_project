@@ -175,25 +175,67 @@ def import_model(args):
             field_info = models.execute_kw(db, uid, pwd, args.model, 'fields_get', [[fm['name']]])
             if fm['name'] in field_info and 'selection' in field_info[fm['name']]:
                 selection_fields[fm['name']] = [s[0] for s in field_info[fm['name']]['selection']]
+                
+    # With this dynamic approach
+    def get_unique_fields(models, db, uid, pwd, model_name):
+        """Dynamically determine potential unique fields for a model."""
+        # Start with common unique fields by model type
+        common_unique_fields = {
+            'res.partner': ['email', 'vat', 'ref'],
+            'product.product': ['default_code', 'barcode'],
+            'product.template': ['default_code', 'barcode'],
+            'account.move': ['name', 'ref'],
+            'sale.order': ['name', 'client_order_ref'],
+            'purchase.order': ['name', 'partner_ref'],
+        }
+        
+        # Get model's potential unique fields
+        result = common_unique_fields.get(model_name, [])
+        
+        # Add 'name' if it exists in the model and isn't already included
+        fields_info = models.execute_kw(db, uid, pwd, model_name, 'fields_get', [['name']])
+        if 'name' in fields_info and 'name' not in result:
+            result.append('name')
+        
+        # Try to get SQL constraints that might indicate unique fields
+        try:
+            constraints = models.execute_kw(db, uid, pwd, 'ir.model.constraint', 'search_read',
+                                        [[('model', '=', model_name)]], 
+                                        {'fields': ['name', 'definition']})
+            for constraint in constraints:
+                if 'UNIQUE' in constraint.get('definition', ''):
+                    # Extract field name from constraint name (common pattern in Odoo)
+                    parts = constraint['name'].split('_')
+                    if len(parts) > 2 and parts[-1] == 'uniq':
+                        potential_field = parts[-2]
+                        # Verify field exists
+                        field_exists = models.execute_kw(db, uid, pwd, 'ir.model.fields', 'search_count',
+                                                    [[('model', '=', model_name), ('name', '=', potential_field)]])
+                        if field_exists and potential_field not in result:
+                            result.append(potential_field)
+        except Exception:
+            # If we can't get constraints, just continue with what we have
+            pass
+        
+        return result
 
-    # Define model-specific unique fields for lookup
-    unique_fields = {
-        'res.partner': ['email', 'vat'],
-        'product.product': ['default_code', 'barcode'],
-        'product.template': ['default_code', 'barcode'],
-    }
+    # Get unique fields for this model dynamically
+    model_unique_fields = get_unique_fields(models, db, uid, pwd, args.model)
+    print(f"Detected potential unique fields for {args.model}: {', '.join(model_unique_fields)}")
 
     # Get the match field for finding existing records
     match_field = getattr(args, 'match_field', 'id')
 
     # Determine if we should update existing records
     update_existing = getattr(args, 'update', False)
+    create_if_not_exists = getattr(args, 'create_if_not_exists', True)
 
     # counter for name updates
     counter = 1
     created_count = 0
     updated_count = 0
     error_count = 0
+    skipped_count = 0
 
     with open(args.input, newline='') as f:
         reader = csv.DictReader(f)
@@ -232,10 +274,11 @@ def import_model(args):
                         if args.skip_invalid:
                             continue
 
-                if t in ('integer','float'):
+                # Process field based on type
+                if t in ('integer', 'float'):
                     vals[name] = safe_int(raw, 0)
                 elif t == 'boolean':
-                    vals[name] = raw.lower() in ('1','true','yes')
+                    vals[name] = raw.lower() in ('1', 'true', 'yes', 't', 'y')
                 elif t == 'many2one':
                     # Try to handle name lookup for many2one fields
                     if not raw.isdigit() and '/' not in raw:  # Not an ID or external ID
@@ -243,10 +286,10 @@ def import_model(args):
                         if relation:
                             try:
                                 # Try to find the record by name
-                                rel_ids = models.execute_kw(db, uid, pwd, relation, 'search',
-                                                          [[('name', '=', raw)]], {'limit': 1})
+                                rel_ids = models.execute_kw(db, uid, pwd, relation, 'name_search',
+                                                         [[raw]], {'limit': 1})
                                 if rel_ids:
-                                    vals[name] = rel_ids[0]
+                                    vals[name] = rel_ids[0][0]
                                 else:
                                     print(f"Warning: Could not find {relation} with name '{raw}' for field '{name}' in row {row_num}")
                             except Exception as e:
@@ -257,13 +300,63 @@ def import_model(args):
                     else:
                         vals[name] = safe_int(raw)
                 elif t == 'many2many':
-                    ids = [safe_int(x) for x in raw.split(',') if x]
-                    vals[name] = [(6,0,ids)]
+                    # Handle comma-separated IDs or names
+                    if ',' in raw:
+                        parts = [p.strip() for p in raw.split(',')]
+                        ids = []
+                        relation = fm.get('relation')
+                        
+                        for part in parts:
+                            if part.isdigit():
+                                ids.append(int(part))
+                            elif relation:
+                                try:
+                                    # Try to find by name
+                                    rel_ids = models.execute_kw(db, uid, pwd, relation, 'name_search',
+                                                             [[part]], {'limit': 1})
+                                    if rel_ids:
+                                        ids.append(rel_ids[0][0])
+                                except Exception:
+                                    pass
+                        
+                        if ids:
+                            vals[name] = [(6, 0, ids)]
+                    else:
+                        # Single value
+                        if raw.isdigit():
+                            vals[name] = [(6, 0, [int(raw)])]
+                        else:
+                            relation = fm.get('relation')
+                            if relation:
+                                try:
+                                    rel_ids = models.execute_kw(db, uid, pwd, relation, 'name_search',
+                                                             [[raw]], {'limit': 1})
+                                    if rel_ids:
+                                        vals[name] = [(6, 0, [rel_ids[0][0]])]
+                                except Exception:
+                                    pass
+                elif t == 'date':
+                    # Ensure date is in YYYY-MM-DD format
+                    try:
+                        from datetime import datetime
+                        date_formats = ['%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%d-%m-%Y', '%m-%d-%Y']
+                        for fmt in date_formats:
+                            try:
+                                parsed_date = datetime.strptime(raw, fmt)
+                                vals[name] = parsed_date.strftime('%Y-%m-%d')
+                                break
+                            except ValueError:
+                                continue
+                        else:
+                            print(f"Warning: Could not parse date '{raw}' for field '{name}' in row {row_num}")
+                    except Exception as e:
+                        print(f"Error parsing date: {e}")
+                        vals[name] = raw
                 else:
                     vals[name] = raw
 
             # override name if prefix provided
-            if hasattr(args, 'name_prefix') and args.name_prefix:
+            if hasattr(args, 'name_prefix') and args.name_prefix and 'name' in vals:
                 vals['name'] = f"{args.name_prefix}-{counter:03d}"
                 counter += 1
 
@@ -280,19 +373,44 @@ def import_model(args):
             # First check by ID if available
             if match_field in row and row[match_field]:
                 try:
-                    record_id = safe_int(row[match_field])
-                    if record_id:
-                        # Check if record with this ID exists
-                        existing_records = models.execute_kw(db, uid, pwd, args.model, 'search',
-                                                          [[('id', '=', record_id)]])
-                        if existing_records:
-                            existing_id = existing_records[0]
+                    # Check if it's an external ID (contains a dot)
+                    if '.' in row[match_field]:
+                        # Try to get the database ID from the external ID
+                        external_id = row[match_field]
+                        try:
+                            # Split the external ID into module and name
+                            module, name = external_id.split('.', 1)
+                            
+                            # Search for the record in ir.model.data
+                            ir_model_data = models.execute_kw(db, uid, pwd, 'ir.model.data', 'search_read',
+                                                           [[('module', '=', module), ('name', '=', name)]],
+                                                           {'fields': ['res_id', 'model']})
+                            
+                            if ir_model_data and ir_model_data[0]['model'] == args.model:
+                                record_id = ir_model_data[0]['res_id']
+                                # Check if record with this ID exists
+                                existing_records = models.execute_kw(db, uid, pwd, args.model, 'search',
+                                                                  [[('id', '=', record_id)]])
+                                if existing_records:
+                                    existing_id = existing_records[0]
+                                    print(f"Found existing record with external ID {external_id}: ID {existing_id}")
+                        except Exception as e:
+                            print(f"Warning: Error resolving external ID {external_id}: {e}")
+                    else:
+                        # It's a numeric ID
+                        record_id = safe_int(row[match_field])
+                        if record_id:
+                            # Check if record with this ID exists
+                            existing_records = models.execute_kw(db, uid, pwd, args.model, 'search',
+                                                              [[('id', '=', record_id)]])
+                            if existing_records:
+                                existing_id = existing_records[0]
+                                print(f"Found existing record with ID {record_id}")
                 except Exception as e:
                     print(f"Warning: Error checking for existing record by ID: {e}")
 
             # If not found by ID, try other unique fields
             if not existing_id:
-                model_unique_fields = unique_fields.get(args.model, [])
                 for field in model_unique_fields:
                     if field in vals and vals[field]:
                         try:
@@ -300,11 +418,12 @@ def import_model(args):
                                                               [[(field, '=', vals[field])]])
                             if existing_records:
                                 existing_id = existing_records[0]
+                                print(f"Found existing record with {field}='{vals[field]}': ID {existing_id}")
                                 break
                         except Exception as e:
                             print(f"Warning: Error checking for existing record by {field}: {e}")
 
-            # For product.product, also check by product_tmpl_id and combination_indices
+            # Handle special cases for specific models
             if not existing_id and args.model == 'product.product' and 'product_tmpl_id' in vals:
                 try:
                     # Get the product template ID
@@ -318,6 +437,7 @@ def import_model(args):
                             # If there's only one variant or we're dealing with a simple product, use it
                             if len(existing_records) == 1:
                                 existing_id = existing_records[0]
+                                print(f"Found existing product with template ID {tmpl_id}: ID {existing_id}")
                             # Otherwise, we need more criteria to identify the specific variant
                             elif 'default_code' in vals and vals['default_code']:
                                 for record_id in existing_records:
@@ -325,9 +445,32 @@ def import_model(args):
                                                              [[record_id]], {'fields': ['default_code']})
                                     if product and product[0]['default_code'] == vals['default_code']:
                                         existing_id = record_id
+                                        print(f"Found existing product variant with default_code '{vals['default_code']}': ID {existing_id}")
                                         break
                 except Exception as e:
                     print(f"Warning: Error checking for existing product by template ID: {e}")
+
+            # Handle account.move special case (reset to draft)
+            if existing_id and update_existing and args.model == 'account.move':
+                try:
+                    # Check if the move is posted
+                    move_info = models.execute_kw(db, uid, pwd, 'account.move', 'read',
+                                               [[existing_id]], {'fields': ['state']})
+                    if move_info and move_info[0]['state'] == 'posted':
+                        if getattr(args, 'reset_to_draft', False):
+                            print(f"Resetting account.move {existing_id} to draft state")
+                            models.execute_kw(db, uid, pwd, 'account.move', 'button_draft', [[existing_id]])
+                        else:
+                            print(f"Warning: Cannot update posted account.move {existing_id} without reset_to_draft option")
+                            if getattr(args, 'skip_readonly_fields', False):
+                                # Remove readonly fields for posted moves
+                                readonly_fields = ['partner_id', 'invoice_date', 'date', 'currency_id']
+                                for field in readonly_fields:
+                                    if field in vals:
+                                        print(f"Removing readonly field {field} for posted move")
+                                        del vals[field]
+                except Exception as e:
+                    print(f"Warning: Error checking account.move state: {e}")
 
             try:
                 # Update or create record
@@ -347,20 +490,30 @@ def import_model(args):
                             del vals['combination_indices']
 
                     # Update existing record
-                    result = models.execute_kw(db, uid, pwd, args.model, 'write',
-                                             [[existing_id], vals])
-                    print(f"Updated {args.model} {existing_id}")
-                    updated_count += 1
-                else:
+                    if vals:  # Only update if there are values to update
+                        result = models.execute_kw(db, uid, pwd, args.model, 'write',
+                                                 [[existing_id], vals])
+                        print(f"Updated {args.model} {existing_id}")
+                        updated_count += 1
+                    else:
+                        print(f"No changes to update for {args.model} {existing_id}")
+                        skipped_count += 1
+                elif existing_id and not update_existing:
+                    print(f"Skipping existing {args.model} {existing_id} (update not enabled)")
+                    skipped_count += 1
+                elif not existing_id and create_if_not_exists:
                     # Create new record
                     rid = models.execute_kw(db, uid, pwd, args.model, 'create', [vals])
                     print(f"Created {args.model} {rid}")
                     created_count += 1
+                else:
+                    print(f"Skipping record in row {row_num} (create not enabled)")
+                    skipped_count += 1
             except Exception as e:
                 print(f"Error processing {args.model} in row {row_num}: {e}")
                 error_count += 1
 
-    print(f"Import summary: {created_count} records created, {updated_count} records updated, {error_count} errors")
+    print(f"Import summary: {created_count} records created, {updated_count} records updated, {skipped_count} skipped, {error_count} errors")
     return
 
 def export_rel(args):
@@ -733,6 +886,12 @@ def main():
     im.add_argument('--skip-invalid', action='store_true', help='Skip invalid values for selection fields')
     im.add_argument('--update', action='store_true', help='Update existing records instead of creating new ones')
     im.add_argument('--match-field', default='id', help='Field to match existing records (default: id)')
+    im.add_argument('--create-if-not-exists', action='store_true', default=True, 
+                    help='Create new records if they don\'t exist (default: True)')
+    im.add_argument('--reset-to-draft', action='store_true', 
+                    help='Reset records to draft before updating (for account.move)')
+    im.add_argument('--skip-readonly-fields', action='store_true', 
+                    help='Skip readonly fields for posted records')
 
     # Export related models command
     rel_ex = sub.add_parser('export-rel', help='Export parent and child model relation to a flat CSV')

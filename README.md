@@ -116,6 +116,9 @@ ODOO_USERNAME=admin
 ODOO_PASSWORD=admin
 GEMINI_API_KEY=your_gemini_api_key_here
 GEMINI_MODEL=gemini-2.0-flash
+ODOO_DOCS_DIR="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs",
+ODOO_INDEX_DIR="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index",
+ODOO_DB_PATH="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index/embeddings.db"
 ```
 
 ### Claude Desktop Integration
@@ -141,7 +144,10 @@ mcp install mcp_server.py --name "Odoo 18 Integration" \
   -v ODOO_USERNAME=admin \
   -v ODOO_PASSWORD=admin \
   -v GEMINI_API_KEY=your_gemini_api_key_here \
-  -v GEMINI_MODEL=gemini-2.0-flash
+  -v GEMINI_MODEL=gemini-2.0-flash \
+  -v ODOO_DOCS_DIR="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs" \
+  -v ODOO_INDEX_DIR="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index" \
+  -v ODOO_DB_PATH="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index/embeddings.db"
 ```
 
 This command will:
@@ -193,7 +199,10 @@ You can also manually update the Claude Desktop configuration file:
             "ODOO_USERNAME": "admin",
             "ODOO_PASSWORD": "admin",
             "GEMINI_API_KEY": "your_gemini_api_key_here",
-            "GEMINI_MODEL": "gemini-2.0-flash"
+            "GEMINI_MODEL": "gemini-2.0-flash",
+            "ODOO_DOCS_DIR": "/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs",
+            "ODOO_INDEX_DIR": "/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index",
+            "ODOO_DB_PATH" : "/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index/embeddings.db"
         }
     }
 }
@@ -388,6 +397,9 @@ ODOO_URL=http://your-odoo-server:8069
 ODOO_DB=your_database
 ODOO_USERNAME=your_username
 ODOO_PASSWORD=your_password
+ODOO_DOCS_DIR="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs",
+ODOO_INDEX_DIR="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index",
+ODOO_DB_PATH="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index/embeddings.db"
 MCP_DEBUG=true
 MCP_LOG_LEVEL=DEBUG
 ```

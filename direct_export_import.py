@@ -272,7 +272,7 @@ def export_records(model_name, output_path, filter_domain=None, fields=None, lim
 
 
 def import_records(input_path, model_name, field_mapping=None, create_if_not_exists=True,
-               update_if_exists=True, defaults=None, force=False, skip_invalid=False, name_prefix=None):
+               update_if_exists=True, defaults=None, force=False, skip_invalid=False, name_prefix=None, match_field='id'):
     """
     Wrapper around dynamic_data_tool.import_model.
 
@@ -286,6 +286,7 @@ def import_records(input_path, model_name, field_mapping=None, create_if_not_exi
         force: Whether to force import even if required fields are missing
         skip_invalid: Whether to skip invalid values for selection fields
         name_prefix: Prefix for the name field during import
+        match_field: Field to use for matching existing records (default: id)
     """
     class Args:
         pass
@@ -311,7 +312,7 @@ def import_records(input_path, model_name, field_mapping=None, create_if_not_exi
     args.name_prefix = name_prefix
     args.create_if_not_exists = create_if_not_exists
     args.update = update_if_exists  # Set update flag for import_model
-    args.match_field = 'id'  # Default match field
+    args.match_field = match_field  # Field to use for matching existing records
 
     # Call the import_model function
     created_count = 0

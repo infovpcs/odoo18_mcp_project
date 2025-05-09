@@ -1,6 +1,6 @@
 # Odoo 18 MCP Integration (18.0 Branch)
 
-Last Updated: 2025-05-24
+Last Updated: 2025-05-25
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Odoo 18.0](https://img.shields.io/badge/odoo-18.0-green.svg)](https://www.odoo.com/)
@@ -19,6 +19,7 @@ A robust integration server that connects MCP (Master Control Program) with Odoo
 - **Dynamic Field Analysis**: Automatically analyze field importance, requirements, and relationships
 - **NLP-Based Field Importance**: Use NLP techniques to determine field importance based on names and descriptions
 - **Intelligent CRUD Generation**: Generate appropriate CRUD operations based on model metadata
+
 - **Field Grouping**: Automatically group fields by purpose (basic info, contact info, etc.)
 - **Smart Search Fields**: Identify fields that are good candidates for search operations
 - **Advanced Natural Language Search**: Parse natural language queries to search across multiple models
@@ -54,6 +55,9 @@ A robust integration server that connects MCP (Master Control Program) with Odoo
 - **Fallback Models**: Integration with Google Gemini and Ollama for code generation
 - **Improved Module Name Extraction**: Better module name extraction from user queries
 - **Enhanced Model Field Generation**: Specialized field generation for different module types
+- **Module Name Suffix (_vpcs_ext)**: Prevent conflicts with existing Odoo apps
+- **Dynamic Field Suggestions**: Context-aware field suggestions based on model type and query
+- **Improved Model Name Derivation**: Better model names based on module type and query context
 - **Code Generator Utility**: Comprehensive utility for generating Odoo 18 model classes, views, and other components
 - **Odoo 18 Compliant Views**: Generate views following Odoo 18 guidelines (list view, single chatter tag)
 - **Mail Thread Integration**: Support for mail.thread and mail.activity.mixin in generated models
@@ -1710,6 +1714,33 @@ We've implemented a comprehensive Streamlit client for interacting with the Odoo
 
 ### Docker Container Issues
 
+### Enhanced Dynamic Import Features
+
+The import functionality has been significantly enhanced to work dynamically with any Odoo model:
+
+- **Dynamic Unique Field Detection**: Automatically identifies potential unique fields for any model based on constraints and common patterns
+- **Enhanced Many2One Handling**: Uses name_search for better record matching during import
+- **Better Many2Many Support**: Handles both IDs and names in many2many fields with proper command format conversion
+- **Date Field Parsing**: Supports multiple date formats in import data
+- **Special Case Handling**: Includes model-specific handling for account.move (reset to draft) and product variants
+- **Improved Reporting**: Provides enhanced feedback on import operations with counts for created, updated, skipped, and error records
+- **Create/Update Control**: Offers fine-grained control over whether to create new records or update existing ones
+- **Intelligent Record Matching**: Uses a multi-strategy approach to match existing records using IDs, external IDs, and unique fields
+
+#### Example Usage
+
+```python
+# Import records with enhanced functionality
+result = import_records(
+    input_path="./exports/companies.csv",
+    model_name="res.partner",
+    create_if_not_exists=True,  # Create new records if they don't exist
+    update_if_exists=True,      # Update existing records
+    match_field="id",           # Field to use for matching existing records
+    skip_invalid=True,          # Skip invalid values for selection fields
+    reset_to_draft=False,       # Reset records to draft before updating (for account.move)
+    skip_readonly_fields=True   # Skip readonly fields for posted records
+)
 - **Issue**: Docker containers fail to start with error: `exec: "/app/entrypoint.sh": stat /app/entrypoint.sh: no such file or directory`
 - **Solution**: This is caused by a syntax issue in the entrypoint.sh script. The project includes a properly formatted entrypoint.sh file that should be copied to the container during the build process. If you encounter this issue, make sure the entrypoint.sh file exists in your project root and has the correct permissions:
 

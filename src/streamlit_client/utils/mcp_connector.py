@@ -714,7 +714,8 @@ class MCPConnector:
         return self.call_tool("retrieve_odoo_documentation", params)
 
     def run_odoo_code_agent(self, query: str, use_gemini: bool = False,
-                           use_ollama: bool = False, feedback: Optional[str] = None,
+                           use_ollama: bool = False, no_llm: bool = False,
+                           feedback: Optional[str] = None,
                            save_to_files: bool = False, output_dir: Optional[str] = None,
                            wait_for_validation: bool = False, current_phase: Optional[str] = None,
                            state_dict: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -724,6 +725,7 @@ class MCPConnector:
             query: The natural language query describing the module to create
             use_gemini: Whether to use Google Gemini as a fallback
             use_ollama: Whether to use Ollama as a fallback
+            no_llm: Whether to disable all LLM models and use fallback analysis only
             feedback: Optional feedback to incorporate
             save_to_files: Whether to save the generated files to disk
             output_dir: Directory to save the generated files to
@@ -734,6 +736,11 @@ class MCPConnector:
         Returns:
             Code generation results
         """
+        # If no_llm is True, set use_gemini and use_ollama to False
+        if no_llm:
+            use_gemini = False
+            use_ollama = False
+
         params = {
             "query": query,
             "use_gemini": use_gemini,

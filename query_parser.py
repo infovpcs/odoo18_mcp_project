@@ -177,15 +177,27 @@ class QueryParser:
         """Load available models from Odoo using ir.model."""
         try:
             # Get all available models from ir.model
-            # Use direct search_read on ir.model for better performance
-            models = self.model_discovery.models_proxy.execute_kw(
-                self.model_discovery.db,
-                self.model_discovery.uid,
-                self.model_discovery.password,
-                'ir.model', 'search_read',
-                [[('transient', '=', False)]],  # Exclude transient models
-                {'fields': ['name', 'model', 'info'], 'order': 'model'}
-            )
+            # Use client's execute method if available
+            if hasattr(self.model_discovery, 'client') and self.model_discovery.client:
+                models = self.model_discovery.client.execute(
+                    'ir.model',
+                    'search_read',
+                    [[('transient', '=', False)]],  # Exclude transient models
+                    {'fields': ['name', 'model', 'info'], 'order': 'model'}
+                )
+            # Fallback to direct execution if models_proxy is available
+            elif hasattr(self.model_discovery, 'models_proxy') and self.model_discovery.models_proxy:
+                models = self.model_discovery.models_proxy.execute_kw(
+                    self.model_discovery.db,
+                    self.model_discovery.uid,
+                    self.model_discovery.password,
+                    'ir.model', 'search_read',
+                    [[('transient', '=', False)]],  # Exclude transient models
+                    {'fields': ['name', 'model', 'info'], 'order': 'model'}
+                )
+            else:
+                # Fallback to get_available_models method
+                raise AttributeError("No suitable method found to execute search for ir.model")
 
             # Cache model information
             for model in models:
@@ -257,15 +269,28 @@ class QueryParser:
 
         try:
             # Get fields directly from ir.model.fields for better field information
-            fields_data = self.model_discovery.models_proxy.execute_kw(
-                self.model_discovery.db,
-                self.model_discovery.uid,
-                self.model_discovery.password,
-                'ir.model.fields', 'search_read',
-                [[('model', '=', model_name)]],
-                {'fields': ['name', 'field_description', 'ttype', 'relation', 'relation_field',
-                           'required', 'readonly', 'store', 'copied', 'selection_ids']}
-            )
+            if hasattr(self.model_discovery, 'client') and self.model_discovery.client:
+                fields_data = self.model_discovery.client.execute(
+                    'ir.model.fields',
+                    'search_read',
+                    [[('model', '=', model_name)]],
+                    {'fields': ['name', 'field_description', 'ttype', 'relation', 'relation_field',
+                               'required', 'readonly', 'store', 'copied', 'selection_ids']}
+                )
+            # Fallback to direct execution if models_proxy is available
+            elif hasattr(self.model_discovery, 'models_proxy') and self.model_discovery.models_proxy:
+                fields_data = self.model_discovery.models_proxy.execute_kw(
+                    self.model_discovery.db,
+                    self.model_discovery.uid,
+                    self.model_discovery.password,
+                    'ir.model.fields', 'search_read',
+                    [[('model', '=', model_name)]],
+                    {'fields': ['name', 'field_description', 'ttype', 'relation', 'relation_field',
+                               'required', 'readonly', 'store', 'copied', 'selection_ids']}
+                )
+            else:
+                # Fallback to get_model_fields method
+                raise AttributeError("No suitable method found to execute search for ir.model.fields")
 
             fields = {}
             for field in fields_data:

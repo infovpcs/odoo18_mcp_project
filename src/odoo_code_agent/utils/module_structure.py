@@ -17,6 +17,10 @@ def create_module_structure(module_name: str, base_path: str = ".") -> Dict[str,
     Returns:
         Dictionary with the module structure
     """
+    # Add _vpcs_ext suffix to prevent conflicts with existing Odoo apps
+    if not module_name.endswith("_vpcs_ext"):
+        module_name = f"{module_name}_vpcs_ext"
+
     module_path = os.path.join(base_path, module_name)
 
     # Define the module structure
@@ -83,8 +87,13 @@ def generate_readme(module_name: str) -> str:
     Returns:
         Content of the README.md file
     """
-    # Convert module_name to a more readable format
-    display_name = module_name.replace("_", " ").title()
+    # Ensure module_name has the _vpcs_ext suffix
+    if not module_name.endswith("_vpcs_ext"):
+        module_name = f"{module_name}_vpcs_ext"
+
+    # Convert module_name to a more readable format for display
+    # Remove the _vpcs_ext suffix for display purposes
+    display_name = module_name.replace("_vpcs_ext", "").replace("_", " ").title()
 
     readme = f"""# {display_name}
 
@@ -122,8 +131,13 @@ def generate_manifest(module_name: str) -> str:
     Returns:
         Content of the __manifest__.py file
     """
-    # Convert module_name to a more readable format
-    display_name = module_name.replace("_", " ").title()
+    # Ensure module_name has the _vpcs_ext suffix
+    if not module_name.endswith("_vpcs_ext"):
+        module_name = f"{module_name}_vpcs_ext"
+
+    # Convert module_name to a more readable format for display
+    # Remove the _vpcs_ext suffix for display purposes
+    display_name = module_name.replace("_vpcs_ext", "").replace("_", " ").title()
 
     manifest = f"""# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.

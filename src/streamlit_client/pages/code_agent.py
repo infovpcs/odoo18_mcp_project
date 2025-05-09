@@ -88,17 +88,23 @@ def render_requirements_tab(session_state: SessionState, mcp_connector: MCPConne
             help="Use Google Gemini as a fallback model for code generation."
         )
 
-        save_to_files = st.checkbox(
-            "Save to Files",
-            value=session_state.code_agent.save_to_files,
-            help="Save the generated files to disk."
-        )
-
-    with col2:
         use_ollama = st.checkbox(
             "Use Ollama",
             value=session_state.code_agent.use_ollama,
             help="Use Ollama as a fallback model for code generation."
+        )
+
+        no_llm = st.checkbox(
+            "No LLM (Fallback Only)",
+            value=session_state.code_agent.no_llm,
+            help="Don't use any LLM models, use fallback analysis only. This is useful if you're having issues with the LLM models."
+        )
+
+    with col2:
+        save_to_files = st.checkbox(
+            "Save to Files",
+            value=session_state.code_agent.save_to_files,
+            help="Save the generated files to disk."
         )
 
         output_dir = st.text_input(
@@ -117,6 +123,7 @@ def render_requirements_tab(session_state: SessionState, mcp_connector: MCPConne
         session_state.code_agent.query = query
         session_state.code_agent.use_gemini = use_gemini
         session_state.code_agent.use_ollama = use_ollama
+        session_state.code_agent.no_llm = no_llm
         session_state.code_agent.save_to_files = save_to_files
         session_state.code_agent.output_dir = output_dir
 
@@ -148,6 +155,7 @@ def render_requirements_tab(session_state: SessionState, mcp_connector: MCPConne
                 query=query,
                 use_gemini=use_gemini,
                 use_ollama=use_ollama,
+                no_llm=no_llm,
                 save_to_files=save_to_files,
                 output_dir=output_dir,
                 wait_for_validation=True  # Stop at the first validation point
@@ -192,13 +200,95 @@ def render_requirements_tab(session_state: SessionState, mcp_connector: MCPConne
                 session_state.code_agent.files_to_create = data.get("files_to_create", {})
                 session_state.code_agent.history = data.get("history", [])
 
+                # Store the raw planning and analysis states if available
+                if "state_dict" in data and isinstance(data["state_dict"], dict):
+                    # Store planning state
+                    session_state.code_agent.planning_state = data["state_dict"].get("planning_state", {})
+
+                    # Store analysis state
+                    session_state.code_agent.analysis_state = data["state_dict"].get("analysis_state", {})
+
+                    # Extract technical considerations and estimated time from planning state
+                    if session_state.code_agent.planning_state and "context" in session_state.code_agent.planning_state:
+                        plan_context = session_state.code_agent.planning_state.get("context", {})
+                        plan_result = plan_context.get("plan_result", {})
+
+                        # Extract technical considerations
+                        if "technical_considerations" in plan_result:
+                            session_state.code_agent.technical_considerations = plan_result.get("technical_considerations", [])
+
+                        # Extract estimated time
+                        if "estimated_time" in plan_result:
+                            session_state.code_agent.estimated_time = plan_result.get("estimated_time", "")
+
+                    # Extract model information from analysis state
+                    if session_state.code_agent.analysis_state and "context" in session_state.code_agent.analysis_state:
+                        analysis_context = session_state.code_agent.analysis_state.get("context", {})
+
+                        # Extract model information
+                        if "model_info" in analysis_context:
+                            session_state.code_agent.model_info = analysis_context.get("model_info", {})
+
+                        # Extract detailed model information
+                        if "detailed_model_info" in analysis_context:
+                            session_state.code_agent.detailed_model_info = analysis_context.get("detailed_model_info", {})
+
+                        # Extract analysis result
+                        if "analysis" in analysis_context:
+                            session_state.code_agent.analysis_result = analysis_context.get("analysis", {})
+
+                            # Extract proposed models from analysis result
+                            if "models" in session_state.code_agent.analysis_result:
+                                proposed_models = session_state.code_agent.analysis_result.get("models", [])
+
+                                # Module name is now managed by the MCP server
+                                # No need to derive module name here as it's handled by the server
+
+                                # Enhance model information with default values if missing
+                                enhanced_models = []
+                                for i, model in enumerate(proposed_models):
+                                    # Ensure model has a name
+                                    if not model.get('name') or model.get('name') == 'unknown.model':
+                                        # Use a default model name if none is provided
+                                        model['name'] = f"{session_state.code_agent.module_name}.model{i+1}"
+
+                                    # Ensure model has a description
+                                    if not model.get('description') or model.get('description') == '':
+                                        model['description'] = f"Model for {model['name']}"
+
+                                    # Ensure model has fields array
+                                    if 'fields' not in model:
+                                        model['fields'] = []
+
+                                    # Enhance field information
+                                    enhanced_fields = []
+                                    for field in model.get('fields', []):
+                                        # Ensure field has a name
+                                        if not field.get('name'):
+                                            field['name'] = 'unknown_field'
+
+                                        # Ensure field has a type
+                                        if not field.get('type'):
+                                            field['type'] = 'char'
+
+                                        # Ensure field has a description
+                                        if not field.get('description'):
+                                            field['description'] = 'No description available'
+
+                                        enhanced_fields.append(field)
+
+                                    model['fields'] = enhanced_fields
+                                    enhanced_models.append(model)
+
+                                session_state.code_agent.proposed_models = enhanced_models
+
                 # Store the state information for resuming later
                 session_state.code_agent.state_dict = data.get("state_dict")
                 session_state.code_agent.requires_validation = data.get("requires_validation", False)
                 session_state.code_agent.current_step = data.get("current_step")
 
                 # Log the session state for debugging
-                logger.info(f"Updated session state: plan={bool(session_state.code_agent.plan)}, tasks={len(session_state.code_agent.tasks)}, module_name={session_state.code_agent.module_name}")
+                logger.info(f"Updated session state: plan={bool(session_state.code_agent.plan)}, tasks={len(session_state.code_agent.tasks)}, technical_considerations={len(session_state.code_agent.technical_considerations)}, estimated_time={session_state.code_agent.estimated_time}, module_name={session_state.code_agent.module_name}, model_info={len(session_state.code_agent.model_info)}, detailed_model_info={len(session_state.code_agent.detailed_model_info)}, proposed_models={len(session_state.code_agent.proposed_models)}")
 
                 # Get the current phase from the result
                 current_phase = data.get("current_phase", "planning")
@@ -249,6 +339,11 @@ def render_planning_tab(session_state: SessionState, mcp_connector: MCPConnector
         st.subheader("Implementation Plan")
         st.markdown(session_state.code_agent.plan)
 
+        # Display estimated time if available
+        if session_state.code_agent.estimated_time:
+            st.subheader("Estimated Time")
+            st.markdown(f"**{session_state.code_agent.estimated_time}**")
+
         # Display the tasks
         if session_state.code_agent.tasks:
             st.subheader("Implementation Tasks")
@@ -268,6 +363,255 @@ def render_planning_tab(session_state: SessionState, mcp_connector: MCPConnector
                 else:
                     # If task is a string, display it directly
                     st.markdown(f"{i}. {task}")
+
+        # Display technical considerations if available
+        if session_state.code_agent.technical_considerations:
+            st.subheader("Technical Considerations")
+            for consideration in session_state.code_agent.technical_considerations:
+                st.markdown(f"- {consideration}")
+
+        # Display model information if available
+        if session_state.code_agent.model_info:
+            with st.expander("Existing Odoo Models Analysis"):
+                st.subheader("Relevant Odoo Models")
+                for model_name, info in session_state.code_agent.model_info.items():
+                    st.markdown(f"**Model: {model_name}** ({info.get('name', '')})")
+                    st.markdown("Important fields:")
+
+                    fields = info.get("fields", {})
+                    for field_name, field_info in fields.items():
+                        field_type = field_info.get("type", "char")
+                        field_string = field_info.get("string", field_name)
+                        relation = field_info.get("relation", "")
+                        relation_info = f" -> {relation}" if relation else ""
+
+                        st.markdown(f"- {field_name} ({field_type}{relation_info}): {field_string}")
+
+                    st.markdown("---")
+
+        # Display proposed models if available
+        if session_state.code_agent.proposed_models:
+            with st.expander("Proposed Models for the Module", expanded=True):
+                st.subheader("Models to be Created")
+                for model in session_state.code_agent.proposed_models:
+                    model_name = model.get('name', '')
+                    model_desc = model.get('description', '')
+
+                    # Display model name with better formatting
+                    st.markdown(f"### Model: {model_name}")
+
+                    # Display model description if available
+                    if model_desc:
+                        st.markdown(f"**Description**: {model_desc}")
+
+                    # Display fields with better formatting
+                    st.markdown("#### Fields:")
+
+                    # Check if fields exist and are not empty
+                    if 'fields' in model and model.get('fields') and len(model.get('fields', [])) > 0:
+                        # Create columns for field information
+                        field_data = []
+                        for field in model.get('fields', []):
+                            field_name = field.get('name', '')
+                            field_type = field.get('type', 'char')
+                            field_desc = field.get('description', '')
+                            relation = field.get('relation', '')
+                            required = field.get('required', False)
+                            readonly = field.get('readonly', False)
+
+                            # Format field type with relation if applicable
+                            field_type_display = field_type
+                            if relation:
+                                field_type_display = f"{field_type} → {relation}"
+
+                            # Add attributes like required, readonly
+                            attributes = []
+                            if required:
+                                attributes.append("required")
+                            if readonly:
+                                attributes.append("readonly")
+
+                            attributes_str = f" ({', '.join(attributes)})" if attributes else ""
+
+                            field_data.append({
+                                "Field": field_name,
+                                "Type": field_type_display,
+                                "Attributes": attributes_str,
+                                "Description": field_desc
+                            })
+
+                        if field_data:
+                            # Convert to DataFrame for better display
+                            import pandas as pd
+                            df = pd.DataFrame(field_data)
+                            st.table(df)
+                    else:
+                        # Dynamic field suggestion based on model name and query
+                        st.info("No fields have been defined for this model yet. Based on your requirements, the following fields might be included:")
+
+                        # Import pandas for table display
+                        import pandas as pd
+                        import re
+
+                        # Extract key concepts from the query
+                        query = session_state.code_agent.query.lower()
+
+                        # Common fields for all models
+                        common_fields = [
+                            {"Field": "name", "Type": "char", "Attributes": "(required)", "Description": "Name/Description of the record"},
+                            {"Field": "active", "Type": "boolean", "Attributes": "", "Description": "Whether this record is active"},
+                            {"Field": "sequence", "Type": "integer", "Attributes": "", "Description": "Sequence for ordering"},
+                        ]
+
+                        # Initialize suggested fields with common fields
+                        suggested_fields = common_fields.copy()
+
+                        # Detect model type from model name
+                        model_type = "unknown"
+
+                        # Check for configuration model
+                        if "config" in model_name or ".config" in model_name:
+                            model_type = "configuration"
+
+                        # Check for wizard model
+                        elif "wizard" in model_name or ".wizard" in model_name:
+                            model_type = "wizard"
+
+                        # Check for report model
+                        elif "report" in model_name or ".report" in model_name:
+                            model_type = "report"
+
+                        # Check for settings model
+                        elif "settings" in model_name or ".settings" in model_name:
+                            model_type = "settings"
+
+                        # Check for line items model
+                        elif "line" in model_name or ".line" in model_name:
+                            model_type = "line_item"
+
+                        # Add fields based on model type
+                        if model_type == "configuration":
+                            suggested_fields.extend([
+                                {"Field": "company_id", "Type": "many2one → res.company", "Attributes": "", "Description": "Company this configuration belongs to"},
+                                {"Field": "user_id", "Type": "many2one → res.users", "Attributes": "", "Description": "User who created this configuration"}
+                            ])
+                        elif model_type == "wizard":
+                            suggested_fields.extend([
+                                {"Field": "user_id", "Type": "many2one → res.users", "Attributes": "", "Description": "User running the wizard"},
+                                {"Field": "state", "Type": "selection", "Attributes": "", "Description": "Current state of the wizard"}
+                            ])
+                        elif model_type == "report":
+                            suggested_fields.extend([
+                                {"Field": "date_from", "Type": "date", "Attributes": "", "Description": "Start date for the report"},
+                                {"Field": "date_to", "Type": "date", "Attributes": "", "Description": "End date for the report"},
+                                {"Field": "company_id", "Type": "many2one → res.company", "Attributes": "", "Description": "Company for the report"}
+                            ])
+                        elif model_type == "settings":
+                            suggested_fields.extend([
+                                {"Field": "company_id", "Type": "many2one → res.company", "Attributes": "(required)", "Description": "Company these settings apply to"},
+                                {"Field": "group_id", "Type": "many2one → res.groups", "Attributes": "", "Description": "User group these settings apply to"}
+                            ])
+                        elif model_type == "line_item":
+                            # Find the parent model from the model name
+                            parent_model = re.sub(r'\.line$', '', model_name)
+                            if parent_model == model_name:
+                                parent_model = model_name.replace("line", "")
+
+                            suggested_fields.extend([
+                                {"Field": f"{parent_model}_id", "Type": f"many2one → {parent_model}", "Attributes": "(required)", "Description": "Parent record this line belongs to"},
+                                {"Field": "product_id", "Type": "many2one → product.product", "Attributes": "", "Description": "Product for this line"},
+                                {"Field": "quantity", "Type": "float", "Attributes": "", "Description": "Quantity"},
+                                {"Field": "price_unit", "Type": "float", "Attributes": "", "Description": "Unit price"}
+                            ])
+
+                        # Add fields based on keywords in the query
+                        if "currency" in query or "multi-currency" in query:
+                            suggested_fields.extend([
+                                {"Field": "currency_id", "Type": "many2one → res.currency", "Attributes": "", "Description": "Currency"},
+                                {"Field": "rate", "Type": "float", "Attributes": "", "Description": "Exchange rate"}
+                            ])
+
+                        if "point of sale" in query or "pos" in query:
+                            suggested_fields.extend([
+                                {"Field": "pos_config_id", "Type": "many2one → pos.config", "Attributes": "", "Description": "POS configuration"},
+                                {"Field": "pos_session_id", "Type": "many2one → pos.session", "Attributes": "", "Description": "POS session"}
+                            ])
+
+                        if "accounting" in query or "invoice" in query or "account" in query:
+                            suggested_fields.extend([
+                                {"Field": "journal_id", "Type": "many2one → account.journal", "Attributes": "", "Description": "Accounting journal"},
+                                {"Field": "account_id", "Type": "many2one → account.account", "Attributes": "", "Description": "Account"}
+                            ])
+
+                        if "partner" in query or "customer" in query or "vendor" in query:
+                            suggested_fields.extend([
+                                {"Field": "partner_id", "Type": "many2one → res.partner", "Attributes": "", "Description": "Partner/Customer/Vendor"}
+                            ])
+
+                        if "product" in query or "inventory" in query:
+                            suggested_fields.extend([
+                                {"Field": "product_id", "Type": "many2one → product.product", "Attributes": "", "Description": "Product"},
+                                {"Field": "product_tmpl_id", "Type": "many2one → product.template", "Attributes": "", "Description": "Product template"}
+                            ])
+
+                        if "sale" in query or "order" in query:
+                            suggested_fields.extend([
+                                {"Field": "order_id", "Type": "many2one → sale.order", "Attributes": "", "Description": "Sales order"},
+                                {"Field": "state", "Type": "selection", "Attributes": "", "Description": "State of the order"}
+                            ])
+
+                        if "purchase" in query:
+                            suggested_fields.extend([
+                                {"Field": "purchase_id", "Type": "many2one → purchase.order", "Attributes": "", "Description": "Purchase order"}
+                            ])
+
+                        if "date" in query or "time" in query:
+                            suggested_fields.extend([
+                                {"Field": "date", "Type": "date", "Attributes": "", "Description": "Date"},
+                                {"Field": "datetime", "Type": "datetime", "Attributes": "", "Description": "Date and time"}
+                            ])
+
+                        if "user" in query or "employee" in query:
+                            suggested_fields.extend([
+                                {"Field": "user_id", "Type": "many2one → res.users", "Attributes": "", "Description": "User"},
+                                {"Field": "employee_id", "Type": "many2one → hr.employee", "Attributes": "", "Description": "Employee"}
+                            ])
+
+                        if "company" in query:
+                            suggested_fields.extend([
+                                {"Field": "company_id", "Type": "many2one → res.company", "Attributes": "", "Description": "Company"}
+                            ])
+
+                        # Remove duplicate fields based on Field name
+                        unique_fields = []
+                        field_names = set()
+                        for field in suggested_fields:
+                            if field["Field"] not in field_names:
+                                unique_fields.append(field)
+                                field_names.add(field["Field"])
+
+                        # Display the suggested fields
+                        if unique_fields:
+                            df = pd.DataFrame(unique_fields)
+                            st.table(df)
+
+                            st.markdown("""
+                            **Note**: These are suggested fields based on the model name and your requirements.
+                            The code agent will define the actual fields during the coding phase, which may include additional fields or modify these suggestions.
+                            """)
+                        else:
+                            # Fallback message if no fields could be suggested
+                            st.markdown("""
+                            The code agent will define appropriate fields during the coding phase based on:
+                            1. The requirements in your query
+                            2. Standard Odoo field conventions
+                            3. Relationships with other models
+                            4. Best practices for the specific use case
+                            """)
+
+                        st.markdown("You can provide feedback about specific fields you want to include in the feedback section below.")
+
+                    st.markdown("---")
 
         # Feedback form
         st.subheader("Feedback")
@@ -320,6 +664,7 @@ def handle_planning_feedback(session_state: SessionState, mcp_connector: MCPConn
             query=session_state.code_agent.query,
             use_gemini=session_state.code_agent.use_gemini,
             use_ollama=session_state.code_agent.use_ollama,
+            no_llm=session_state.code_agent.no_llm,
             feedback=feedback,
             save_to_files=session_state.code_agent.save_to_files,
             output_dir=session_state.code_agent.output_dir,
@@ -364,13 +709,91 @@ def handle_planning_feedback(session_state: SessionState, mcp_connector: MCPConn
             session_state.code_agent.files_to_create = data.get("files_to_create", {})
             session_state.code_agent.history = data.get("history", [])
 
+            # Store the raw planning and analysis states if available
+            if "state_dict" in data and isinstance(data["state_dict"], dict):
+                # Store planning state
+                session_state.code_agent.planning_state = data["state_dict"].get("planning_state", {})
+
+                # Store analysis state
+                session_state.code_agent.analysis_state = data["state_dict"].get("analysis_state", {})
+
+                # Extract technical considerations and estimated time from planning state
+                if session_state.code_agent.planning_state and "context" in session_state.code_agent.planning_state:
+                    plan_context = session_state.code_agent.planning_state.get("context", {})
+                    plan_result = plan_context.get("plan_result", {})
+
+                    # Extract technical considerations
+                    if "technical_considerations" in plan_result:
+                        session_state.code_agent.technical_considerations = plan_result.get("technical_considerations", [])
+
+                    # Extract estimated time
+                    if "estimated_time" in plan_result:
+                        session_state.code_agent.estimated_time = plan_result.get("estimated_time", "")
+
+                # Extract model information from analysis state
+                if session_state.code_agent.analysis_state and "context" in session_state.code_agent.analysis_state:
+                    analysis_context = session_state.code_agent.analysis_state.get("context", {})
+
+                    # Extract model information
+                    if "model_info" in analysis_context:
+                        session_state.code_agent.model_info = analysis_context.get("model_info", {})
+
+                    # Extract detailed model information
+                    if "detailed_model_info" in analysis_context:
+                        session_state.code_agent.detailed_model_info = analysis_context.get("detailed_model_info", {})
+
+                    # Extract analysis result
+                    if "analysis" in analysis_context:
+                        session_state.code_agent.analysis_result = analysis_context.get("analysis", {})
+
+                        # Extract proposed models from analysis result
+                        if "models" in session_state.code_agent.analysis_result:
+                            proposed_models = session_state.code_agent.analysis_result.get("models", [])
+
+                            # Enhance model information with default values if missing
+                            enhanced_models = []
+                            for model in proposed_models:
+                                # Ensure model has a name
+                                if not model.get('name'):
+                                    model['name'] = 'unknown.model'
+
+                                # Ensure model has a description
+                                if not model.get('description'):
+                                    model['description'] = 'No description available'
+
+                                # Ensure model has fields array
+                                if 'fields' not in model:
+                                    model['fields'] = []
+
+                                # Enhance field information
+                                enhanced_fields = []
+                                for field in model.get('fields', []):
+                                    # Ensure field has a name
+                                    if not field.get('name'):
+                                        field['name'] = 'unknown_field'
+
+                                    # Ensure field has a type
+                                    if not field.get('type'):
+                                        field['type'] = 'char'
+
+                                    # Ensure field has a description
+                                    if not field.get('description'):
+                                        field['description'] = 'No description available'
+
+                                    enhanced_fields.append(field)
+
+                                model['fields'] = enhanced_fields
+                                enhanced_models.append(model)
+
+                            session_state.code_agent.proposed_models = enhanced_models
+
             # Store the state information for resuming later
             session_state.code_agent.state_dict = data.get("state_dict")
             session_state.code_agent.requires_validation = data.get("requires_validation", False)
             session_state.code_agent.current_step = data.get("current_step")
 
             # Log the session state for debugging
-            logger.info(f"Updated session state (feedback): files_to_create={len(session_state.code_agent.files_to_create)}, requires_validation={session_state.code_agent.requires_validation}")
+            logger.info(f"Updated session state (feedback): files_to_create={len(session_state.code_agent.files_to_create)}, technical_considerations={len(session_state.code_agent.technical_considerations)}, estimated_time={session_state.code_agent.estimated_time}, model_info={len(session_state.code_agent.model_info)}, detailed_model_info={len(session_state.code_agent.detailed_model_info)}, proposed_models={len(session_state.code_agent.proposed_models)}, requires_validation={session_state.code_agent.requires_validation}")
 
             # Get the current phase from the result
             current_phase = data.get("current_phase", "coding")
@@ -474,6 +897,7 @@ def handle_code_feedback(session_state: SessionState, mcp_connector: MCPConnecto
             query=session_state.code_agent.query,
             use_gemini=session_state.code_agent.use_gemini,
             use_ollama=session_state.code_agent.use_ollama,
+            no_llm=session_state.code_agent.no_llm,
             feedback=feedback,
             save_to_files=session_state.code_agent.save_to_files,
             output_dir=session_state.code_agent.output_dir,
@@ -518,13 +942,91 @@ def handle_code_feedback(session_state: SessionState, mcp_connector: MCPConnecto
             session_state.code_agent.files_to_create = data.get("files_to_create", {})
             session_state.code_agent.history = data.get("history", [])
 
+            # Store the raw planning and analysis states if available
+            if "state_dict" in data and isinstance(data["state_dict"], dict):
+                # Store planning state
+                session_state.code_agent.planning_state = data["state_dict"].get("planning_state", {})
+
+                # Store analysis state
+                session_state.code_agent.analysis_state = data["state_dict"].get("analysis_state", {})
+
+                # Extract technical considerations and estimated time from planning state
+                if session_state.code_agent.planning_state and "context" in session_state.code_agent.planning_state:
+                    plan_context = session_state.code_agent.planning_state.get("context", {})
+                    plan_result = plan_context.get("plan_result", {})
+
+                    # Extract technical considerations
+                    if "technical_considerations" in plan_result:
+                        session_state.code_agent.technical_considerations = plan_result.get("technical_considerations", [])
+
+                    # Extract estimated time
+                    if "estimated_time" in plan_result:
+                        session_state.code_agent.estimated_time = plan_result.get("estimated_time", "")
+
+                # Extract model information from analysis state
+                if session_state.code_agent.analysis_state and "context" in session_state.code_agent.analysis_state:
+                    analysis_context = session_state.code_agent.analysis_state.get("context", {})
+
+                    # Extract model information
+                    if "model_info" in analysis_context:
+                        session_state.code_agent.model_info = analysis_context.get("model_info", {})
+
+                    # Extract detailed model information
+                    if "detailed_model_info" in analysis_context:
+                        session_state.code_agent.detailed_model_info = analysis_context.get("detailed_model_info", {})
+
+                    # Extract analysis result
+                    if "analysis" in analysis_context:
+                        session_state.code_agent.analysis_result = analysis_context.get("analysis", {})
+
+                        # Extract proposed models from analysis result
+                        if "models" in session_state.code_agent.analysis_result:
+                            proposed_models = session_state.code_agent.analysis_result.get("models", [])
+
+                            # Enhance model information with default values if missing
+                            enhanced_models = []
+                            for model in proposed_models:
+                                # Ensure model has a name
+                                if not model.get('name'):
+                                    model['name'] = 'unknown.model'
+
+                                # Ensure model has a description
+                                if not model.get('description'):
+                                    model['description'] = 'No description available'
+
+                                # Ensure model has fields array
+                                if 'fields' not in model:
+                                    model['fields'] = []
+
+                                # Enhance field information
+                                enhanced_fields = []
+                                for field in model.get('fields', []):
+                                    # Ensure field has a name
+                                    if not field.get('name'):
+                                        field['name'] = 'unknown_field'
+
+                                    # Ensure field has a type
+                                    if not field.get('type'):
+                                        field['type'] = 'char'
+
+                                    # Ensure field has a description
+                                    if not field.get('description'):
+                                        field['description'] = 'No description available'
+
+                                    enhanced_fields.append(field)
+
+                                model['fields'] = enhanced_fields
+                                enhanced_models.append(model)
+
+                            session_state.code_agent.proposed_models = enhanced_models
+
             # Store the state information for resuming later
             session_state.code_agent.state_dict = data.get("state_dict")
             session_state.code_agent.requires_validation = data.get("requires_validation", False)
             session_state.code_agent.current_step = data.get("current_step")
 
             # Log the session state for debugging
-            logger.info(f"Updated session state (code feedback): files_to_create={len(session_state.code_agent.files_to_create)}, requires_validation={session_state.code_agent.requires_validation}")
+            logger.info(f"Updated session state (code feedback): files_to_create={len(session_state.code_agent.files_to_create)}, technical_considerations={len(session_state.code_agent.technical_considerations)}, estimated_time={session_state.code_agent.estimated_time}, model_info={len(session_state.code_agent.model_info)}, detailed_model_info={len(session_state.code_agent.detailed_model_info)}, proposed_models={len(session_state.code_agent.proposed_models)}, requires_validation={session_state.code_agent.requires_validation}")
 
             # Get the current phase from the result
             current_phase = data.get("current_phase", "finalization")

@@ -39,6 +39,7 @@ class OdooClient:
         self.uid = None
         
         self._setup_connection()
+        self.authenticate()
     
     def _setup_connection(self) -> None:
         """Set up the XML-RPC connection to Odoo."""

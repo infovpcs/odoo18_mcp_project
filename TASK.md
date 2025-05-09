@@ -1,6 +1,7 @@
+
 # Odoo 18 Integration MCP Server - Tasks
 
-Last Updated: 2025-05-24
+Last Updated: 2025-05-25
 
 ## Phase 1: Project Setup and Basic Infrastructure
 - [x] Initialize project structure (2023-12-20)
@@ -230,6 +231,20 @@ Last Updated: 2025-05-24
 - [x] Create example scripts for common export/import scenarios
 - [x] Test enhanced export/import functionality with various models
 - [x] Add model information tool for field discovery
+
+## Phase 28: Enhanced Module and Model Name Generation (2025-05-25)
+- [x] Improve module name extraction from user queries
+- [x] Add _vpcs_ext suffix to module names to prevent conflicts with existing Odoo apps
+- [x] Enhance model name derivation based on module type and query context
+- [x] Update module_structure.py to handle _vpcs_ext suffix correctly
+- [x] Improve display names in manifest and README files
+- [x] Add dynamic field suggestions based on model type and query context
+- [x] Implement context-aware field generation for different module types
+- [x] Update Gemini client to extract better module and model names
+- [x] Enhance analysis_nodes.py to generate more specific model fields
+- [x] Update coding_nodes.py to use improved module and model names
+- [x] Test module generation with various query types
+- [x] Update documentation with module naming conventions
 
 ## Discovered During Work
 - [x] Fix Python version compatibility issues (2025-04-27)
@@ -465,6 +480,17 @@ Last Updated: 2025-05-24
 - [x] Add progress indicators during polling
 - [x] Implement error recovery for failed requests
 - [x] Update documentation with polling mechanism improvements
+
+## Phase 27: Enhanced Dynamic Import Functionality (2025-05-25)
+- [x] Implement dynamic unique field detection for any model
+- [x] Enhance many2one field handling with name_search
+- [x] Improve many2many field support with proper command format
+- [x] Add support for multiple date formats in import data
+- [x] Implement special case handling for account.move and product.product
+- [x] Enhance reporting with detailed counts for created, updated, skipped, and error records
+- [x] Add fine-grained control over record creation and updates
+- [x] Implement intelligent record matching with multiple strategies
+- [x] Update documentation with enhanced import functionality
 
 ## Completed Tasks
 - [x] Create Streamlit client directory structure (2025-05-19)

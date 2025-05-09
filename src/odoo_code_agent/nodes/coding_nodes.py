@@ -42,7 +42,7 @@ def setup_module_structure(state: OdooCodeAgentState) -> OdooCodeAgentState:
             # Try to find a meaningful module name based on the query
             if "customer feedback" in query:
                 module_name = "customer_feedback"
-            elif "project" in query:
+            elif "project" in query and "management" in query:
                 module_name = "project_management"
             elif "inventory" in query:
                 module_name = "inventory_management"
@@ -50,8 +50,26 @@ def setup_module_structure(state: OdooCodeAgentState) -> OdooCodeAgentState:
                 module_name = "sales_management"
             elif "purchase" in query:
                 module_name = "purchase_management"
+            elif "point of sale" in query or "pos" in query:
+                if "multi-currency" in query or "currency" in query:
+                    module_name = "pos_multi_currency"
+                else:
+                    module_name = "pos_custom"
+            elif "website" in query:
+                module_name = "website_custom"
+            elif "ecommerce" in query or "e-commerce" in query:
+                module_name = "website_sale_custom"
+            elif "crm" in query:
+                module_name = "crm_custom"
             else:
-                module_name = "odoo_custom_module"
+                # Default fallback: extract key words from the query
+                words = query.split()
+                key_words = [w for w in words if len(w) > 3 and w not in ["odoo", "module", "create", "with", "that", "this", "for", "and", "the"]]
+                module_name = "_".join(key_words[:2]) if key_words else "custom_module"
+
+        # Add _vpcs_ext suffix to prevent conflicts with existing Odoo apps
+        if not module_name.endswith("_vpcs_ext"):
+            module_name = f"{module_name}_vpcs_ext"
 
         state.coding_state.module_name = module_name
 

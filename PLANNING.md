@@ -1,6 +1,7 @@
+
 # Odoo 18 Integration MCP Server - Project Planning
 
-Last Updated: 2025-05-24
+Last Updated: 2025-05-25
 
 ## Project Overview
 This project aims to create a robust integration server that connects MCP (Master Control Program) with Odoo 18.0 ERP system, focusing on efficient data synchronization, API management, and secure communications. The implementation provides a standardized interface for performing CRUD operations on Odoo 18 models through a simple API, with dynamic model discovery and field analysis capabilities. The project includes direct implementation for advanced operations like data export and import, with dynamic model and field discovery using ir.model and ir.model.fields. Additionally, the project includes an Odoo code agent that helps with generating Odoo 18 modules and code using a structured workflow with analysis, planning, human feedback, coding, and finalization phases.
@@ -267,6 +268,16 @@ odoo18-mcp-project/
 14. **Detailed Result Information**: Enhanced result objects with detailed statistics ✅
 15. **Comprehensive Testing**: Test scripts for verifying functionality ✅
 
+### Import Process Enhancements
+1. **Dynamic Unique Field Detection**: Automatically identify potential unique fields for any model based on constraints and common patterns
+2. **Enhanced Many2One Handling**: Improved name_search for better record matching during import
+3. **Better Many2Many Support**: Handle both IDs and names in many2many fields with proper command format conversion
+4. **Date Field Parsing**: Support for multiple date formats in import data
+5. **Special Case Handling**: Model-specific handling for account.move (reset to draft) and product variants
+6. **Improved Reporting**: Enhanced feedback on import operations with counts for created, updated, skipped, and error records
+7. **Create/Update Control**: Fine-grained control over whether to create new records or update existing ones
+8. **Intelligent Record Matching**: Multi-strategy approach to match existing records using IDs, external IDs, and unique fields
+
 ### Special Handling for Complex Models
 1. **account.move (Invoices)**
    - Support for different invoice types ✅
@@ -406,6 +417,10 @@ odoo18-mcp-project/
    - Complete module file generation ✅
    - File saving functionality ✅
    - Generated module directory structure ✅
+   - Module name suffix (_vpcs_ext) to prevent conflicts ✅
+   - Improved model name derivation from query ✅
+   - Enhanced field suggestions based on model type ✅
+   - Dynamic field generation based on query context ✅
 
 5. **Fallback Models**
    - Google Gemini integration ✅

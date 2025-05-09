@@ -87,10 +87,43 @@ class GeminiClient:
                 "max_output_tokens": max_output_tokens,
             }
 
-            response = self.model.generate_content(
-                prompt,
-                generation_config=generation_config
-            )
+            # Add a timeout to prevent hanging
+            import threading
+            import time
+
+            response = None
+            error = None
+
+            def generate_with_timeout():
+                nonlocal response, error
+                try:
+                    response = self.model.generate_content(
+                        prompt,
+                        generation_config=generation_config
+                    )
+                except Exception as e:
+                    error = e
+
+            # Start generation in a separate thread
+            thread = threading.Thread(target=generate_with_timeout)
+            thread.start()
+
+            # Wait for the thread to complete with a timeout
+            thread.join(timeout=30)  # 30 second timeout
+
+            # Check if the thread is still running (timed out)
+            if thread.is_alive():
+                logger.error("Gemini API call timed out after 30 seconds")
+                return None
+
+            # Check if there was an error
+            if error:
+                raise error
+
+            # Check if we got a response
+            if not response:
+                logger.error("No response from Gemini API")
+                return None
 
             return response.text
         except Exception as e:
@@ -149,7 +182,7 @@ class GeminiClient:
 
         Ensure the module name follows Odoo conventions (lowercase with underscores).
 
-        IMPORTANT: Return your response as a valid JSON object without any markdown formatting or code blocks.
+        IMPORTANT: Return your response as a valid JSON object without any markdown formatting or code blocks. Do not use single quotes for JSON keys or values, use double quotes only. Do not include any explanations or text outside the JSON object.
         """
 
         try:
@@ -207,17 +240,54 @@ class GeminiClient:
                                     # Try to manually construct a valid JSON
                                     logger.info("Trying manual JSON construction for analysis...")
 
-                                    # Extract module name
+                                    # Extract module name from the query
+                                    query_lower = query.lower()
+
+                                    # Try to find a meaningful module name based on the query
+                                    if "customer feedback" in query_lower:
+                                        derived_module_name = "customer_feedback"
+                                    elif "project" in query_lower and "management" in query_lower:
+                                        derived_module_name = "project_management"
+                                    elif "inventory" in query_lower:
+                                        derived_module_name = "inventory_management"
+                                    elif "sales" in query_lower:
+                                        derived_module_name = "sales_management"
+                                    elif "purchase" in query_lower:
+                                        derived_module_name = "purchase_management"
+                                    elif "hr" in query_lower or "employee" in query_lower:
+                                        derived_module_name = "hr_management"
+                                    elif "point of sale" in query_lower or "pos" in query_lower:
+                                        if "multi-currency" in query_lower or "currency" in query_lower:
+                                            derived_module_name = "pos_multi_currency"
+                                        else:
+                                            derived_module_name = "pos_custom"
+                                    elif "website" in query_lower:
+                                        derived_module_name = "website_custom"
+                                    elif "ecommerce" in query_lower or "e-commerce" in query_lower:
+                                        derived_module_name = "website_sale_custom"
+                                    elif "crm" in query_lower:
+                                        derived_module_name = "crm_custom"
+                                    else:
+                                        # Default fallback: extract key words from the query
+                                        words = query_lower.split()
+                                        key_words = [w for w in words if len(w) > 3 and w not in ["odoo", "module", "create", "with", "that", "this", "for", "and", "the"]]
+                                        derived_module_name = "_".join(key_words[:2]) if key_words else "custom_module"
+
+                                    # Try to extract module name from JSON, fall back to derived name
                                     module_name_match = re.search(r'"module_name"\s*:\s*"([^"]+)"', json_str)
-                                    module_name = module_name_match.group(1) if module_name_match else "unknown_module"
+                                    module_name = module_name_match.group(1) if module_name_match and module_name_match.group(1) != "unknown_module" else derived_module_name
+
+                                    # Add _vpcs_ext suffix to prevent conflicts with existing Odoo apps
+                                    if not module_name.endswith("_vpcs_ext"):
+                                        module_name = f"{module_name}_vpcs_ext"
 
                                     # Extract module title
                                     module_title_match = re.search(r'"module_title"\s*:\s*"([^"]+)"', json_str)
-                                    module_title = module_title_match.group(1) if module_title_match else "Unknown Module"
+                                    module_title = module_title_match.group(1) if module_title_match else query
 
                                     # Extract description
                                     description_match = re.search(r'"description"\s*:\s*"([^"]+)"', json_str)
-                                    description = description_match.group(1) if description_match else ""
+                                    description = description_match.group(1) if description_match else f"Module for {query}"
 
                                     # Try to extract models
                                     models = []
@@ -225,16 +295,33 @@ class GeminiClient:
                                     if models_section:
                                         # This is a simplified approach - in a real implementation, you'd want more robust parsing
                                         model_blocks = re.finditer(r'{([^{}]*(?:{[^{}]*}[^{}]*)*)}', models_section.group(1))
-                                        for model_block in model_blocks:
+                                        for i, model_block in enumerate(model_blocks):
                                             model_text = model_block.group(0)
 
-                                            # Extract model name
+                                            # Extract model name from JSON
                                             model_name_match = re.search(r'"name"\s*:\s*"([^"]+)"', model_text)
-                                            model_name = model_name_match.group(1) if model_name_match else "unknown.model"
+
+                                            # If no model name or it's the default unknown, derive a better one
+                                            if not model_name_match or model_name_match.group(1) == "unknown.model":
+                                                # Derive model name based on module name and query
+                                                if "point of sale" in query_lower or "pos" in query_lower:
+                                                    if "currency" in query_lower and i == 0:
+                                                        derived_model_name = f"{module_name}.currency"
+                                                    elif "config" in query_lower:
+                                                        derived_model_name = f"{module_name}.config"
+                                                    else:
+                                                        derived_model_name = f"{module_name}.{i+1}"
+                                                else:
+                                                    # Default model name based on module
+                                                    derived_model_name = f"{module_name.replace('_', '.')}.{i+1}"
+
+                                                model_name = derived_model_name
+                                            else:
+                                                model_name = model_name_match.group(1)
 
                                             # Extract model description
                                             model_desc_match = re.search(r'"description"\s*:\s*"([^"]+)"', model_text)
-                                            model_desc = model_desc_match.group(1) if model_desc_match else ""
+                                            model_desc = model_desc_match.group(1) if model_desc_match else f"Model for {module_name.replace('_', ' ')}"
 
                                             # Extract fields
                                             fields = []
@@ -358,7 +445,7 @@ class GeminiClient:
         4. Mention any potential challenges and how to address them
         5. Consider testing and quality assurance steps
 
-        IMPORTANT: Return your response as a valid JSON object without any markdown formatting or code blocks.
+        IMPORTANT: Return your response as a valid JSON object without any markdown formatting or code blocks. Do not use single quotes for JSON keys or values, use double quotes only. Do not include any explanations or text outside the JSON object.
         """
 
         try:

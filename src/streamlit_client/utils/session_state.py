@@ -35,6 +35,8 @@ class CodeAgentState:
     phase: AgentPhase = AgentPhase.ANALYSIS
     plan: str = ""
     tasks: List[Union[str, Dict[str, Any]]] = field(default_factory=list)
+    technical_considerations: List[str] = field(default_factory=list)  # Technical considerations for the module
+    estimated_time: str = ""  # Estimated time for implementation
     module_name: str = ""
     files_to_create: Dict[str, str] = field(default_factory=dict)
     feedback: str = ""
@@ -42,11 +44,18 @@ class CodeAgentState:
     error: Optional[str] = None
     use_gemini: bool = False
     use_ollama: bool = False
+    no_llm: bool = False  # Whether to disable all LLM models and use fallback analysis only
     save_to_files: bool = False
     output_dir: Optional[str] = None
     state_dict: Optional[Dict[str, Any]] = None  # Serialized state from the agent for resuming later
     requires_validation: bool = False  # Whether the agent is waiting for validation
     current_step: Optional[str] = None  # Current step in the agent workflow
+    planning_state: Optional[Dict[str, Any]] = None  # Raw planning state from the agent
+    analysis_state: Optional[Dict[str, Any]] = None  # Raw analysis state from the agent
+    model_info: Dict[str, Any] = field(default_factory=dict)  # Information about relevant Odoo models
+    detailed_model_info: Dict[str, Any] = field(default_factory=dict)  # Detailed information about Odoo models
+    analysis_result: Optional[Dict[str, Any]] = None  # Result of the analysis phase
+    proposed_models: List[Dict[str, Any]] = field(default_factory=list)  # Models proposed for the module
 
 @dataclass
 class ExportImportState:

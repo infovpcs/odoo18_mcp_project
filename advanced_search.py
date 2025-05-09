@@ -66,15 +66,33 @@ class AdvancedSearch:
                     search_params['order'] = 'date_deadline asc'
 
                 # Execute the search
-                records = self.model_discovery.models_proxy.execute_kw(
-                    self.model_discovery.db,
-                    self.model_discovery.uid,
-                    self.model_discovery.password,
-                    model_name,
-                    'search_read',
-                    [domain],
-                    search_params
-                )
+                try:
+                    # Use the client's execute method if available
+                    if hasattr(self.model_discovery, 'client') and self.model_discovery.client:
+                        records = self.model_discovery.client.execute(
+                            model_name,
+                            'search_read',
+                            [domain],
+                            search_params
+                        )
+                    # Fallback to direct execution if models_proxy is available
+                    elif hasattr(self.model_discovery, 'models_proxy') and self.model_discovery.models_proxy:
+                        records = self.model_discovery.models_proxy.execute_kw(
+                            self.model_discovery.db,
+                            self.model_discovery.uid,
+                            self.model_discovery.password,
+                            model_name,
+                            'search_read',
+                            [domain],
+                            search_params
+                        )
+                    else:
+                        # Last resort fallback
+                        logger.warning(f"No suitable method found to execute search for {model_name}")
+                        records = []
+                except Exception as e:
+                    logger.error(f"Error executing search for {model_name}: {str(e)}")
+                    records = []
 
                 # Add to results
                 query_results.append((model_name, records, model_info))
@@ -95,15 +113,29 @@ class AdvancedSearch:
 
                     # Get the Wood Corner partner ID
                     try:
-                        partner_records = self.model_discovery.models_proxy.execute_kw(
-                            self.model_discovery.db,
-                            self.model_discovery.uid,
-                            self.model_discovery.password,
-                            'res.partner',
-                            'search_read',
-                            [[("name", "=", "Wood Corner")]],
-                            {'fields': ['id', 'name']}
-                        )
+                        # Use the client's execute method if available
+                        if hasattr(self.model_discovery, 'client') and self.model_discovery.client:
+                            partner_records = self.model_discovery.client.execute(
+                                'res.partner',
+                                'search_read',
+                                [[("name", "=", "Wood Corner")]],
+                                {'fields': ['id', 'name']}
+                            )
+                        # Fallback to direct execution if models_proxy is available
+                        elif hasattr(self.model_discovery, 'models_proxy') and self.model_discovery.models_proxy:
+                            partner_records = self.model_discovery.models_proxy.execute_kw(
+                                self.model_discovery.db,
+                                self.model_discovery.uid,
+                                self.model_discovery.password,
+                                'res.partner',
+                                'search_read',
+                                [[("name", "=", "Wood Corner")]],
+                                {'fields': ['id', 'name']}
+                            )
+                        else:
+                            # Last resort fallback
+                            logger.warning("No suitable method found to execute search for res.partner")
+                            partner_records = []
 
                         if partner_records:
                             wood_corner_id = partner_records[0]['id']

@@ -18,15 +18,55 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # Get Odoo connection details from environment variables
-ODOO_URL = os.getenv("ODOO_URL", "http://localhost:8069")
+# Hardcode the URL to ensure proper connection
+ODOO_URL = "http://localhost:8069"  # Hardcoded to ensure proper connection
 ODOO_DB = os.getenv("ODOO_DB", "llmdb18")
 ODOO_USERNAME = os.getenv("ODOO_USERNAME", "admin")
 ODOO_PASSWORD = os.getenv("ODOO_PASSWORD", "admin")
+ODOO_HOST = "localhost"  # Hardcoded to ensure proper connection
+ODOO_PORT = "8069"  # Hardcoded to ensure proper connection
 
 # Set up XML-RPC connections
 try:
-    common = xmlrpc.client.ServerProxy(f"{ODOO_URL}/xmlrpc/2/common", allow_none=True)
-    models = xmlrpc.client.ServerProxy(f"{ODOO_URL}/xmlrpc/2/object", allow_none=True)
+    # Ensure URL is properly formatted
+    if not ODOO_URL.startswith(("http://", "https://")):
+        ODOO_URL = f"http://{ODOO_URL}"
+
+    # Remove trailing slash if present
+    ODOO_URL = ODOO_URL.rstrip("/")
+
+    logger.info(f"Connecting to Odoo server at {ODOO_URL}")
+
+    # Add transport options to handle connection issues
+    transport = xmlrpc.client.Transport()
+
+    # Create server proxies with proper error handling
+    common = xmlrpc.client.ServerProxy(
+        f"{ODOO_URL}/xmlrpc/2/common",
+        allow_none=True,
+        transport=transport,
+        verbose=False
+    )
+
+    models = xmlrpc.client.ServerProxy(
+        f"{ODOO_URL}/xmlrpc/2/object",
+        allow_none=True,
+        transport=transport,
+        verbose=False
+    )
+
+    # Test connection with version info before authentication
+    try:
+        version_info = common.version()
+        logger.info(f"Connected to Odoo server: {version_info.get('server_version', 'Unknown version')}")
+    except Exception as conn_err:
+        logger.error(f"Failed to get Odoo server version: {str(conn_err)}")
+        # Try alternative URL format if host.docker.internal is used
+        if "host.docker.internal" in ODOO_URL:
+            alt_url = ODOO_URL.replace("host.docker.internal", "localhost")
+            logger.info(f"Trying alternative URL: {alt_url}")
+            common = xmlrpc.client.ServerProxy(f"{alt_url}/xmlrpc/2/common", allow_none=True)
+            models = xmlrpc.client.ServerProxy(f"{alt_url}/xmlrpc/2/object", allow_none=True)
 
     # Authenticate
     uid = common.authenticate(ODOO_DB, ODOO_USERNAME, ODOO_PASSWORD, {})

@@ -160,13 +160,21 @@ def run_odoo_code_agent(
             break
 
         # Execute the node function
-        if state.current_step == "process_feedback" and feedback:
-            # Pass the feedback to the process_feedback node
-            state = node_func(state, feedback)
-            # Clear the feedback after processing
-            feedback = None
-        else:
-            state = node_func(state)
+        logger.info(f"Executing node function: {node_func.__name__}")
+        try:
+            if state.current_step == "process_feedback" and feedback:
+                # Pass the feedback to the process_feedback node
+                state = node_func(state, feedback)
+                # Clear the feedback after processing
+                feedback = None
+            else:
+                state = node_func(state)
+            logger.info(f"Node function {node_func.__name__} completed successfully")
+            logger.info(f"Next step: {state.current_step}, Phase: {state.phase}")
+        except Exception as e:
+            logger.error(f"Error executing node function {node_func.__name__}: {str(e)}")
+            # Continue to the next step even if there's an error
+            state.current_step = "error"
 
         # Add a small delay to avoid overwhelming the system
         time.sleep(0.1)

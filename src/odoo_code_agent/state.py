@@ -50,6 +50,7 @@ class FeedbackState(BaseModel):
     changes_required: List[str] = Field(default_factory=list)
     error: Optional[str] = None
 
+from odoo_code_agent.utils import odoo_connector
 
 class OdooCodeAgentState(BaseModel):
     """State for the Odoo Code Agent flow."""
@@ -60,10 +61,10 @@ class OdooCodeAgentState(BaseModel):
     feedback_state: FeedbackState = Field(default_factory=FeedbackState)
     current_step: str = "initialize"
     history: List[str] = Field(default_factory=list)
-    odoo_url: str = "http://localhost:8069"
-    odoo_db: str = "llmdb18"
-    odoo_username: str = "admin"
-    odoo_password: str = "admin"
+    odoo_url: str = odoo_connector.ODOO_URL
+    odoo_db: str = odoo_connector.ODOO_DB
+    odoo_username: str = odoo_connector.ODOO_USERNAME
+    odoo_password: str = odoo_connector.ODOO_PASSWORD
     use_gemini: bool = False
     use_ollama: bool = False
 

@@ -506,9 +506,35 @@ class MCPConnector:
             params,
             timeout=90,
             use_polling=True,
-            max_polls=10,
+            max_polls=15,
             poll_interval=2
         )
+
+    def generate_mermaid_diagram(self, mermaid_code: str, name: str = "diagram",
+                                theme: str = "default", background_color: str = "white") -> Dict[str, Any]:
+        """Generate a Mermaid diagram using the generate_npx tool.
+
+        Args:
+            mermaid_code: The Mermaid code to generate a diagram from
+            name: Name of the diagram (used for the output file name)
+            theme: Theme for the diagram (default, forest, dark, neutral)
+            background_color: Background color for the diagram
+
+        Returns:
+            Response from the tool with the path to the generated image
+        """
+        params = {
+            "code": mermaid_code,
+            "name": name,
+            "theme": theme,
+            "backgroundColor": background_color
+        }
+
+        # Log the request for debugging
+        logger.info(f"Generating Mermaid diagram with {len(mermaid_code)} characters of code")
+
+        # Call the generate_npx tool
+        return self.call_tool("generate_npx", params, timeout=60)
 
 
 

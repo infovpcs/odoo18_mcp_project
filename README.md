@@ -1,6 +1,6 @@
 # Odoo 18 MCP Integration (18.0 Branch)
 
-Last Updated: 2025-05-25
+Last Updated: 2025-05-29
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Odoo 18.0](https://img.shields.io/badge/odoo-18.0-green.svg)](https://www.odoo.com/)
@@ -53,6 +53,7 @@ A robust integration server that connects MCP (Master Control Program) with Odoo
 - **Google Gemini Integration**: Direct integration with Google Gemini API for code generation
 - **Environment Variable Configuration**: Use GEMINI_API_KEY and GEMINI_MODEL environment variables
 - **Fallback Models**: Integration with Google Gemini and Ollama for code generation
+- **Mermaid Diagram Generation**: Generate PNG diagrams from Mermaid markdown with customizable themes and colors
 - **Improved Module Name Extraction**: Better module name extraction from user queries
 - **Enhanced Model Field Generation**: Specialized field generation for different module types
 - **Module Name Suffix (_vpcs_ext)**: Prevent conflicts with existing Odoo apps
@@ -475,6 +476,39 @@ Once you've configured Claude Desktop, you can use the Odoo 18 MCP integration:
 | **retrieve_odoo_documentation** | Retrieve information from Odoo 18 documentation | `/tool retrieve_odoo_documentation query="How to create a custom module in Odoo 18" max_results=5` | ✅ Working |
 | **validate_field_value** | Validate a field value for a model | `/tool validate_field_value model_name=res.partner field_name=email value="test@example.com"` | ✅ Working |
 | **run_odoo_code_agent** | Generate Odoo 18 module code | `/tool run_odoo_code_agent_tool query="Create a customer feedback module" use_gemini=true use_ollama=false` | ✅ Working |
+| **generate_npx** | Generate PNG image from Mermaid markdown | `/tool generate_npx code="graph TD; A[Start] --> B[Process]; B --> C[End]" name="workflow" theme="default" backgroundColor="white"` | ✅ Working |
+
+#### Mermaid Diagram Generation
+
+The project includes a powerful Mermaid diagram generation tool that converts Mermaid markdown into PNG images. This feature is particularly useful for visualizing workflows, entity relationships, and other diagrams.
+
+**Features:**
+- Generate high-quality PNG images from Mermaid markdown
+- Support for all Mermaid diagram types (flowchart, sequence, class, ER, etc.)
+- Customizable themes (default, forest, dark, neutral)
+- Configurable background color
+- File caching to avoid regenerating unchanged diagrams
+- Integrated with the Streamlit client for interactive visualization
+
+**Usage in Streamlit Client:**
+- The Code Agent Graph page automatically generates and displays workflow diagrams
+- Cached diagrams are reused to improve performance
+- A "Regenerate" button allows forcing regeneration when needed
+- Timestamps show when diagrams were last generated
+
+**Usage with MCP Tool:**
+```bash
+# Basic usage
+/tool generate_npx code="graph TD; A[Start] --> B[Process]; B --> C[End]" name="simple_workflow"
+
+# With custom theme and background color
+/tool generate_npx code="sequenceDiagram; A->>B: Hello; B->>A: Hi there" name="sequence_diagram" theme="dark" backgroundColor="#f5f5f5"
+
+# Complex flowchart
+/tool generate_npx code="graph TD; A[Start] --> B{Decision}; B -->|Yes| C[Process 1]; B -->|No| D[Process 2]; C --> E[End]; D --> E" name="decision_flow" theme="forest" backgroundColor="white"
+```
+
+The generated PNG files are saved in the `exports/diagrams` directory and can be used in documentation, presentations, or embedded in web applications.
 
 #### Available Prompts
 
@@ -2376,3 +2410,68 @@ You can also save the generated files to disk:
 ```
 /tool run_odoo_code_agent_tool query="Create a simple Odoo 18 module for customer feedback" use_gemini=true save_to_files=true output_dir="./generated_modules"
 ```
+
+## Mermaid Diagram Generation
+
+The MCP server includes a tool for generating diagrams from Mermaid markdown. This is useful for visualizing workflows, entity relationships, and other diagrams directly from Claude Desktop.
+
+### Using the Mermaid Diagram Tool
+
+You can generate diagrams using the `generate_npx` tool:
+
+```
+/tool generate_npx code="graph TD; A[Start] --> B[Process]; B --> C[End]" name="workflow" theme="default" backgroundColor="white"
+```
+
+Parameters:
+- `code`: The Mermaid markdown code for the diagram (required)
+- `name`: Name for the output file (optional, defaults to timestamp)
+- `theme`: Theme for the diagram (optional, options: default, forest, dark, neutral)
+- `backgroundColor`: Background color for the diagram (optional, e.g., white, transparent, #F0F0F0)
+- `folder`: Custom output folder path (optional, defaults to exports/diagrams)
+
+### Mermaid Diagram Types
+
+You can create various types of diagrams:
+
+1. **Flowcharts**:
+```
+graph TD;
+    A[Start] --> B[Process];
+    B --> C{Decision};
+    C -->|Yes| D[End];
+    C -->|No| B;
+```
+
+2. **Sequence Diagrams**:
+```
+sequenceDiagram
+    participant User
+    participant System
+    User->>System: Request Data
+    System->>User: Return Data
+```
+
+3. **Class Diagrams**:
+```
+classDiagram
+    class Customer {
+        +String name
+        +String email
+        +getOrders()
+    }
+    class Order {
+        +int id
+        +Customer customer
+    }
+    Customer "1" --> "*" Order
+```
+
+4. **Entity Relationship Diagrams**:
+```
+erDiagram
+    CUSTOMER ||--o{ ORDER : places
+    ORDER ||--|{ LINE-ITEM : contains
+```
+
+The generated diagrams are saved as PNG files in the exports/diagrams directory and can be accessed for further use.

@@ -106,6 +106,8 @@ try:
         analyze_field_importance,
         get_field_groups,
         get_record_template,
+        # Visualization tools
+        generate_npx,
     )
 
     # Add the tools to our dictionary
@@ -134,6 +136,9 @@ try:
     tools["analyze_field_importance"] = analyze_field_importance
     tools["get_field_groups"] = get_field_groups
     tools["get_record_template"] = get_record_template
+
+    # Visualization tools
+    tools["generate_npx"] = generate_npx
 
 except Exception as e:
     logger.error(f"Error getting tools from MCP server: {str(e)}")

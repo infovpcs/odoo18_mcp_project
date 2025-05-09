@@ -8,12 +8,13 @@ This module provides the code agent graph visualization page for the Streamlit c
 
 import logging
 import os
-import tempfile
+import re
+import time
+from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Optional
 
 import streamlit as st
-from streamlit.delta_generator import DeltaGenerator
 
 from ..utils.mcp_connector import MCPConnector
 from ..utils.session_state import SessionState, AgentPhase
@@ -46,6 +47,30 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("code_agent_graph_page")
 
+def get_diagram_path(name: str, ensure_dir: bool = True) -> str:
+    """Get the path for a diagram file and ensure the directory exists.
+
+    Args:
+        name: Name of the diagram (without extension)
+        ensure_dir: Whether to ensure the directory exists
+
+    Returns:
+        Path to the diagram file
+    """
+    # Define the base directory for diagrams
+    base_dir = "/Users/vinusoft85/workspace/odoo18_mcp_project/exports/diagrams"
+
+    # Ensure the directory exists if requested
+    if ensure_dir and not os.path.exists(base_dir):
+        try:
+            os.makedirs(base_dir, exist_ok=True)
+            logger.info(f"Created diagram directory: {base_dir}")
+        except Exception as e:
+            logger.error(f"Failed to create diagram directory: {str(e)}")
+
+    # Return the full path
+    return os.path.join(base_dir, f"{name}.png")
+
 def render_code_agent_graph_page(session_state: SessionState, mcp_connector: MCPConnector) -> None:
     """Render the code agent graph page.
 
@@ -53,6 +78,9 @@ def render_code_agent_graph_page(session_state: SessionState, mcp_connector: MCP
         session_state: Session state
         mcp_connector: MCP connector
     """
+    # Store the MCP connector in the session state for use in other functions
+    st.session_state["mcp_connector"] = mcp_connector
+
     st.title("Odoo 18 Code Agent Graph Flow")
 
     # Description of the page
@@ -186,10 +214,6 @@ def render_graph_visualization():
 
         # Generate the Mermaid diagram
         try:
-            # Create a temporary file to save the image
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:
-                tmp_path = tmp.name
-
             # Try to use the LangGraph visualization API
             try:
                 # Import the visualization module
@@ -281,12 +305,77 @@ def render_graph_visualization():
             st.markdown("### Odoo Code Agent Workflow")
             st.markdown(f"```mermaid\n{mermaid_text}\n```")
 
-            # Clean up the temporary file if it exists
-            if os.path.exists(tmp_path):
-                try:
-                    os.unlink(tmp_path)
-                except Exception as cleanup_error:
-                    logger.warning(f"Failed to clean up temporary file: {cleanup_error}")
+            # Generate a PNG image using the MCP server's generate_npx tool
+            st.markdown("### Workflow Diagram (PNG)")
+
+            # Define the expected diagram path
+            diagram_name = "odoo_code_agent_workflow"
+            expected_diagram_path = get_diagram_path(diagram_name)
+
+            # Add a regenerate button
+            col1, col2 = st.columns([3, 1])
+            with col2:
+                regenerate = st.button("Regenerate Diagram")
+
+            # Check if the diagram already exists and we don't need to regenerate
+            if os.path.exists(expected_diagram_path) and not regenerate:
+                # Get the file modification time
+                mod_time = os.path.getmtime(expected_diagram_path)
+                mod_time_str = datetime.fromtimestamp(mod_time).strftime("%Y-%m-%d %H:%M:%S")
+
+                # Display the existing diagram
+                with col1:
+                    st.success("Using cached diagram")
+                st.image(expected_diagram_path, caption="Odoo Code Agent Workflow Diagram")
+                st.info(f"Diagram loaded from: {expected_diagram_path}")
+                st.info(f"Last generated: {mod_time_str}")
+                st.info("Click 'Regenerate Diagram' if you want to create a new version.")
+            else:
+                # Create a spinner to show progress
+                with st.spinner("Generating diagram..."):
+                    # Get the MCP connector from the session state
+                    mcp_connector = st.session_state.get("mcp_connector")
+
+                    if mcp_connector:
+                        # Call the generate_mermaid_diagram method
+                        result = mcp_connector.generate_mermaid_diagram(
+                            mermaid_code=mermaid_text,
+                            name=diagram_name,
+                            theme="default",
+                            background_color="white"
+                        )
+
+                        if result.get("success", False):
+                            # Extract the path to the generated image
+                            result_text = result.get("result", "")
+
+                            # Look for the path in the result text
+                            import re
+                            path_match = re.search(r"`([^`]+)`", result_text)
+
+                            if path_match:
+                                image_path = path_match.group(1)
+
+                                # Check if the file exists
+                                if os.path.exists(image_path):
+                                    # Get the file modification time
+                                    mod_time = os.path.getmtime(image_path)
+                                    mod_time_str = datetime.fromtimestamp(mod_time).strftime("%Y-%m-%d %H:%M:%S")
+
+                                    # Display the image
+                                    st.image(image_path, caption="Odoo Code Agent Workflow Diagram")
+                                    st.success(f"Diagram generated successfully and saved to: {image_path}")
+                                    st.info(f"Generated at: {mod_time_str}")
+                                else:
+                                    st.warning(f"Generated image file not found at: {image_path}")
+                            else:
+                                st.warning("Could not extract image path from result")
+                        else:
+                            error_msg = result.get("error", "Unknown error")
+                            st.error(f"Error generating diagram: {error_msg}")
+                    else:
+                        st.warning("MCP connector not available. Cannot generate PNG diagram.")
+
         except Exception as e:
             st.error(f"Error generating graph visualization: {str(e)}")
             st.info("Displaying text-based representation instead.")

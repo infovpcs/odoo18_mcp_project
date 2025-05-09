@@ -27,6 +27,15 @@ WORKDIR /app
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js and NPM for mermaid-cli
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    nodejs \
+    && npm install -g npm@latest \
+    && npm install -g @mermaid-js/mermaid-cli \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy wheels from builder stage

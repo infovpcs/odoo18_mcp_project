@@ -3122,6 +3122,98 @@ try:
                     "data": {"success": False, "error": error_message}
                 }
 
+    # Tool for generating Mermaid diagrams
+    @mcp.tool()
+    def generate_npx(
+        code: str,
+        name: Optional[str] = None,
+        theme: Optional[str] = None,
+        backgroundColor: Optional[str] = None,
+        folder: Optional[str] = None,
+    ) -> str:
+        """Generate PNG image from mermaid markdown
+
+        Args:
+            code: The mermaid markdown to generate an image from
+            name: Name of the diagram (optional)
+            theme: Theme for the diagram (optional)
+            backgroundColor: Background color for the diagram, e.g. 'white', 'transparent', '#F0F0F0' (optional)
+            folder: Absolute path to save the image to (optional)
+
+        Returns:
+            A confirmation message with the path to the generated image
+        """
+        try:
+            import subprocess
+            import tempfile
+            import os
+            import datetime
+            import re
+            from pathlib import Path
+
+            logger.info(f"Generating mermaid diagram with {len(code)} characters of code")
+
+            # Create a temporary directory for the mermaid files
+            with tempfile.TemporaryDirectory() as temp_dir:
+                # Create a temporary file for the mermaid code
+                mermaid_file = os.path.join(temp_dir, "diagram.mmd")
+                with open(mermaid_file, "w") as f:
+                    f.write(code)
+
+                # Determine the output path
+                if folder:
+                    # Make sure the folder exists
+                    os.makedirs(folder, exist_ok=True)
+                    output_dir = folder
+                else:
+                    # Use a default folder in the project directory
+                    output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exports", "diagrams")
+                    os.makedirs(output_dir, exist_ok=True)
+
+                # Determine the output filename
+                if name:
+                    # Sanitize the name to be a valid filename
+                    name = re.sub(r'[^\w\-_\.]', '_', name)
+                    output_file = os.path.join(output_dir, f"{name}.png")
+                else:
+                    # Use a timestamp as the filename
+                    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    output_file = os.path.join(output_dir, f"diagram_{timestamp}.png")
+
+                # Skip the specialized mermaid-mcp-server package and use standard mermaid-cli directly
+                logger.info("Falling back to standard @mermaid-js/mermaid-cli")
+                cmd = ["npx", "-y", "@mermaid-js/mermaid-cli", "-i", mermaid_file, "-o", output_file]
+
+                # Add theme if specified
+                if theme:
+                    cmd.extend(["--theme", theme])
+
+                # Add background color if specified
+                if backgroundColor:
+                    cmd.extend(["--backgroundColor", backgroundColor])
+
+                # Run the command
+                logger.info(f"Running command: {' '.join(cmd)}")
+                result = subprocess.run(cmd, capture_output=True, text=True)
+
+                # Check if the command was successful
+                if result.returncode != 0:
+                    error_msg = f"Error generating mermaid diagram: {result.stderr}"
+                    logger.error(error_msg)
+                    return f"# Error Generating Mermaid Diagram\n\n{error_msg}"
+
+                # Check if the output file was created
+                if not os.path.exists(output_file):
+                    error_msg = "Output file was not created"
+                    logger.error(error_msg)
+                    return f"# Error Generating Mermaid Diagram\n\n{error_msg}"
+
+                # Return a success message with the path to the generated image
+                return f"# Mermaid Diagram Generated Successfully\n\nThe diagram has been saved to: `{output_file}`"
+        except Exception as e:
+            logger.error(f"Error generating mermaid diagram: {str(e)}")
+            return f"# Error Generating Mermaid Diagram\n\n{str(e)}"
+
     # Main entry point
     if __name__ == "__main__":
         try:

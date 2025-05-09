@@ -1,7 +1,7 @@
 
 # Odoo 18 Integration MCP Server - Project Planning
 
-Last Updated: 2025-05-25
+Last Updated: 2025-05-29
 
 ## Project Overview
 This project aims to create a robust integration server that connects MCP (Master Control Program) with Odoo 18.0 ERP system, focusing on efficient data synchronization, API management, and secure communications. The implementation provides a standardized interface for performing CRUD operations on Odoo 18 models through a simple API, with dynamic model discovery and field analysis capabilities. The project includes direct implementation for advanced operations like data export and import, with dynamic model and field discovery using ir.model and ir.model.fields. Additionally, the project includes an Odoo code agent that helps with generating Odoo 18 modules and code using a structured workflow with analysis, planning, human feedback, coding, and finalization phases.
@@ -25,6 +25,7 @@ This project aims to create a robust integration server that connects MCP (Maste
    - Field mapping and transformation ✅
    - CSV handling and processing ✅
    - Odoo documentation retrieval (RAG) ✅
+   - Mermaid diagram generation ✅
 
 2. **Odoo Code Agent**
    - Analysis phase ✅
@@ -372,6 +373,35 @@ odoo18-mcp-project/
    - Handle error cases and fallbacks ✅
    - Add fallback to more general queries when specific queries fail ✅
    - Implement specialized handling for tax and localization queries ✅
+
+### Mermaid Diagram Generation
+1. **Diagram Generation Tool**
+   - MCP tool implementation ✅
+   - Support for multiple diagram types (flowchart, sequence, class, ER) ✅
+   - Custom theme and styling options (default, forest, dark, neutral) ✅
+   - Background color customization ✅
+   - Output file naming options ✅
+   - Custom output directory support ✅
+   - Error handling and logging ✅
+   - Fallback mechanisms for different Mermaid CLI tools ✅
+   - Integration with external MCP servers ✅
+   - Support for @peng-shawn/mermaid-mcp-server ✅
+   - Documentation and examples ✅
+   - File caching to avoid regenerating unchanged diagrams ✅
+   - Timestamp tracking for diagram generation ✅
+   - Regeneration option for forcing diagram updates ✅
+
+2. **Streamlit Client Integration**
+   - Diagram visualization in Code Agent Graph page ✅
+   - Cached diagram reuse for improved performance ✅
+   - Regenerate button for forcing diagram updates ✅
+   - Timestamp display for diagram generation time ✅
+   - Progress indicators during diagram generation ✅
+   - Error handling and fallback to text representation ✅
+   - Directory structure management for diagram storage ✅
+   - Automatic diagram path resolution ✅
+   - MCPConnector helper method for diagram generation ✅
+   - Interactive diagram display with Streamlit ✅
 
 ### Odoo Code Agent
 1. **Agent Workflow**

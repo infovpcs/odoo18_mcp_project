@@ -1,7 +1,7 @@
 
 # Odoo 18 Integration MCP Server - Tasks
 
-Last Updated: 2025-05-25
+Last Updated: 2025-05-29
 
 ## Phase 1: Project Setup and Basic Infrastructure
 - [x] Initialize project structure (2023-12-20)
@@ -245,6 +245,36 @@ Last Updated: 2025-05-25
 - [x] Update coding_nodes.py to use improved module and model names
 - [x] Test module generation with various query types
 - [x] Update documentation with module naming conventions
+
+## Phase 29: Mermaid Diagram Generation Implementation (2025-05-09)
+- [x] Add generate_npx tool to mcp_server.py
+- [x] Register the tool in standalone_mcp_server.py
+- [x] Implement fallback mechanisms for different Mermaid CLI tools
+- [x] Add support for @peng-shawn/mermaid-mcp-server
+- [x] Create exports/diagrams directory for storing generated diagrams
+- [x] Add custom theme and styling options
+- [x] Implement background color customization
+- [x] Add output file naming options
+- [x] Implement custom output directory support
+- [x] Add error handling and logging
+- [x] Update README.md with Mermaid diagram generation information
+- [x] Update PLANNING.md with Mermaid diagram generation information
+- [x] Update TASK.md with Mermaid diagram generation task
+
+## Phase 30: Streamlit Client Mermaid Diagram Integration (2025-05-09)
+- [x] Integrate Mermaid diagram generation in Streamlit client
+- [x] Add diagram visualization in Code Agent Graph page
+- [x] Implement file caching to avoid regenerating unchanged diagrams
+- [x] Add timestamp tracking for diagram generation
+- [x] Create regenerate button for forcing diagram updates
+- [x] Implement progress indicators during diagram generation
+- [x] Add error handling and fallback to text representation
+- [x] Create directory structure management for diagram storage
+- [x] Implement automatic diagram path resolution
+- [x] Add MCPConnector helper method for diagram generation
+- [x] Update Streamlit client documentation
+- [x] Test diagram generation with different diagram types
+- [x] Update README.md with Streamlit client diagram integration information
 
 ## Discovered During Work
 - [x] Fix Python version compatibility issues (2025-04-27)

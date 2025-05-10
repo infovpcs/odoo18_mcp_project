@@ -46,10 +46,10 @@ RUN pip install --no-cache-dir /app/wheels/*.whl
 
 # Copy the rest of the application
 COPY main.py mcp_server.py standalone_mcp_server.py ./
-COPY test_mcp_functions.py test_mcp_tools.py ./
 COPY .env.example ./.env.example
 COPY entrypoint.sh /app/entrypoint.sh
 COPY src ./src
+COPY tests ./tests
 
 # Create directories for logs, data, and generated modules
 RUN mkdir -p /app/logs /app/data /app/exports /app/tmp /app/generated_modules

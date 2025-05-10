@@ -142,7 +142,7 @@ def run_import_flow(
 
         # Call the import_records function
         result = import_records(
-            import_path=import_path,
+            input_path=import_path,  # Changed from import_path to input_path to match the function signature
             model_name=model_name,
             field_mapping=field_mapping,
             create_if_not_exists=create_if_not_exists,

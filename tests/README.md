@@ -1,142 +1,131 @@
 # Odoo 18 MCP Project Tests
 
-This directory contains test scripts for the Odoo 18 MCP Project.
+This directory contains consolidated test scripts for the Odoo 18 MCP Project. The test suite has been streamlined into four main test files that cover all functionality.
 
-## Test Files
+## Consolidated Test Files
 
-### Export/Import Tests
+- **test_mcp_server_consolidated.py**: Comprehensive tests for the MCP server and all its tools, including:
+  - Server health and tool listing
+  - Basic CRUD operations (search, create, update, delete)
+  - Advanced search and documentation retrieval
+  - Field analysis and validation
+  - Export/import functionality for single and related models
+  - Odoo code agent functionality
+  - Mermaid diagram generation
 
-- **test_export_import_agent.py**: Tests the langgraph agent flow for exporting and importing Odoo records.
-- **test_direct_export_import.py**: Tests the direct export and import functions without using the agent flow.
+- **test_odoo_code_agent_consolidated.py**: Consolidated tests for the Odoo Code Agent, including:
+  - Basic functionality
+  - Feedback handling
+  - Testing with different LLM backends (Gemini, Ollama)
+  - Complete workflow testing
 
-### MCP Server Tests
+- **test_odoo_code_agent_utils_consolidated.py**: Consolidated tests for the Odoo Code Agent utilities, including:
+  - Documentation helper
+  - Odoo connector
+  - Human validation workflow
+  - File handling
+  - Module structure generation
 
-- **test_mcp_server_consolidated.py**: Comprehensive tests for the MCP server, including health checks, tool listing, and testing various tools.
-
-### Odoo Code Agent Tests
-
-- **test_odoo_code_agent_consolidated.py**: Consolidated tests for the Odoo Code Agent, including basic functionality, feedback handling, and testing with different LLM backends.
-- **test_odoo_code_agent_utils_consolidated.py**: Consolidated tests for the Odoo Code Agent utilities, including documentation helper, Odoo connector, and file handling.
-- **test_odoo_code_agent_playwright.ts**: End-to-end tests for the Odoo Code Agent using Playwright to test the Streamlit interface.
-- **test_odoo_code_agent.py**: (Legacy) Tests the Odoo Code Agent with various queries.
-- **run_playwright_test.py**: Helper script to run the Playwright tests.
+- **test_export_import_agent.py**: Tests for the langgraph agent flow for exporting and importing Odoo records, including:
+  - Export flow
+  - Import flow
+  - Export-import cycle
+  - Related models export-import
 
 ## Running the Tests
 
-### Export/Import Agent Tests
+### 1. MCP Server Consolidated Tests
+
+The `test_mcp_server_consolidated.py` file provides comprehensive testing for all MCP server tools and functionality.
 
 ```bash
-# Test export flow
-python tests/test_export_import_agent.py --export --model res.partner --limit 10
-
-# Test import flow
-python tests/test_export_import_agent.py --import_data --model res.partner --limit 10
-
-# Test export-import cycle
-python tests/test_export_import_agent.py --cycle --model res.partner --limit 10
-
-# Test related models export-import
-python tests/test_export_import_agent.py --related --model sale.order --limit 5
-
-# Run all tests with default model (res.partner)
-python tests/test_export_import_agent.py
-```
-
-### Direct Export/Import Tests
-
-```bash
-# Test export_records_to_csv
-python tests/test_direct_export_import.py --export --model res.partner --limit 10
-
-# Test import_records_from_csv
-python tests/test_direct_export_import.py --import_data --model res.partner --limit 10
-
-# Test export-import cycle
-python tests/test_direct_export_import.py --cycle --model res.partner --limit 10
-
-# Test export_related_records_to_csv
-python tests/test_direct_export_import.py --related-export --model sale.order --limit 5
-
-# Test import_related_records_from_csv
-python tests/test_direct_export_import.py --related-import --model sale.order --limit 5
-
-# Run all tests with default model (res.partner)
-python tests/test_direct_export_import.py
-```
-
-### MCP Server Tests
-
-```bash
-# Run all MCP server tests
+# Run all tests
 uv run tests/test_mcp_server_consolidated.py --all
 
-# Run specific tests
-uv run tests/test_mcp_server_consolidated.py --health --tools --search
+# Run test categories
+uv run tests/test_mcp_server_consolidated.py --server    # Server health and tools
+uv run tests/test_mcp_server_consolidated.py --basic     # Basic functionality
+uv run tests/test_mcp_server_consolidated.py --crud      # CRUD operations
+uv run tests/test_mcp_server_consolidated.py --field-tools  # Field analysis tools
+uv run tests/test_mcp_server_consolidated.py --export-import  # Export/import tools
 
-# Test advanced search
-uv run tests/test_mcp_server_consolidated.py --advanced
+# Run specific tool tests
+# Server tests
+uv run tests/test_mcp_server_consolidated.py --health --tools
 
-# Test the Odoo code agent tool
-uv run tests/test_mcp_server_consolidated.py --code-agent
+# CRUD operations
+uv run tests/test_mcp_server_consolidated.py --search --create --update --delete --execute
 
-# Test export/import tools
-uv run tests/test_mcp_server_consolidated.py --export --import
+# Advanced search and documentation
+uv run tests/test_mcp_server_consolidated.py --advanced --docs
+
+# Field analysis
+uv run tests/test_mcp_server_consolidated.py --validate --analyze --groups --template
+
+# Export/import
+uv run tests/test_mcp_server_consolidated.py --export --import --export-related --import-related
+
+# Code agent and visualization
+uv run tests/test_mcp_server_consolidated.py --code-agent --mermaid
 ```
 
-### Odoo Code Agent Tests
+### 2. Odoo Code Agent Consolidated Tests
+
+The `test_odoo_code_agent_consolidated.py` file tests the Odoo Code Agent functionality.
 
 ```bash
 # Run all Odoo Code Agent tests
 uv run tests/test_odoo_code_agent_consolidated.py --all
 
-# Run basic functionality test
-uv run tests/test_odoo_code_agent_consolidated.py --basic
-
-# Test with feedback
-uv run tests/test_odoo_code_agent_consolidated.py --feedback
-
-# Test with Google Gemini as a fallback
-uv run tests/test_odoo_code_agent_consolidated.py --gemini
-
-# Test with Ollama as a fallback
-uv run tests/test_odoo_code_agent_consolidated.py --ollama
-
-# Test complete workflow
-uv run tests/test_odoo_code_agent_consolidated.py --workflow
+# Run specific tests
+uv run tests/test_odoo_code_agent_consolidated.py --basic     # Basic functionality
+uv run tests/test_odoo_code_agent_consolidated.py --feedback  # Test with feedback
+uv run tests/test_odoo_code_agent_consolidated.py --gemini    # Test with Gemini
+uv run tests/test_odoo_code_agent_consolidated.py --ollama    # Test with Ollama
+uv run tests/test_odoo_code_agent_consolidated.py --workflow  # Test complete workflow
 ```
 
-### Odoo Code Agent Utilities Tests
+### 3. Odoo Code Agent Utilities Consolidated Tests
+
+The `test_odoo_code_agent_utils_consolidated.py` file tests the utilities used by the Odoo Code Agent.
 
 ```bash
 # Run all Odoo Code Agent utilities tests
 uv run tests/test_odoo_code_agent_utils_consolidated.py --all
 
-# Test documentation helper
-uv run tests/test_odoo_code_agent_utils_consolidated.py --docs
-
-# Test Odoo connector
-uv run tests/test_odoo_code_agent_utils_consolidated.py --connector
-
-# Test human validation workflow
-uv run tests/test_odoo_code_agent_utils_consolidated.py --workflow
-
-# Test file saver
-uv run tests/test_odoo_code_agent_utils_consolidated.py --files
-
-# Test module structure
-uv run tests/test_odoo_code_agent_utils_consolidated.py --structure
+# Run specific tests
+uv run tests/test_odoo_code_agent_utils_consolidated.py --docs      # Documentation helper
+uv run tests/test_odoo_code_agent_utils_consolidated.py --connector # Odoo connector
+uv run tests/test_odoo_code_agent_utils_consolidated.py --workflow  # Human validation
+uv run tests/test_odoo_code_agent_utils_consolidated.py --files     # File saver
+uv run tests/test_odoo_code_agent_utils_consolidated.py --structure # Module structure
 ```
-### Legacy Tests (For Reference)
+
+### 4. Export/Import Agent Tests
+
+The `test_export_import_agent.py` file tests the langgraph agent flow for exporting and importing Odoo records.
 
 ```bash
-# Test the Odoo Code Agent (legacy)
-uv run tests/test_odoo_code_agent.py
+# Run all tests with default model (res.partner)
+uv run tests/test_export_import_agent.py
 
-# Test with Google Gemini as a fallback (legacy)
-uv run tests/test_odoo_code_agent.py --gemini
+# Run specific tests
+uv run tests/test_export_import_agent.py --export --model res.partner --limit 10
+uv run tests/test_export_import_agent.py --import_data --model res.partner --limit 10
+uv run tests/test_export_import_agent.py --cycle --model res.partner --limit 10
+uv run tests/test_export_import_agent.py --related --model sale.order --limit 5
+```
 
-# Test with Ollama as a fallback (legacy)
-uv run tests/test_odoo_code_agent.py --ollama
+### Running All Tests
+
+To run all tests in sequence:
+
+```bash
+# Run all consolidated tests
+uv run tests/test_mcp_server_consolidated.py --all
+uv run tests/test_odoo_code_agent_consolidated.py --all
+uv run tests/test_odoo_code_agent_utils_consolidated.py --all
+uv run tests/test_export_import_agent.py
 ```
 
 ## Test Data
@@ -182,3 +171,41 @@ To add new tests:
 3. Define test functions for each feature to test
 4. Add a `main()` function with argument parsing
 5. Update this README with information about the new tests
+
+## Consolidated Files and Redundant Tests
+
+### Consolidated Test Files
+
+The test suite has been streamlined into these four main test files:
+
+1. **test_mcp_server_consolidated.py**: Comprehensive MCP server and tools tests
+2. **test_odoo_code_agent_consolidated.py**: Consolidated Odoo code agent tests
+3. **test_odoo_code_agent_utils_consolidated.py**: Consolidated Odoo code agent utilities tests
+4. **test_export_import_agent.py**: Export/import agent tests
+
+### Redundant Test Files (Can Be Removed)
+
+The following test files are now redundant and can be removed as their functionality is covered by the consolidated test files:
+
+#### MCP Server Tests (Consolidated into test_mcp_server_consolidated.py)
+- `simple_mcp_test.py` - Basic MCP server connection test
+- `client_test.py` - Tests client functionality
+- `direct_test.py` - Direct test of MCP functionality
+- `simple_test.py` - Simple test
+- `test_advanced_search.py` - Advanced search test
+- `test_advanced_search_tool.py` - Advanced search tool test
+- `test_mcp_tools.py` - Export/import functionality test
+- `test_direct_export_import.py` - Direct export/import test
+- `test_specific_queries.py` - Specific query test
+- `test_product_import.py` - Product import test
+- `comprehensive_test.py` - Older comprehensive test
+
+#### Odoo Code Agent Tests (Consolidated into test_odoo_code_agent_consolidated.py)
+- `test_odoo_code_agent.py` - Legacy Odoo code agent test
+- `test_odoo_code_agent_tool.py` - Odoo code agent tool test
+
+#### Utility Tests (Consolidated into test_odoo_code_agent_utils_consolidated.py)
+- `test_embedding_db.py` - Embedding database test
+- `test_gemini_client.py` - Gemini client test
+- `test_human_validation.py` - Human validation test
+- `test_mermaid.py` - Mermaid diagram test

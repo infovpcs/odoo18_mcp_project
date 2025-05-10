@@ -106,16 +106,22 @@ services:
       - ODOO_PASSWORD=${ODOO_PASSWORD:-admin}
       - MCP_DEBUG=${MCP_DEBUG:-true}
       - MCP_LOG_LEVEL=${MCP_LOG_LEVEL:-DEBUG}
+      - MCP_SERVER_URL=http://standalone-server:8000
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
     volumes:
       - ./logs:/app/logs
       - ./exports:/app/exports
       - ./tmp:/app/tmp
       - ./generated_modules:/app/generated_modules
+      - ./tests:/app/tests
     networks:
       - mcp_network
+    depends_on:
+      - standalone-server
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 512M
+          cpus: '1'
+          memory: 1G
     command: ["test", "all"]

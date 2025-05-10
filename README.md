@@ -313,6 +313,12 @@ make dev
 # Run tests
 make test
 
+# Run specific test categories
+make test-mcp         # Run MCP server tests
+make test-agent       # Run Odoo code agent tests
+make test-utils       # Run Odoo code agent utilities tests
+make test-export-import  # Run export/import agent tests
+
 # Start production environment
 make prod
 
@@ -925,97 +931,6 @@ For the best results, we recommend using Google Gemini as a fallback model. To e
 
 With Gemini enabled, the Odoo Code Agent can generate more sophisticated and context-aware code, with better analysis of requirements and more detailed implementation plans.
 
-### Using the Direct Export/Import Implementation
-
-The project includes a direct implementation for export/import operations. This approach provides a straightforward process for exporting and importing data with proper field mapping and validation.
-
-#### Test Scripts for Export/Import Functionality
-
-We've created several test scripts to verify the export/import functionality:
-
-1. **test_export_import.py**: Tests the basic export_related_records and import_related_records functions with res.partner and res.partner.bank models.
-
-```bash
-python test_export_import.py
-```
-
-2. **test_import_records.py**: Tests the import_records function with res.partner model.
-
-```bash
-python test_import_records.py
-```
-
-3. **test_direct_export_import.py**: Tests exporting and importing account.move and account.move.line records.
-
-```bash
-python test_direct_export_import.py
-```
-
-4. **test_mcp_tools.py**: Tests the MCP tools for export/import operations.
-
-```bash
-# Make sure the standalone MCP server is running
-python standalone_mcp_server.py
-
-# In another terminal
-python test_mcp_tools.py
-```
-
-These test scripts help ensure that the export/import functionality is working correctly and provide examples of how to use the functions.
-
-#### Export/Import Features
-
-- Support for any Odoo model
-- Dynamic field discovery using ir.model and ir.model.fields
-- Field mapping and transformation
-- Handling of complex field types (many2one, many2many, etc.)
-- Parent-child relationship maintenance
-- Error handling and validation
-- CSV as the primary data format
-
-```python
-from direct_export_import import export_records, import_records, export_related_records, import_related_records
-
-# Export records
-result = export_records(
-    model_name="res.partner",
-    fields=["id", "name", "email", "phone"],
-    filter_domain=[["is_company", "=", True]],
-    export_path="./exports/companies.csv"
-)
-
-# Import records
-result = import_records(
-    input_path="./exports/companies.csv",
-    model_name="res.partner",
-    field_mapping={"id": "id", "name": "name", "email": "email", "phone": "phone"},
-    create_if_not_exists=False,
-    update_if_exists=True
-)
-
-# Export related records (parent-child)
-result = export_related_records(
-    parent_model="account.move",
-    child_model="account.move.line",
-    relation_field="move_id",
-    parent_fields=["id", "name", "partner_id", "invoice_date", "amount_total"],
-    child_fields=["id", "product_id", "account_id", "quantity", "price_unit"],
-    filter_domain="[('move_type', '=', 'out_invoice')]",
-    export_path="./exports/invoices.csv"
-)
-
-# Import related records (parent-child)
-result = import_related_records(
-    parent_model="account.move",
-    child_model="account.move.line",
-    relation_field="move_id",
-    input_path="./exports/invoices.csv",
-    force=True,
-    reset_to_draft=True,
-    skip_readonly_fields=True
-)
-```
-
 ### API Endpoints
 
 - `POST /api/v1/odoo`: Main endpoint for Odoo operations
@@ -1256,26 +1171,18 @@ odoo18_mcp_project/
 ├── scripts/                # Utility scripts
 │   └── dynamic_data_tool.py # Export/Import CLI tool
 ├── tests/                  # Test suite
-│   ├── test_core/          # Core tests
-│   ├── test_mcp/           # MCP tests
-│   ├── test_odoo/          # Odoo tests
-│   ├── test_code_generator.py # Code generator tests
-│   ├── test_module_structure.py # Module structure tests
-│   └── test_odoo_code_agent.py # Odoo code agent tests
+│   ├── test_export_import_agent.py # Export/import agent tests
+│   ├── test_mcp_server_consolidated.py # MCP server tests
+│   ├── test_odoo_code_agent_consolidated.py # Odoo code agent tests
+│   └── test_odoo_code_agent_utils_consolidated.py # Odoo code agent utilities tests
 ├── odoo_docs/              # Odoo documentation repository
 ├── odoo_docs_index/        # Odoo documentation index
 │   ├── documents.pkl       # Processed documents
-│   └── faiss_index.bin     # FAISS vector index
+│   ├── faiss_index.bin       # FAISS vector index
+│   └── embeddings.db       # Embeddings database
 ├── tmp/                    # Temporary files directory
 ├── mcp_server.py           # MCP server implementation
 ├── standalone_mcp_server.py # Standalone MCP server
-├── test_mcp_functions.py   # MCP functions test
-├── test_mcp_tools.py       # MCP tools test
-├── test_advanced_search.py # Advanced search test
-├── test_odoo_docs_rag.py   # Odoo documentation RAG test
-├── test_odoo_code_agent_tool.py # Odoo code agent tool test
-├── test_export_import_tools.py # Export/Import tools test
-├── test_export_import_agent.py # Export/Import agent test
 ├── query_parser.py         # Natural language query parser
 ├── relationship_handler.py # Model relationship handler
 ├── update_claude_config.sh # Claude Desktop config updater
@@ -1292,29 +1199,48 @@ odoo18_mcp_project/
 ### Running Tests
 
 ```bash
-python client_test.py             # Basic client test
-python advanced_client_test.py    # Advanced client test
-python dynamic_model_test.py      # Dynamic model test
-python test_mcp_functions.py      # Test MCP server functions directly
-python test_mcp_tools.py          # Test MCP server tools via HTTP
-python test_advanced_search.py    # Test advanced search functionality
-python comprehensive_test.py      # Comprehensive test of all MCP server tools
+python tests/test_mcp_server_consolidated.py --all         # Comprehensive MCP server and tools tests
+python tests/test_odoo_code_agent_consolidated.py --all    # Consolidated Odoo code agent tests
+python tests/test_odoo_code_agent_utils_consolidated.py --all  # Consolidated Odoo code agent utilities tests
+python tests/test_export_import_agent.py                   # Export/import agent tests
 ```
 
 #### Comprehensive Testing
 
-We've created a comprehensive test script (`comprehensive_test.py`) that tests all MCP server tools directly, without requiring the MCP server to be running. This script:
+We've created a comprehensive test suite with four consolidated test files that cover all aspects of the project:
 
-1. Tests all MCP server tools directly by importing the functions from `mcp_server.py`
-2. Includes specific test cases for each tool with expected inputs and outputs
-3. Handles error cases and edge cases
-4. Tests export/import functionality using the `dynamic_data_tool.py` script
-5. Validates that all tools work correctly with Odoo 18
+1. **test_mcp_server_consolidated.py**: Tests all MCP server tools and functionality, including:
+   - Server health and tool listing
+   - Basic CRUD operations (search, create, update, delete)
+   - Advanced search and documentation retrieval
+   - Field analysis and validation
+   - Export/import functionality for single and related models
+   - Odoo code agent functionality
+   - Mermaid diagram generation
 
-To run the comprehensive test:
+2. **test_odoo_code_agent_consolidated.py**: Tests the Odoo Code Agent, including:
+   - Basic functionality
+   - Feedback handling
+   - Testing with different LLM backends (Gemini, Ollama)
+   - Complete workflow testing
+
+3. **test_odoo_code_agent_utils_consolidated.py**: Tests the Odoo Code Agent utilities, including:
+   - Documentation helper
+   - Odoo connector
+   - Human validation workflow
+   - File handling
+   - Module structure generation
+
+4. **test_export_import_agent.py**: Tests the langgraph agent flow for exporting and importing Odoo records, including:
+   - Export flow
+   - Import flow
+   - Export-import cycle
+   - Related models export-import
+
+To run the comprehensive MCP server tests:
 
 ```bash
-python comprehensive_test.py
+python tests/test_mcp_server_consolidated.py --all
 ```
 
 This will test all MCP server tools and report any issues. The test script is designed to be robust and handle various error conditions, making it ideal for validating the MCP server functionality.
@@ -2100,29 +2026,29 @@ The Streamlit client provides a user-friendly interface for interacting with the
 
 ### Testing the MCP Server Connection
 
-Before starting the Streamlit client, you can test the MCP server connection using the provided test script:
+Before starting the Streamlit client, you can test the MCP server connection using the consolidated test script:
 
 ```bash
 # Test if the MCP server is running
-python test_mcp_connection.py --test health
+python tests/test_mcp_server_consolidated.py --health
 
 # List available tools
-python test_mcp_connection.py --test tools
+python tests/test_mcp_server_consolidated.py --tools
 
 # Test the search_records tool
-python test_mcp_connection.py --test search
+python tests/test_mcp_server_consolidated.py --search
 
 # Test the advanced_search tool
-python test_mcp_connection.py --test advanced
+python tests/test_mcp_server_consolidated.py --advanced
 
 # Test the retrieve_odoo_documentation tool
-python test_mcp_connection.py --test docs
+python tests/test_mcp_server_consolidated.py --docs
 
 # Test the run_odoo_code_agent_tool tool
-python test_mcp_connection.py --test agent
+python tests/test_mcp_server_consolidated.py --code-agent
 
 # Run all tests
-python test_mcp_connection.py --test all
+python tests/test_mcp_server_consolidated.py --all
 ```
 
 This script helps verify that the MCP server is running correctly and that all the required tools are available and functioning properly before launching the Streamlit client.

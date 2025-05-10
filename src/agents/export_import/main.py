@@ -11,7 +11,9 @@ from typing import Dict, List, Any, Optional, Union, Tuple, Annotated, TypedDict
 
 from langchain.schema import HumanMessage, AIMessage
 # StrOutputParser removed (unavailable in this langchain version)
-
+from dotenv import load_dotenv
+load_dotenv()
+import os
 try:
     from langgraph.graph import StateGraph, END
     from langgraph.prebuilt import ToolNode
@@ -42,10 +44,10 @@ import export_import_tools
 from export_import_tools import run_export_flow as run_export_flow_direct, run_import_flow as run_import_flow_direct
 
 def create_export_import_agent(
-    odoo_url: str = "http://localhost:8069",
-    odoo_db: str = "llmdb18",
-    odoo_username: str = "admin",
-    odoo_password: str = "admin"
+    odoo_url: str = os.getenv("ODOO_URL", "http://localhost:8069"),
+    odoo_db: str = os.getenv("ODOO_DB", "llmdb18"),
+    odoo_username: str = os.getenv("ODOO_USERNAME", "admin"),
+    odoo_password: str = os.getenv("ODOO_PASSWORD", "admin")
 ) -> StateGraph:
     """
     Create the Export/Import agent flow.

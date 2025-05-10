@@ -8,7 +8,9 @@ State management for the Export/Import agent flow.
 from enum import Enum
 from typing import Dict, List, Optional, Union, Any
 from pydantic import BaseModel, Field
-
+from dotenv import load_dotenv
+load_dotenv()
+import os
 
 class FlowMode(str, Enum):
     """Mode of operation for the agent flow."""
@@ -55,10 +57,10 @@ class AgentState(BaseModel):
     import_state: ImportState = Field(default_factory=ImportState)
     current_step: str = "initialize"
     history: List[str] = Field(default_factory=list)
-    odoo_url: str = "http://localhost:8069"
-    odoo_db: str = "llmdb18"
-    odoo_username: str = "admin"
-    odoo_password: str = "admin"
+    odoo_url: str = os.getenv("ODOO_URL", "http://localhost:8069")
+    odoo_db: str = os.getenv("ODOO_DB", "llmdb18")
+    odoo_username: str = os.getenv("ODOO_USERNAME", "admin")
+    odoo_password: str = os.getenv("ODOO_PASSWORD", "admin")
     
     def get_current_state(self) -> Union[ExportState, ImportState]:
         """Get the current state based on the mode."""

@@ -32,6 +32,13 @@ This directory contains consolidated test scripts for the Odoo 18 MCP Project. T
   - Export-import cycle
   - Related models export-import
 
+- **test_enhanced_rag.py**: Tests for the enhanced RAG tool with Gemini integration and online search, including:
+  - Basic retrieval functionality
+  - Gemini integration for summarization
+  - Online search integration
+  - Combined functionality (local docs + online search + Gemini)
+  - MCP tool integration
+
 ## Running the Tests
 
 ### 1. MCP Server Consolidated Tests

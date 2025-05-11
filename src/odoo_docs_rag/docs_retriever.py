@@ -16,6 +16,10 @@ from .embedding_engine import EmbeddingEngine
 from .db_storage import EmbeddingDatabase
 from .utils import logger
 
+# Import the new components
+from .online_search import OnlineSearch
+from .gemini_summarizer import GeminiSummarizer
+
 
 class OdooDocsRetriever:
     """Main class for retrieving information from Odoo documentation."""
@@ -32,6 +36,8 @@ class OdooDocsRetriever:
         db_path: Optional[str] = None,  # Add database path parameter
         update_repo: bool = False,  # Whether to update the repository
         skip_embedding_if_exists: bool = False,  # Skip embedding creation if they exist
+        use_gemini: bool = True,  # Whether to use Gemini for summarization
+        use_online_search: bool = True,  # Whether to use online search
     ):
         """Initialize the Odoo documentation retriever.
 
@@ -46,6 +52,8 @@ class OdooDocsRetriever:
             db_path: Optional path to the database file (if db is not provided)
             update_repo: Whether to update the repository even if it exists
             skip_embedding_if_exists: Skip embedding creation if database already exists
+            use_gemini: Whether to use Gemini for summarization
+            use_online_search: Whether to use online search for additional results
         """
         # Set up directories
         self.docs_dir = Path(docs_dir) if docs_dir else None
@@ -90,6 +98,24 @@ class OdooDocsRetriever:
         # Store the update_repo and skip_embedding_if_exists parameters
         self.update_repo = update_repo
         self.skip_embedding_if_exists = skip_embedding_if_exists
+
+        # Initialize online search
+        self.online_search = OnlineSearch() if use_online_search else None
+        self.use_online_search = use_online_search and self.online_search and self.online_search.is_available
+
+        # Initialize Gemini summarizer
+        self.gemini_summarizer = GeminiSummarizer() if use_gemini else None
+        self.use_gemini = use_gemini and self.gemini_summarizer and self.gemini_summarizer.is_available
+
+        if self.use_gemini:
+            logger.info("Gemini summarizer is available and will be used")
+        else:
+            logger.info("Gemini summarizer is not available or disabled")
+
+        if self.use_online_search:
+            logger.info("Online search is available and will be used")
+        else:
+            logger.info("Online search is not available or disabled")
 
         # Check if we can skip embedding creation
         if skip_embedding_if_exists and self.db and self.db.has_embeddings():
@@ -455,3 +481,142 @@ class OdooDocsRetriever:
 
         # Format the results
         return self.format_results(results, query)
+
+    def enhanced_query(
+        self,
+        query: str,
+        max_results: int = 5,
+        min_score: float = 0.5,
+        use_gemini: Optional[bool] = None,
+        use_online_search: Optional[bool] = None,
+    ) -> str:
+        """Query the Odoo documentation with enhanced features.
+
+        This method combines local documentation search, online search,
+        and Gemini summarization for comprehensive results.
+
+        Args:
+            query: Query text
+            max_results: Maximum number of results to return
+            min_score: Minimum similarity score for results
+            use_gemini: Override the instance setting for using Gemini
+            use_online_search: Override the instance setting for using online search
+
+        Returns:
+            Formatted string with the enhanced results
+        """
+        # Use instance settings if not overridden
+        use_gemini = self.use_gemini if use_gemini is None else use_gemini
+        use_online_search = self.use_online_search if use_online_search is None else use_online_search
+
+        # Get documentation results
+        doc_results = self.retrieve(query, max_results=max_results, min_score=min_score)
+
+        # Get online search results if enabled
+        online_results = []
+        if use_online_search and self.online_search:
+            online_results = self.online_search.search(query, count=max_results)
+
+        # Use Gemini to summarize if available
+        if use_gemini and self.gemini_summarizer:
+            return self.gemini_summarizer.summarize(query, doc_results, online_results)
+        else:
+            # Fall back to standard formatting
+            return self._format_combined_results(query, doc_results, online_results)
+
+    def _format_combined_results(
+        self,
+        query: str,
+        doc_results: List[Dict[str, Any]],
+        online_results: List[Dict[str, Any]]
+    ) -> str:
+        """Format combined results from documentation and online search.
+
+        Args:
+            query: Original query
+            doc_results: Results from documentation search
+            online_results: Results from online search
+
+        Returns:
+            Formatted string with combined results
+        """
+        output = f"# Results for: {query}\n\n"
+
+        # Add documentation results
+        output += "## Documentation Results\n\n"
+        if not doc_results:
+            output += "No relevant documentation found.\n\n"
+        else:
+            for i, result in enumerate(doc_results[:3]):  # Limit to top 3
+                # Extract title from metadata or use filename
+                title = None
+                if "metadata" in result and "title" in result["metadata"]:
+                    title = result["metadata"]["title"]
+                elif "source" in result:
+                    file_name = os.path.basename(result["source"])
+                    title = file_name.replace("_", " ").replace(".md", "").replace(".rst", "").title()
+
+                # Format the result with a more descriptive header
+                output += f"### {i+1}. {title or f'Result {i+1}'}\n\n"
+
+                # Add source information if available
+                if "source" in result:
+                    file_name = os.path.basename(result["source"])
+                    relative_path = result["source"]
+                    source_info = f" (Section: {result.get('metadata', {}).get('section', 'Unknown')})" if "metadata" in result and "section" in result["metadata"] else ""
+
+                    output += f"**Source**: {file_name}{source_info}\n"
+                    output += f"**Path**: {relative_path}\n\n"
+
+                # Add the content
+                output += result["text"] + "\n\n"
+
+        # Add online results
+        if online_results:
+            output += "## Online Search Results\n\n"
+            for i, result in enumerate(online_results[:3]):  # Limit to top 3
+                output += f"### {i+1}. {result['title']}\n\n"
+                output += f"**Source**: [{result['url']}]({result['url']})\n\n"
+                output += f"{result['description']}\n\n"
+
+        # Add suggestions for related searches
+        output += "## Related Searches\n\n"
+
+        # Generate related search suggestions based on the query
+        related_searches = []
+
+        if "tax" in query.lower():
+            related_searches.extend([
+                "Odoo 18 tax configuration",
+                "Odoo 18 tax reports",
+                "Odoo 18 fiscal positions",
+            ])
+
+        if "india" in query.lower() or "indian" in query.lower():
+            related_searches.extend([
+                "Odoo 18 Indian GST",
+                "Odoo 18 TDS TCS configuration",
+                "Odoo 18 e-invoicing India",
+            ])
+
+        if "localization" in query.lower():
+            related_searches.extend([
+                "Odoo 18 fiscal localization packages",
+                "Odoo 18 accounting localization",
+                "Odoo 18 country-specific features",
+            ])
+
+        # If no specific related searches, add general ones
+        if not related_searches:
+            related_searches = [
+                "Odoo 18 accounting setup",
+                "Odoo 18 developer guide",
+                "Odoo 18 module development",
+                "Odoo 18 technical documentation",
+            ]
+
+        # Add the related searches to the output
+        for search in related_searches[:3]:  # Limit to 3 suggestions
+            output += f"- {search}\n"
+
+        return output

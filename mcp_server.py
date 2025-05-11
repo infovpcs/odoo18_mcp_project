@@ -2446,16 +2446,19 @@ try:
 
     # Tool for retrieving Odoo documentation
     @mcp.tool()
-    def retrieve_odoo_documentation(query: str, max_results: int = 5) -> str:
+    def retrieve_odoo_documentation(query: str, max_results: int = 5, use_gemini: bool = True, use_online_search: bool = True) -> str:
         """Retrieve information from Odoo 18 documentation based on a query.
 
         This tool searches the official Odoo 18 documentation repository and returns
         relevant information based on your query. It uses semantic search to find
-        the most relevant documentation sections.
+        the most relevant documentation sections. It can also use Gemini LLM to summarize
+        results and include online search results for a more comprehensive response.
 
         Args:
             query: The query to search for in the Odoo documentation
             max_results: Maximum number of results to return (default: 5)
+            use_gemini: Whether to use Gemini LLM for summarization (default: True)
+            use_online_search: Whether to include online search results (default: True)
 
         Returns:
             A formatted string with the search results from the Odoo documentation
@@ -2507,29 +2510,40 @@ try:
             if processed_query != query:
                 logger.info(f"Processed query: '{processed_query}'")
 
-            # Query the documentation with a higher max_results to get more options
-            results = odoo_docs_retriever_instance.query(
-                processed_query, max_results=max_results
-            )
-
-            # If no results found, try with a more general query
-            if "No relevant information found" in results:
-                logger.info(
-                    f"No results found for '{processed_query}', trying more general query"
+            # Use the enhanced query method if available
+            if hasattr(odoo_docs_retriever_instance, 'enhanced_query'):
+                logger.info(f"Using enhanced query with Gemini: {use_gemini}, Online Search: {use_online_search}")
+                results = odoo_docs_retriever_instance.enhanced_query(
+                    processed_query,
+                    max_results=max_results,
+                    use_gemini=use_gemini,
+                    use_online_search=use_online_search
                 )
-
-                # Create a more general query by removing specific terms
-                general_query = query.lower()
-                for term in ["18.0", "18", "odoo", "with"]:
-                    general_query = general_query.replace(term, "")
-
-                general_query = f"Odoo 18 {general_query.strip()}"
-                logger.info(f"General query: '{general_query}'")
-
-                # Try with the general query
+            else:
+                # Fall back to standard query if enhanced_query is not available
+                logger.info("Enhanced query not available, using standard query")
                 results = odoo_docs_retriever_instance.query(
-                    general_query, max_results=max_results
+                    processed_query, max_results=max_results
                 )
+
+                # If no results found, try with a more general query
+                if "No relevant information found" in results:
+                    logger.info(
+                        f"No results found for '{processed_query}', trying more general query"
+                    )
+
+                    # Create a more general query by removing specific terms
+                    general_query = query.lower()
+                    for term in ["18.0", "18", "odoo", "with"]:
+                        general_query = general_query.replace(term, "")
+
+                    general_query = f"Odoo 18 {general_query.strip()}"
+                    logger.info(f"General query: '{general_query}'")
+
+                    # Try with the general query
+                    results = odoo_docs_retriever_instance.query(
+                        general_query, max_results=max_results
+                    )
 
             return results
         except Exception as e:

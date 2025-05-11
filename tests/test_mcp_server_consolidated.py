@@ -339,6 +339,15 @@ def test_retrieve_odoo_documentation():
         "max_results": 3
     }, timeout=120)
 
+def test_retrieve_odoo_documentation_enhanced():
+    """Test the enhanced retrieve_odoo_documentation tool with Gemini and online search."""
+    return call_tool("retrieve_odoo_documentation", {
+        "query": "How to create a custom module in Odoo 18",
+        "max_results": 3,
+        "use_gemini": True,
+        "use_online_search": True
+    }, timeout=180)  # Longer timeout for enhanced retrieval
+
 def test_validate_field_value():
     """Test the validate_field_value tool."""
     return call_tool("validate_field_value", {
@@ -404,6 +413,7 @@ def main():
     # Advanced search and documentation tests
     parser.add_argument("--advanced", action="store_true", help="Test advanced_search tool")
     parser.add_argument("--docs", action="store_true", help="Test retrieve_odoo_documentation tool")
+    parser.add_argument("--enhanced-docs", action="store_true", help="Test enhanced retrieve_odoo_documentation tool")
 
     # Field analysis tests
     parser.add_argument("--validate", action="store_true", help="Test validate_field_value tool")
@@ -485,6 +495,9 @@ def main():
 
     if args.all or args.docs:
         tests.append(("Retrieve Odoo Documentation", test_retrieve_odoo_documentation))
+
+    if args.all or args.enhanced_docs:
+        tests.append(("Enhanced Retrieve Odoo Documentation", test_retrieve_odoo_documentation_enhanced))
 
     # Field analysis tests
     if args.all or args.field_tools or args.validate:

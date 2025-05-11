@@ -45,7 +45,7 @@ A robust integration server that connects MCP (Master Control Program) with Odoo
 - **Performance Optimization**: Caching and resource usage optimization
 - **Monitoring**: Built-in monitoring capabilities for tracking performance
 - **Comprehensive Documentation**: API docs, setup guides, and troubleshooting information
-- **Odoo Documentation Retrieval**: RAG-based retrieval of information from the official Odoo 18 documentation
+- **Odoo Documentation Retrieval**: RAG-based retrieval of information from the official Odoo 18 documentation with Gemini LLM integration and online search capability
 - **Odoo Code Agent**: Generate Odoo 18 modules and code using a structured workflow
 - **LangGraph Workflow**: Analysis, planning, human feedback, coding, and finalization phases
 - **Two-Stage Human Validation**: Interactive workflow with validation points after planning and coding
@@ -112,19 +112,29 @@ pip install -e .
 cp .env.example .env
 ```
 
-5. Edit the `.env` file with your Odoo connection details and optional Gemini API key:
+5. Edit the `.env` file with your Odoo connection details, optional Gemini API key, and optional Brave Search API key:
 
 ```
+# Odoo connection details
 ODOO_URL=http://localhost:8069
 ODOO_DB=llmdb18
 ODOO_USERNAME=admin
 ODOO_PASSWORD=admin
+
+# Gemini LLM integration for Odoo Code Agent and RAG tool
 GEMINI_API_KEY=your_gemini_api_key_here
 GEMINI_MODEL=gemini-2.0-flash
+
+# Brave Search API for online search in RAG tool
+BRAVE_API_KEY=your_brave_api_key_here
+
+# Odoo documentation paths
 ODOO_DOCS_DIR="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs",
 ODOO_INDEX_DIR="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index",
 ODOO_DB_PATH="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index/embeddings.db"
 ```
+
+> **Note**: The `BRAVE_API_KEY` is required for the online search functionality in the enhanced RAG tool. You can obtain a Brave Search API key from the [Brave Search Developer Portal](https://brave.com/search/api/).
 
 ### Claude Desktop Integration
 
@@ -205,6 +215,7 @@ You can also manually update the Claude Desktop configuration file:
             "ODOO_PASSWORD": "admin",
             "GEMINI_API_KEY": "your_gemini_api_key_here",
             "GEMINI_MODEL": "gemini-2.0-flash",
+            "BRAVE_API_KEY": "your_brave_api_key_here",
             "ODOO_DOCS_DIR": "/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs",
             "ODOO_INDEX_DIR": "/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index",
             "ODOO_DB_PATH" : "/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index/embeddings.db"
@@ -216,6 +227,7 @@ You can also manually update the Claude Desktop configuration file:
 **Important Configuration Notes**:
 - Replace `/full/path/to/your/python` with the actual full path to your Python executable. You can find this by running `which python3` in your terminal. For example, if you're using a virtual environment, it might be something like `/Users/username/workspace/odoo18_mcp_project/.venv/bin/python3`.
 - Replace `your_gemini_api_key_here` with your actual Google Gemini API key if you want to use the Odoo Code Agent with Gemini integration.
+- Replace `your_brave_api_key_here` with your actual Brave Search API key if you want to use the online search functionality in the enhanced RAG tool. You can obtain a Brave Search API key from the [Brave Search Developer Portal](https://brave.com/search/api/).
 - Make sure the path to `mcp_server.py` is correct for your installation.
 
 #### Verifying the Installation
@@ -408,6 +420,9 @@ ODOO_URL=http://your-odoo-server:8069
 ODOO_DB=your_database
 ODOO_USERNAME=your_username
 ODOO_PASSWORD=your_password
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-2.0-flash
+BRAVE_API_KEY=your_brave_api_key_here
 ODOO_DOCS_DIR="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs",
 ODOO_INDEX_DIR="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index",
 ODOO_DB_PATH="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index/embeddings.db"
@@ -479,7 +494,7 @@ Once you've configured Claude Desktop, you can use the Odoo 18 MCP integration:
 | **export_related_records_to_csv** | Export parent-child records to CSV | `/tool export_related_records_to_csv parent_model=account.move child_model=account.move.line relation_field=move_id move_type=out_invoice export_path="./tmp/customer_invoices.csv"` | ✅ Working |
 | **import_related_records_from_csv** | Import parent-child records from CSV | `/tool import_related_records_from_csv parent_model=account.move child_model=account.move.line relation_field=move_id input_path="./tmp/customer_invoices.csv" reset_to_draft=true skip_readonly_fields=true` | ✅ Working |
 | **advanced_search** | Perform advanced natural language search | `/tool advanced_search query="List all unpaid bills with respect of vendor details" limit=10` | ✅ Working |
-| **retrieve_odoo_documentation** | Retrieve information from Odoo 18 documentation | `/tool retrieve_odoo_documentation query="How to create a custom module in Odoo 18" max_results=5` | ✅ Working |
+| **retrieve_odoo_documentation** | Retrieve information from Odoo 18 documentation | `/tool retrieve_odoo_documentation query="How to create a custom module in Odoo 18" max_results=5 use_gemini=true use_online_search=true` | ✅ Working |
 | **validate_field_value** | Validate a field value for a model | `/tool validate_field_value model_name=res.partner field_name=email value="test@example.com"` | ✅ Working |
 | **run_odoo_code_agent** | Generate Odoo 18 module code | `/tool run_odoo_code_agent_tool query="Create a customer feedback module" use_gemini=true use_ollama=false` | ✅ Working |
 | **generate_npx** | Generate PNG image from Mermaid markdown | `/tool generate_npx code="graph TD; A[Start] --> B[Process]; B --> C[End]" name="workflow" theme="default" backgroundColor="white"` | ✅ Working |
@@ -671,10 +686,10 @@ The standalone server provides the same functionality as the MCP server used by 
 You can test individual tools using curl or any HTTP client:
 
 ```bash
-# Test the retrieve_odoo_documentation tool
+# Test the retrieve_odoo_documentation tool with enhanced features
 curl -X POST "http://127.0.0.1:8001/call_tool" \
   -H "Content-Type: application/json" \
-  -d '{"tool": "retrieve_odoo_documentation", "params": {"query": "How to create a custom module in Odoo 18", "max_results": 5}}'
+  -d '{"tool": "retrieve_odoo_documentation", "params": {"query": "How to create a custom module in Odoo 18", "max_results": 5, "use_gemini": true, "use_online_search": true}}'
 
 # Test the advanced_search tool
 curl -X POST "http://127.0.0.1:8001/call_tool" \
@@ -1400,27 +1415,55 @@ We've implemented a powerful Retrieval Augmented Generation (RAG) tool for acces
 
 13. **Dependency Management**: The tool handles dependencies gracefully, with proper error messages when required packages are missing.
 
-14. **Test Scripts**: Comprehensive test scripts (`test_odoo_docs_rag.py` and `test_specific_queries.py`) are provided to verify the functionality works correctly with various query types, including specialized tests for tax and localization queries.
+14. **Google Gemini Integration**: The tool integrates with Google's Gemini LLM to summarize and enhance search results, providing more coherent and comprehensive responses.
+
+15. **Online Search Capability**: Using the Brave Search API, the tool can supplement local documentation with relevant information from the web, providing a more complete answer.
+
+16. **Combined Results**: The enhanced query functionality combines local documentation, online search results, and Gemini summarization to provide the most comprehensive and useful responses.
+
+17. **Test Scripts**: Comprehensive test scripts (`test_enhanced_rag.py`, `test_odoo_docs_rag.py`, and `test_specific_queries.py`) are provided to verify the functionality works correctly with various query types, including specialized tests for tax and localization queries.
 
 ### Example Usage
 
 #### Using the MCP tool in Claude Desktop:
 
 ```
-/tool retrieve_odoo_documentation query="How to create a custom module in Odoo 18" max_results=5
+/tool retrieve_odoo_documentation query="How to create a custom module in Odoo 18" max_results=5 use_gemini=true use_online_search=true
 ```
 
-This will return relevant sections from the Odoo 18 documentation about creating custom modules, with source information and context.
+This will return relevant sections from the Odoo 18 documentation about creating custom modules, combined with online search results and summarized by Gemini LLM for a more comprehensive response.
 
 #### Using the Standalone MCP Server:
 
 ```bash
 curl -X POST "http://127.0.0.1:8001/call_tool" \
   -H "Content-Type: application/json" \
-  -d '{"tool": "retrieve_odoo_documentation", "params": {"query": "How to create a custom module in Odoo 18", "max_results": 5}}'
+  -d '{"tool": "retrieve_odoo_documentation", "params": {"query": "How to create a custom module in Odoo 18", "max_results": 5, "use_gemini": true, "use_online_search": true}}'
 ```
 
-#### Testing the RAG Tool
+#### Testing the Enhanced RAG Tool
+
+The enhanced RAG tool can be tested using the `test_enhanced_rag.py` script, which tests all aspects of the tool:
+
+```bash
+python tests/test_enhanced_rag.py --all
+```
+
+This will test the basic retrieval functionality, online search integration, Gemini summarization, enhanced query with all components, and MCP tool integration.
+
+#### Configuration
+
+To use the enhanced RAG tool with all features, you need to set up the following environment variables in your `.env` file:
+
+```
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-2.0-flash
+BRAVE_API_KEY=your_brave_api_key_here
+```
+
+The tool is designed to be resilient and will work with whatever components are available. If Gemini or Brave Search is not available, it will fall back to using only the available components.
+
+#### Customizing the RAG Tool
 
 The quality of the RAG tool's responses depends on the documentation available in the index. The tool currently indexes 32 documents from the Odoo 18 documentation repository. To improve the quality of responses, you can add more documentation files to the `odoo_docs` directory and rebuild the index by setting `force_rebuild=True` in the `OdooDocsRetriever` constructor.
 
@@ -1428,7 +1471,9 @@ The quality of the RAG tool's responses depends on the documentation available i
 odoo_docs_retriever_instance = OdooDocsRetriever(
     docs_dir=docs_dir,
     index_dir=index_dir,
-    force_rebuild=True  # Force rebuilding the index
+    force_rebuild=True,  # Force rebuilding the index
+    use_gemini=True,     # Enable Gemini integration
+    use_online_search=True  # Enable online search
 )
 ```
 

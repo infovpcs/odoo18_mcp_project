@@ -9,12 +9,17 @@ It supports both the standard MCP protocol and a fallback to the custom HTTP API
 
 import json
 import logging
+import os
 import requests
 import time
 import uuid
 import asyncio
 from typing import Any, Dict, List, Optional
 from enum import Enum
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Import MCP SDK (for future use)
 try:
@@ -718,23 +723,33 @@ class MCPConnector:
 
         return result
 
-    def retrieve_odoo_documentation(self, query: str, max_results: int = 5) -> Dict[str, Any]:
+    def retrieve_odoo_documentation(self, query: str, max_results: int = 5, use_gemini: bool = True, use_online_search: bool = True) -> Dict[str, Any]:
         """Retrieve information from Odoo 18 documentation.
 
         Args:
             query: The query to search for
             max_results: Maximum number of results to return
+            use_gemini: Whether to use Gemini LLM for summarization
+            use_online_search: Whether to include online search results
 
         Returns:
             Documentation results
         """
         params = {
             "query": query,
-            "max_results": max_results
+            "max_results": max_results,
+            "use_gemini": use_gemini,
+            "use_online_search": use_online_search
         }
 
         # Log the query for debugging
-        logger.info(f"Retrieving Odoo documentation with query: {query}")
+        logger.info(f"Retrieving Odoo documentation with query: {query} (Gemini: {use_gemini}, Online Search: {use_online_search})")
+
+        # Log environment variables for debugging (without showing sensitive values)
+        brave_api_key = os.getenv('BRAVE_API_KEY')
+        gemini_api_key = os.getenv('GEMINI_API_KEY')
+        logger.info(f"Environment check - BRAVE_API_KEY set: {'Yes' if brave_api_key else 'No'}")
+        logger.info(f"Environment check - GEMINI_API_KEY set: {'Yes' if gemini_api_key else 'No'}")
 
         # The tool-specific settings are now handled in _http_call_tool
         return self.call_tool("retrieve_odoo_documentation", params)

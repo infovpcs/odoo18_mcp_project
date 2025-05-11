@@ -373,6 +373,11 @@ odoo18-mcp-project/
    - Handle error cases and fallbacks ✅
    - Add fallback to more general queries when specific queries fail ✅
    - Implement specialized handling for tax and localization queries ✅
+   - Add Google Gemini integration for result summarization ✅
+   - Implement online search capability using Brave Search API ✅
+   - Create enhanced query method combining local docs, online search, and Gemini ✅
+   - Add proper error handling and fallbacks for enhanced features ✅
+   - Update MCP tool to support enhanced query parameters ✅
 
 ### Mermaid Diagram Generation
 1. **Diagram Generation Tool**

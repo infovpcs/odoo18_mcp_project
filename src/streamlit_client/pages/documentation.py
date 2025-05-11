@@ -55,6 +55,24 @@ def render_documentation_page(session_state: SessionState, mcp_connector: MCPCon
             help="Maximum number of results to return."
         )
 
+    # Advanced options
+    with st.expander("Advanced Options"):
+        col1, col2 = st.columns(2)
+
+        with col1:
+            use_gemini = st.checkbox(
+                "Use Gemini LLM",
+                value=session_state.documentation.use_gemini,
+                help="Use Google's Gemini LLM to summarize and enhance the search results."
+            )
+
+        with col2:
+            use_online_search = st.checkbox(
+                "Include Online Search",
+                value=session_state.documentation.use_online_search,
+                help="Include results from online search in addition to local documentation."
+            )
+
     # Search button
     if st.button("Search", type="primary"):
         if not query:
@@ -64,13 +82,17 @@ def render_documentation_page(session_state: SessionState, mcp_connector: MCPCon
         # Update session state
         session_state.documentation.query = query
         session_state.documentation.max_results = max_results
+        session_state.documentation.use_gemini = use_gemini
+        session_state.documentation.use_online_search = use_online_search
 
         # Show a spinner while processing
         with st.spinner("Searching documentation..."):
             # Call the MCP tool
             result = mcp_connector.retrieve_odoo_documentation(
                 query=query,
-                max_results=max_results
+                max_results=max_results,
+                use_gemini=use_gemini,
+                use_online_search=use_online_search
             )
 
             if result.get("success", False):

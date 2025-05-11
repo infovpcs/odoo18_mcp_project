@@ -110,6 +110,19 @@ Last Updated: 2025-05-29
 - [x] Create test script for specific tax and localization queries
 - [x] Update documentation with improved RAG functionality
 
+## Phase 31: Enhanced RAG with Gemini and Online Search (2025-05-11)
+- [x] Create online_search.py module for Brave Search API integration
+- [x] Implement gemini_summarizer.py for Gemini LLM integration
+- [x] Add enhanced_query method to OdooDocsRetriever class
+- [x] Implement proper error handling and fallbacks for enhanced features
+- [x] Update MCP tool to support enhanced query parameters
+- [x] Add use_gemini and use_online_search parameters to retrieve_odoo_documentation tool
+- [x] Create test_enhanced_rag.py for testing enhanced RAG functionality
+- [x] Update test_mcp_server_consolidated.py to test enhanced documentation retrieval
+- [x] Add google-generativeai dependency to requirements.txt and pyproject.toml
+- [x] Update README.md with enhanced RAG functionality information
+- [x] Update PLANNING.md and TASK.md with enhanced RAG tasks
+
 ## Phase 11: MCP Server Testing and Fixes (2025-05-02)
 - [x] Create comprehensive test script for MCP server tools
 - [x] Fix update_record test case to handle different success messages

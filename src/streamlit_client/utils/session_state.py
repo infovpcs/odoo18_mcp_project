@@ -87,6 +87,20 @@ class DocumentationState:
     max_results: int = 5
     results: List[Dict[str, Any]] = field(default_factory=list)
     raw_results: str = ""
+    use_gemini: bool = True
+    use_online_search: bool = True
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get an attribute value by key with a default fallback.
+
+        Args:
+            key: The attribute name to get
+            default: Default value if the attribute doesn't exist
+
+        Returns:
+            The attribute value or default
+        """
+        return getattr(self, key, default)
 
 @dataclass
 class ChatMessage:

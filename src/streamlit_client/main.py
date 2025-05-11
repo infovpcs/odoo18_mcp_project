@@ -253,7 +253,12 @@ def handle_chat_message(session_state: SessionState, mcp_connector: MCPConnector
                 time.sleep(0.02)
 
             # Call the documentation retrieval with polling
-            doc_result = mcp_connector.retrieve_odoo_documentation(query=message, max_results=5)
+            doc_result = mcp_connector.retrieve_odoo_documentation(
+                query=message,
+                max_results=5,
+                use_gemini=True,
+                use_online_search=True
+            )
 
             # Continue progress bar while waiting for response
             for i in range(30, 101):

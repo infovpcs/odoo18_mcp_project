@@ -162,7 +162,8 @@ mcp install mcp_server.py --name "Odoo 18 Integration" \
   -v GEMINI_MODEL=gemini-2.0-flash \
   -v ODOO_DOCS_DIR="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs" \
   -v ODOO_INDEX_DIR="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index" \
-  -v ODOO_DB_PATH="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index/embeddings.db"
+  -v ODOO_DB_PATH="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index/embeddings.db" \
+  -v BRAVE_API_KEY=your_brave_api_key_here
 ```
 
 This command will:

@@ -61,6 +61,7 @@ local_settings.py
 
 # Database files
 *.db
+!odoo_docs_index/embeddings.db
 *.sqlite3
 
 # Temporary files
@@ -72,7 +73,6 @@ exports/
 
 # Odoo Documentation RAG
 odoo_docs/
-odoo_docs_index/
 
 # Generated Odoo modules
 generated_modules/

@@ -1,0 +1,34 @@
+2025-05-28 14:28:31,954 - odoo_docs_rag - WARNING - Google Generative AI package not found. Install with 'pip install google-generativeai'
+2025-05-28 14:28:31,955 - odoo_docs_rag - INFO - OdooDocsRetriever patched to use existing embeddings
+2025-05-28 14:28:31,955 - odoo_mcp - INFO - Odoo documentation retriever and storage imported successfully
+2025-05-28 14:28:31,968 - odoo_mcp - WARNING - Odoo code agent not available. Import error: No module named 'odoo_code_agent'
+2025-05-28 14:28:31,969 - odoo_mcp - WARNING - Make sure the odoo_code_agent module is properly installed
+2025-05-28 14:28:32,205 - odoo_mcp - INFO - Connecting to Odoo at http://127.0.0.1:8069, database llmdb18
+2025-05-28 14:28:32,206 - odoo_mcp - ERROR - Error connecting to Odoo: [Errno 111] Connection refused
+2025-05-28 14:28:32,207 - odoo_mcp - ERROR - Failed to initialize Odoo model discovery: [Errno 111] Connection refused
+2025-05-28 14:28:32,207 - odoo_mcp - INFO - Initializing Odoo documentation retriever with docs_dir=/app/./odoo_docs, db_path=/app/./odoo_docs_index/embeddings.db
+2025-05-28 14:28:32,207 - odoo_mcp - WARNING - Missing dependency for Odoo documentation retriever: No module named 'sentence_transformers'
+2025-05-28 14:28:32,207 - odoo_mcp - WARNING - Install the required dependencies: sentence-transformers, faiss-cpu, beautifulsoup4, markdown, gitpython
+2025-05-28 14:28:32,265 - mcp.server.fastmcp.tools.tool_manager - WARNING - Tool already exists: query_deepwiki
+2025-05-28 14:28:32,267 - mcp.server.fastmcp.tools.tool_manager - WARNING - Tool already exists: query_deepwiki
+2025-05-28 14:28:32,268 - mcp.server.fastmcp.tools.tool_manager - WARNING - Tool already exists: query_deepwiki
+2025-05-28 14:28:32,270 - mcp.server.fastmcp.tools.tool_manager - WARNING - Tool already exists: query_deepwiki
+2025-05-28 14:28:32,274 - odoo_mcp - INFO - Odoo documentation retriever and storage imported successfully
+2025-05-28 14:28:32,284 - odoo_mcp - WARNING - Odoo code agent not available. Import error: No module named 'odoo_code_agent'
+2025-05-28 14:28:32,284 - odoo_mcp - WARNING - Make sure the odoo_code_agent module is properly installed
+2025-05-28 14:28:32,287 - odoo_mcp - INFO - Connecting to Odoo at http://127.0.0.1:8069, database llmdb18
+2025-05-28 14:28:32,288 - odoo_mcp - ERROR - Error connecting to Odoo: [Errno 111] Connection refused
+2025-05-28 14:28:32,288 - odoo_mcp - ERROR - Failed to initialize Odoo model discovery: [Errno 111] Connection refused
+2025-05-28 14:28:32,288 - odoo_mcp - INFO - Initializing Odoo documentation retriever with docs_dir=/app/./odoo_docs, db_path=/app/./odoo_docs_index/embeddings.db
+2025-05-28 14:28:32,288 - odoo_mcp - WARNING - Missing dependency for Odoo documentation retriever: No module named 'sentence_transformers'
+2025-05-28 14:28:32,288 - odoo_mcp - WARNING - Install the required dependencies: sentence-transformers, faiss-cpu, beautifulsoup4, markdown, gitpython
+2025-05-28 14:28:32,381 - mcp.server.fastmcp.tools.tool_manager - WARNING - Tool already exists: query_deepwiki
+2025-05-28 14:28:32,383 - mcp.server.fastmcp.tools.tool_manager - WARNING - Tool already exists: query_deepwiki
+2025-05-28 14:28:32,385 - mcp.server.fastmcp.tools.tool_manager - WARNING - Tool already exists: query_deepwiki
+2025-05-28 14:28:32,386 - mcp.server.fastmcp.tools.tool_manager - WARNING - Tool already exists: query_deepwiki
+2025-05-28 14:28:32,386 - standalone_mcp_server - INFO - Loaded 18 tools from MCP server: retrieve_odoo_documentation, advanced_search, search_records, create_record, update_record, delete_record, execute_method, export_records_to_csv, import_records_from_csv, export_related_records_to_csv, import_related_records_from_csv, validate_field_value, run_odoo_code_agent_tool, analyze_field_importance, get_field_groups, get_record_template, generate_npx, query_deepwiki
+2025-05-28 14:28:32,387 - standalone_mcp_server - INFO - Starting standalone MCP server at 0.0.0.0:8001
+INFO:     Started server process [13836]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)

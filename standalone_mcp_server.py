@@ -108,6 +108,7 @@ try:
         get_record_template,
         # Visualization tools
         generate_npx,
+        query_deepwiki, # Added import
     )
 
     # Add the tools to our dictionary
@@ -139,6 +140,7 @@ try:
 
     # Visualization tools
     tools["generate_npx"] = generate_npx
+    tools["query_deepwiki"] = query_deepwiki # Added registration
 
 except Exception as e:
     logger.error(f"Error getting tools from MCP server: {str(e)}")

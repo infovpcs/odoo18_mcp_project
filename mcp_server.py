@@ -33,6 +33,8 @@ try:
 
     # Import the direct export/import implementation
     import subprocess
+    import requests # Ensured for query_deepwiki
+    from bs4 import BeautifulSoup # Ensured for query_deepwiki
 
     # Import the advanced search implementation
     from advanced_search import AdvancedSearch
@@ -3149,13 +3151,13 @@ try:
 
         Args:
             code: The mermaid markdown to generate an image from
-            name: Name of the diagram (optional)
-            theme: Theme for the diagram (optional)
-            backgroundColor: Background color for the diagram, e.g. 'white', 'transparent', '#F0F0F0' (optional)
-            folder: Absolute path to save the image to (optional)
+            name: Name of the diagram (optional), used for the filename.
+            theme: Theme for the diagram (optional, e.g., 'default', 'forest', 'dark', 'neutral').
+            backgroundColor: Background color for the diagram (e.g., 'white', 'transparent', '#F0F0F0').
+            folder: Absolute path to save the image to. If None, defaults to '/app/exports/diagrams/'.
 
         Returns:
-            A confirmation message with the path to the generated image
+            A confirmation message with the path to the generated image, or an error message.
         """
         try:
             import subprocess
@@ -3165,68 +3167,365 @@ try:
             import re
             from pathlib import Path
 
-            logger.info(f"Generating mermaid diagram with {len(code)} characters of code")
+            logger.info(f"Generating mermaid diagram with {len(code)} characters of code. Name: {name}, Folder: {folder}")
 
-            # Create a temporary directory for the mermaid files
-            with tempfile.TemporaryDirectory() as temp_dir:
-                # Create a temporary file for the mermaid code
-                mermaid_file = os.path.join(temp_dir, "diagram.mmd")
-                with open(mermaid_file, "w") as f:
-                    f.write(code)
+            # Determine the output directory
+            if folder:
+                output_dir = Path(folder)
+                if not output_dir.is_absolute():
+                    # If folder is relative, it's relative to /app
+                    output_dir = Path("/tmp") / folder
+            else:
+                output_dir = Path("/tmp")
+            
+            # Create the output directory if it doesn't exist
+            try:
+                output_dir.mkdir(parents=True, exist_ok=True)
+                logger.info(f"Ensured output directory exists: {output_dir.resolve()}")
+            except Exception as e:
+                logger.error(f"Error creating directory {output_dir}: {e}")
+                return f"# Error: Could not create directory {output_dir}: {e}"
 
-                # Determine the output path
-                if folder:
-                    # Make sure the folder exists
-                    os.makedirs(folder, exist_ok=True)
-                    output_dir = folder
+            # Determine the output filename
+            if name:
+                # Sanitize the name to be a valid filename
+                safe_name = re.sub(r'[^\w\-_\.]', '_', name)
+                output_file_name = f"{safe_name}.png"
+            else:
+                # Use a timestamp as the filename if no name is provided
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                output_file_name = f"diagram_{timestamp}.png"
+            
+            # Construct the absolute path for the output file
+            absolute_output_file = (output_dir / output_file_name).resolve()
+            
+            # Create a temporary file for the mermaid code in a standard temporary directory
+            with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".mmd") as tmp_mmd_file:
+                tmp_mmd_file.write(code)
+                input_file_path = tmp_mmd_file.name
+            
+            logger.info(f"Temporary Mermaid input file: {input_file_path}")
+            logger.info(f"Target output file: {absolute_output_file}")
+
+            cmd = ["npx", "-y", "@mermaid-js/mermaid-cli", "-i", input_file_path, "-o", str(absolute_output_file)]
+
+            if theme:
+                cmd.extend(["--theme", theme])
+            if backgroundColor:
+                cmd.extend(["--backgroundColor", backgroundColor])
+
+            logger.info(f"Executing command: {' '.join(cmd)} with cwd='/app'")
+            
+            process_result = subprocess.run(
+                cmd, 
+                capture_output=True, 
+                text=True, 
+                cwd="/tmp" # Explicitly set current working directory
+            )
+            
+            logger.info(f"Mermaid CLI return code: {process_result.returncode}")
+            logger.info(f"Mermaid CLI stdout: {process_result.stdout.strip()}")
+            if process_result.stderr:
+                logger.error(f"Mermaid CLI stderr: {process_result.stderr.strip()}")
+
+            # Clean up the temporary mmd file
+            try:
+                os.unlink(input_file_path)
+                logger.info(f"Temporary input file {input_file_path} deleted.")
+            except OSError as e_unlink:
+                logger.error(f"Error removing temporary file {input_file_path}: {e_unlink}")
+
+            if process_result.returncode == 0:
+                if absolute_output_file.exists():
+                    logger.info(f"Diagram successfully generated: {absolute_output_file}")
+                    return f"# Mermaid Diagram Generated Successfully\n\nThe diagram has been saved to: `{absolute_output_file}`"
                 else:
-                    # Use a default folder in the project directory
-                    output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exports", "diagrams")
-                    os.makedirs(output_dir, exist_ok=True)
-
-                # Determine the output filename
-                if name:
-                    # Sanitize the name to be a valid filename
-                    name = re.sub(r'[^\w\-_\.]', '_', name)
-                    output_file = os.path.join(output_dir, f"{name}.png")
-                else:
-                    # Use a timestamp as the filename
-                    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                    output_file = os.path.join(output_dir, f"diagram_{timestamp}.png")
-
-                # Skip the specialized mermaid-mcp-server package and use standard mermaid-cli directly
-                logger.info("Falling back to standard @mermaid-js/mermaid-cli")
-                cmd = ["npx", "-y", "@mermaid-js/mermaid-cli", "-i", mermaid_file, "-o", output_file]
-
-                # Add theme if specified
-                if theme:
-                    cmd.extend(["--theme", theme])
-
-                # Add background color if specified
-                if backgroundColor:
-                    cmd.extend(["--backgroundColor", backgroundColor])
-
-                # Run the command
-                logger.info(f"Running command: {' '.join(cmd)}")
-                result = subprocess.run(cmd, capture_output=True, text=True)
-
-                # Check if the command was successful
-                if result.returncode != 0:
-                    error_msg = f"Error generating mermaid diagram: {result.stderr}"
+                    error_msg = f"Mermaid CLI reported success (RC: {process_result.returncode}) but output file not found at {absolute_output_file}.\nStdout: {process_result.stdout}\nStderr: {process_result.stderr}"
                     logger.error(error_msg)
                     return f"# Error Generating Mermaid Diagram\n\n{error_msg}"
+            else:
+                error_msg = f"Mermaid CLI failed with return code {process_result.returncode}.\nStdout: {process_result.stdout}\nStderr: {process_result.stderr}"
+                logger.error(error_msg)
+                return f"# Error Generating Mermaid Diagram\n\n{error_msg}"
 
-                # Check if the output file was created
-                if not os.path.exists(output_file):
-                    error_msg = "Output file was not created"
-                    logger.error(error_msg)
-                    return f"# Error Generating Mermaid Diagram\n\n{error_msg}"
-
-                # Return a success message with the path to the generated image
-                return f"# Mermaid Diagram Generated Successfully\n\nThe diagram has been saved to: `{output_file}`"
+        except FileNotFoundError:
+            logger.error("Mermaid CLI (npx) not found. Make sure Node.js and npx are installed and in PATH.")
+            return "Error: Mermaid CLI (npx) not found. Please ensure Node.js and npx are installed and in your PATH."
         except Exception as e:
-            logger.error(f"Error generating mermaid diagram: {str(e)}")
-            return f"# Error Generating Mermaid Diagram\n\n{str(e)}"
+            logger.error(f"An unexpected error occurred in generate_npx: {str(e)}", exc_info=True)
+            # Ensure cleanup of temp file even if other errors occur
+            if 'input_file_path' in locals() and os.path.exists(input_file_path):
+                try:
+                    os.unlink(input_file_path)
+                except OSError as e_unlink_finally:
+                    logger.error(f"Error removing temporary file {input_file_path} in finally block: {e_unlink_finally}")
+            return f"# Error in generate_npx tool\n\nAn unexpected error occurred: {str(e)}"
+
+    @mcp.tool()
+    def query_deepwiki(target_url: str, query: Optional[str] = None) -> str:
+       '''Fetches content from a DeepWiki page.
+
+       Args:
+           target_url: The DeepWiki URL to fetch (e.g., https://deepwiki.com/odoo/documentation).
+           query: An optional query string (currently not used for server-side filtering,
+                  but can be used by the client or for future enhancements).
+
+       Returns:
+           The plain text content of the DeepWiki page or an error message.
+       '''
+       import requests 
+       from bs4 import BeautifulSoup
+
+       logger.info(f"Querying DeepWiki URL: {target_url}")
+       if query:
+           logger.info(f"User query (currently informational): {query}")
+
+       if not target_url.startswith("https://deepwiki.com/"):
+           logger.warning(f"Invalid DeepWiki URL: {target_url}")
+           return "# Error: Invalid URL\n\nOnly URLs starting with 'https://deepwiki.com/' are allowed for this tool."
+
+       try:
+           response = requests.get(target_url, timeout=10) # 10 second timeout
+           response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
+           
+           # For DeepWiki, the content seems to be HTML.
+           # To get plain text, we should parse the HTML.
+           soup = BeautifulSoup(response.content, 'html.parser')
+           
+           # Extract text from main content areas if possible, otherwise full text.
+           # This might need refinement based on DeepWiki's actual structure.
+           # Attempt to find common main content tags.
+           main_content = soup.find('main') or soup.find('article') or soup.find('div', class_='content') # Add more as needed
+           if main_content:
+               text_content = main_content.get_text(separator='\n', strip=True)
+           else:
+               # Fallback: try to remove common non-content tags
+               for SCRIPT_TAG in soup(["script", "style", "header", "footer", "nav", "aside"]): 
+                   SCRIPT_TAG.extract() 
+               text_content = soup.get_text(separator='\n', strip=True)
+
+
+           logger.info(f"Successfully fetched content from {target_url}. Length: {len(text_content)}")
+           return text_content
+
+       except requests.exceptions.RequestException as e:
+           logger.error(f"Error fetching DeepWiki URL {target_url}: {str(e)}")
+           return f"# Error: Could not fetch content\n\nFailed to retrieve content from {target_url}. Error: {str(e)}"
+       except Exception as e:
+           logger.error(f"An unexpected error occurred while processing {target_url}: {str(e)}", exc_info=True)
+           return f"# Error: An unexpected error occurred\n\nDetails: {str(e)}"
+
+
+    @mcp.tool()
+    def query_deepwiki(target_url: str, query: Optional[str] = None) -> str:
+       '''Fetches content from a DeepWiki page.
+
+       Args:
+           target_url: The DeepWiki URL to fetch (e.g., https://deepwiki.com/odoo/documentation).
+           query: An optional query string (currently not used for server-side filtering,
+                  but can be used by the client or for future enhancements).
+
+       Returns:
+           The plain text content of the DeepWiki page or an error message.
+       '''
+       logger.info(f"Querying DeepWiki URL: {target_url}")
+       if query:
+           logger.info(f"User query (currently informational): {query}")
+
+       if not target_url.startswith("https://deepwiki.com/"):
+           logger.warning(f"Invalid DeepWiki URL: {target_url}")
+           return "# Error: Invalid URL\n\nOnly URLs starting with 'https://deepwiki.com/' are allowed for this tool."
+
+       try:
+           response = requests.get(target_url, timeout=10) # 10 second timeout
+           response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
+           
+           # For DeepWiki, the content seems to be HTML.
+           # To get plain text, we should parse the HTML.
+           soup = BeautifulSoup(response.content, 'html.parser')
+           
+           # Extract text from main content areas if possible, otherwise full text.
+           # This might need refinement based on DeepWiki's actual structure.
+           # Attempt to find common main content tags.
+           main_content = soup.find('main') or soup.find('article') or soup.find('div', class_='content') # Add more as needed
+           if main_content:
+               text_content = main_content.get_text(separator='\n', strip=True)
+           else:
+               # Fallback: try to remove common non-content tags
+               for SCRIPT_TAG in soup(["script", "style", "header", "footer", "nav", "aside"]): 
+                   SCRIPT_TAG.extract() 
+               text_content = soup.get_text(separator='\n', strip=True)
+
+
+           logger.info(f"Successfully fetched content from {target_url}. Length: {len(text_content)}")
+           return text_content
+
+       except requests.exceptions.RequestException as e:
+           logger.error(f"Error fetching DeepWiki URL {target_url}: {str(e)}")
+           return f"# Error: Could not fetch content\n\nFailed to retrieve content from {target_url}. Error: {str(e)}"
+       except Exception as e:
+           logger.error(f"An unexpected error occurred while processing {target_url}: {str(e)}", exc_info=True)
+           return f"# Error: An unexpected error occurred\n\nDetails: {str(e)}"
+
+    @mcp.tool()
+    def query_deepwiki(target_url: str, query: Optional[str] = None) -> str:
+       '''Fetches content from a DeepWiki page.
+
+       Args:
+           target_url: The DeepWiki URL to fetch (e.g., https://deepwiki.com/odoo/documentation).
+           query: An optional query string (currently not used for server-side filtering,
+                  but can be used by the client or for future enhancements).
+
+       Returns:
+           The plain text content of the DeepWiki page or an error message.
+       '''
+       import requests 
+       from bs4 import BeautifulSoup
+
+       logger.info(f"Querying DeepWiki URL: {target_url}")
+       if query:
+           logger.info(f"User query (currently informational): {query}")
+
+       if not target_url.startswith("https://deepwiki.com/"):
+           logger.warning(f"Invalid DeepWiki URL: {target_url}")
+           return "# Error: Invalid URL\n\nOnly URLs starting with 'https://deepwiki.com/' are allowed for this tool."
+
+       try:
+           response = requests.get(target_url, timeout=10) # 10 second timeout
+           response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
+           
+           # For DeepWiki, the content seems to be HTML.
+           # To get plain text, we should parse the HTML.
+           soup = BeautifulSoup(response.content, 'html.parser')
+           
+           # Extract text from main content areas if possible, otherwise full text.
+           # This might need refinement based on DeepWiki's actual structure.
+           # Attempt to find common main content tags.
+           main_content = soup.find('main') or soup.find('article') or soup.find('div', class_='content') # Add more as needed
+           if main_content:
+               text_content = main_content.get_text(separator='\n', strip=True)
+           else:
+               # Fallback: try to remove common non-content tags
+               for SCRIPT_TAG in soup(["script", "style", "header", "footer", "nav", "aside"]): 
+                   SCRIPT_TAG.extract() 
+               text_content = soup.get_text(separator='\n', strip=True)
+
+
+           logger.info(f"Successfully fetched content from {target_url}. Length: {len(text_content)}")
+           return text_content
+
+       except requests.exceptions.RequestException as e:
+           logger.error(f"Error fetching DeepWiki URL {target_url}: {str(e)}")
+           return f"# Error: Could not fetch content\n\nFailed to retrieve content from {target_url}. Error: {str(e)}"
+       except Exception as e:
+           logger.error(f"An unexpected error occurred while processing {target_url}: {str(e)}", exc_info=True)
+           return f"# Error: An unexpected error occurred\n\nDetails: {str(e)}"
+
+
+    @mcp.tool()
+    def query_deepwiki(target_url: str, query: Optional[str] = None) -> str:
+       '''Fetches content from a DeepWiki page.
+
+       Args:
+           target_url: The DeepWiki URL to fetch (e.g., https://deepwiki.com/odoo/documentation).
+           query: An optional query string (currently not used for server-side filtering,
+                  but can be used by the client or for future enhancements).
+
+       Returns:
+           The plain text content of the DeepWiki page or an error message.
+       '''
+       import requests 
+       from bs4 import BeautifulSoup
+
+       logger.info(f"Querying DeepWiki URL: {target_url}")
+       if query:
+           logger.info(f"User query (currently informational): {query}")
+
+       if not target_url.startswith("https://deepwiki.com/"):
+           logger.warning(f"Invalid DeepWiki URL: {target_url}")
+           return "# Error: Invalid URL\n\nOnly URLs starting with 'https://deepwiki.com/' are allowed for this tool."
+
+       try:
+           response = requests.get(target_url, timeout=10) # 10 second timeout
+           response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
+           
+           # For DeepWiki, the content seems to be HTML.
+           # To get plain text, we should parse the HTML.
+           soup = BeautifulSoup(response.content, 'html.parser')
+           
+           # Extract text from main content areas if possible, otherwise full text.
+           # This might need refinement based on DeepWiki's actual structure.
+           # Attempt to find common main content tags.
+           main_content = soup.find('main') or soup.find('article') or soup.find('div', class_='content') # Add more as needed
+           if main_content:
+               text_content = main_content.get_text(separator='\n', strip=True)
+           else:
+               # Fallback: try to remove common non-content tags
+               for SCRIPT_TAG in soup(["script", "style", "header", "footer", "nav", "aside"]): 
+                   SCRIPT_TAG.extract() 
+               text_content = soup.get_text(separator='\n', strip=True)
+
+
+           logger.info(f"Successfully fetched content from {target_url}. Length: {len(text_content)}")
+           return text_content
+
+       except requests.exceptions.RequestException as e:
+           logger.error(f"Error fetching DeepWiki URL {target_url}: {str(e)}")
+           return f"# Error: Could not fetch content\n\nFailed to retrieve content from {target_url}. Error: {str(e)}"
+       except Exception as e:
+           logger.error(f"An unexpected error occurred while processing {target_url}: {str(e)}", exc_info=True)
+           return f"# Error: An unexpected error occurred\n\nDetails: {str(e)}"
+
+
+    @mcp.tool()
+    def query_deepwiki(target_url: str, query: Optional[str] = None) -> str:
+       '''Fetches content from a DeepWiki page.
+
+       Args:
+           target_url: The DeepWiki URL to fetch (e.g., https://deepwiki.com/odoo/documentation).
+           query: An optional query string (currently not used for server-side filtering,
+                  but can be used by the client or for future enhancements).
+
+       Returns:
+           The plain text content of the DeepWiki page or an error message.
+       '''
+       # requests and BeautifulSoup are imported at the top level now
+       logger.info(f"Querying DeepWiki URL: {target_url} with query: {query}")
+
+       if not target_url.startswith("https://deepwiki.com/"):
+           logger.warning(f"Invalid DeepWiki URL: {target_url}")
+           return "# Error: Invalid URL\n\nOnly URLs starting with 'https://deepwiki.com/' are allowed for this tool."
+
+       try:
+           response = requests.get(target_url, timeout=10) 
+           response.raise_for_status() 
+           
+           soup = BeautifulSoup(response.content, 'html.parser')
+           
+           main_content = soup.find('main') or soup.find('article') or soup.find('div', class_='content')
+           if main_content:
+               text_content = main_content.get_text(separator='\n', strip=True)
+           else:
+               # Fallback: remove common non-content tags and then get text
+               for SCRIPT_TAG in soup(["script", "style", "header", "footer", "nav", "aside", "form", "button", "input", "select", "textarea"]):
+                   SCRIPT_TAG.extract() 
+               text_content = soup.get_text(separator='\n', strip=True)
+
+           logger.info(f"Successfully fetched content from {target_url}. Length: {len(text_content)}")
+           if not text_content.strip(): # Check if the extracted text is empty or only whitespace
+               logger.warning(f"No meaningful content extracted from {target_url} after stripping tags.")
+               return f"# Warning: No Content\n\nNo meaningful text content found on {target_url} after processing."
+           return text_content
+
+       except requests.exceptions.HTTPError as http_err:
+           logger.error(f"HTTP error fetching DeepWiki URL {target_url}: {str(http_err)}")
+           return f"# Error: HTTP Error {http_err.response.status_code}\n\nFailed to retrieve content from {target_url}. Server responded with status: {http_err.response.status_code}"
+       except requests.exceptions.RequestException as e:
+           logger.error(f"Error fetching DeepWiki URL {target_url}: {str(e)}")
+           return f"# Error: Could not fetch content\n\nFailed to retrieve content from {target_url}. Error: {str(e)}"
+       except Exception as e:
+           logger.error(f"An unexpected error occurred while processing {target_url}: {str(e)}", exc_info=True)
+           return f"# Error: An unexpected error occurred\n\nDetails: {str(e)}"
 
     # Main entry point
     if __name__ == "__main__":

@@ -767,3 +767,5 @@ Last Updated: 2025-05-29
 - [x] Test the MCP tool with various queries (2025-05-04)
 - [x] Test the file saving functionality (2025-05-04)
 - [x] Update documentation with MCP tool usage information (2025-05-04)
+- [x] Implement DeepWiki integration for AI documentation lookups (2025-05-29)
+- [x] Create test script for DeepWiki tool functionality (2025-05-29)

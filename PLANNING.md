@@ -26,6 +26,7 @@ This project aims to create a robust integration server that connects MCP (Maste
    - CSV handling and processing ✅
    - Odoo documentation retrieval (RAG) ✅
    - Mermaid diagram generation ✅
+   - DeepWiki integration for documentation lookups ✅
 
 2. **Odoo Code Agent**
    - Analysis phase ✅

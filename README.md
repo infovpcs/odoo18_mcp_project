@@ -2383,6 +2383,34 @@ You can also save the generated files to disk:
 /tool run_odoo_code_agent_tool query="Create a simple Odoo 18 module for customer feedback" use_gemini=true save_to_files=true output_dir="./generated_modules"
 ```
 
+## DeepWiki Integration
+
+The MCP server now includes integration with DeepWiki for enhanced AI documentation lookups. This integration provides a more effective way to retrieve and utilize documentation from various AI frameworks and libraries.
+
+### Using the DeepWiki Tool
+
+You can query DeepWiki for documentation using the `query_deepwiki` tool:
+
+```
+/tool query_deepwiki target_url="https://deepwiki.com/odoo/odoo"
+```
+
+Parameters:
+- `target_url`: The DeepWiki URL to query (must start with https://deepwiki.com/)
+
+### DeepWiki Features
+
+- **Enhanced Documentation Retrieval**: Access comprehensive documentation for AI frameworks like OpenAI, Google, Meta, Anthropic, and Hugging Face
+- **Odoo Documentation**: Special support for Odoo core and OWL documentation
+- **Recursive Documentation Loading**: Automatically follows documentation dependencies
+- **Context-Aware References**: Provides AI-contextual references to improve understanding
+
+### Supported Framework Documentation
+
+- **AI Frameworks**: OpenAI (GPT, Assistants API, Function Calling), Google (LangGraph, Vertex AI, Gemini), Meta (LLaMA), Anthropic (Claude API), Hugging Face, and more
+- **AI Toolkits**: LangChain, LangGraph, Haystack, AutoGPT, CrewAI, AgentVerse
+- **ERP & Integration**: Odoo Core and OWL, Zapier, N8N agent pipelines
+
 ## Mermaid Diagram Generation
 
 The MCP server includes a tool for generating diagrams from Mermaid markdown. This is useful for visualizing workflows, entity relationships, and other diagrams directly from Claude Desktop.

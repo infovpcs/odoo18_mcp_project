@@ -69,8 +69,8 @@ def run_test_case1():
                 else:
                     print(f"File NOT FOUND at reported path: {file_path_str}")
                     # Let's check the directory structure as well
-                    exports_dir = "/app/exports"
-                    diagrams_dir = "/app/exports/diagrams"
+                    exports_dir = "/Users/vinusoft85/workspace/odoo18_mcp_project/exports"
+                    diagrams_dir = "/Users/vinusoft85/workspace/odoo18_mcp_project/exports/diagrams"
                     print(f"Checking existence of {exports_dir}: {os.path.exists(exports_dir)}")
                     if os.path.exists(exports_dir):
                         print(f"Contents of {exports_dir}: {os.listdir(exports_dir)}")

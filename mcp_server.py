@@ -3174,9 +3174,9 @@ try:
                 output_dir = Path(folder)
                 if not output_dir.is_absolute():
                     # If folder is relative, it's relative to /app
-                    output_dir = Path("/app") / folder
+                    output_dir = Path("/tmp") / folder
             else:
-                output_dir = Path("/app/exports/diagrams")
+                output_dir = Path("/tmp")
             
             # Create the output directory if it doesn't exist
             try:
@@ -3220,7 +3220,7 @@ try:
                 cmd, 
                 capture_output=True, 
                 text=True, 
-                cwd="/app" # Explicitly set current working directory
+                cwd="/tmp" # Explicitly set current working directory
             )
             
             logger.info(f"Mermaid CLI return code: {process_result.returncode}")

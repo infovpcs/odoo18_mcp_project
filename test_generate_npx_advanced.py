@@ -94,7 +94,7 @@ def test_case_4_custom_folder():
     print("\n=== Test Case 4: Generation with Custom Folder ===")
     mermaid_code = "graph TD; A-->B;"
     diagram_name = "test_diagram_custom_folder"
-    custom_folder = "/tmp/custom_diagrams_output" # Using /tmp as it's generally writable
+    custom_folder = "/Users/vinusoft85/workspace/odoo18_mcp_project/exports/diagrams/custom_diagrams_output" 
     
     # Ensure the custom folder exists for verification, though the tool should create it
     os.makedirs(custom_folder, exist_ok=True)

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Main Menu -->
+    <menuitem id="menu_{{ name|snake }}_root"
+              name="{{ name|pascal }}"
+              web_icon="{{ name|snake }},static/description/icon.png"
+              sequence="10"/>
+    
+    <!-- Sub Menus -->
+    <menuitem id="menu_{{ name|snake }}_main"
+              name="{{ name|pascal }}"
+              parent="menu_{{ name|snake }}_root"
+              sequence="10"/>
+    
+    <!-- Menu Items -->
+    <menuitem id="menu_{{ name|snake }}"
+              name="{{ name|pascal }}"
+              parent="menu_{{ name|snake }}_main"
+              action="action_{{ name|snake }}"
+              sequence="10"/>
+</odoo>

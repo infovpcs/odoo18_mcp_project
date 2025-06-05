@@ -1,0 +1,29 @@
+# -*- coding: utf-8 -*-
+
+from odoo import models, fields, api, _
+from odoo.exceptions import ValidationError
+
+
+class {{ name|pascal }}(models.TransientModel):
+    _name = '{{ name|snake }}.{{ name|snake }}'
+    _description = '{{ name|pascal }} Wizard'
+    _rec_name = 'name'
+
+    name = fields.Char(string='Name', required=True)
+    description = fields.Text(string='Description')
+    active = fields.Boolean(default=True)
+
+    # Add your fields here
+
+    @api.model
+    def create(self, vals):
+        return super({{ name|pascal }}, self).create(vals)
+
+    def write(self, vals):
+        return super({{ name|pascal }}, self).write(vals)
+
+    def action_confirm(self):
+        """ Example action for the wizard """
+        self.ensure_one()
+        # Add your wizard logic here
+        return {'type': 'ir.actions.act_window_close'}

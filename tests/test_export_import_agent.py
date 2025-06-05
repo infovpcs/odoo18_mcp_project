@@ -14,6 +14,7 @@ import logging
 import argparse
 from typing import Dict, Any, Optional, List, Tuple
 from dotenv import load_dotenv
+import pytest
 
 # Add the project root directory to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -126,7 +127,7 @@ try:
                 )
 except ImportError:
     print("Failed to import Export/Import Agent. Make sure the package is installed.")
-    sys.exit(1)
+    pass # Allow pytest to continue collection
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -146,9 +147,10 @@ TEST_DATA_DIR = os.path.join(project_root, "tests", "data")
 os.makedirs(TEST_DATA_DIR, exist_ok=True)
 
 
+@pytest.mark.parametrize("model_name", ["res.partner"])
 def test_export_flow(model_name: str, domain: Optional[str] = None,
                     fields: Optional[List[str]] = None, limit: int = 10,
-                    export_path: Optional[str] = None) -> Tuple[bool, Dict[str, Any]]:
+                    export_path: Optional[str] = None):
     """Test the export flow of the Export/Import Agent.
 
     Args:
@@ -182,43 +184,26 @@ def test_export_flow(model_name: str, domain: Optional[str] = None,
     )
 
     # Check if the export was successful
-    if result.get("error"):
-        logger.error(f"Export failed: {result['error']}")
-        return False, result
+    assert result.get("error") is None, f"Export failed: {result.get('error')}"
 
     # Check if the file was created
-    if not os.path.exists(export_path):
-        logger.error(f"Export file was not created: {export_path}")
-        return False, result
+    assert os.path.exists(export_path), f"Export file was not created: {export_path}"
 
     # Get file size
     file_size = os.path.getsize(export_path)
     logger.info(f"Export successful. File created at: {export_path} (Size: {file_size} bytes)")
 
     # Check if the file has content
-    if file_size == 0:
-        logger.error("Export file is empty")
-        return False, result
+    assert file_size > 0, "Export file is empty"
 
     return True, result
 
 
-def test_import_flow(model_name: str, input_path: str,
+def _run_import_flow(model_name: str, input_path: str,
                     field_mapping: Optional[Dict[str, str]] = None,
                     create_if_not_exists: bool = True,
                     update_if_exists: bool = True) -> Tuple[bool, Dict[str, Any]]:
-    """Test the import flow of the Export/Import Agent.
-
-    Args:
-        model_name: Name of the model to import into
-        input_path: Path to the CSV file to import
-        field_mapping: Mapping from CSV field names to Odoo field names
-        create_if_not_exists: Whether to create new records if they don't exist
-        update_if_exists: Whether to update existing records
-
-    Returns:
-        Tuple of (success, result)
-    """
+    """Helper function to run the import flow."""
     logger.info(f"Testing import flow for model: {model_name}")
 
     # Check if the input file exists
@@ -249,19 +234,10 @@ def test_import_flow(model_name: str, input_path: str,
     return True, result
 
 
+@pytest.mark.parametrize("model_name", ["res.partner"])
 def test_export_import_cycle(model_name: str, domain: Optional[str] = None,
-                           fields: Optional[List[str]] = None, limit: int = 10) -> bool:
-    """Test a complete export-import cycle for a model.
-
-    Args:
-        model_name: Name of the model to test
-        domain: Domain filter in string format
-        fields: List of fields to export
-        limit: Maximum number of records to export
-
-    Returns:
-        True if the test was successful, False otherwise
-    """
+                           fields: Optional[List[str]] = None, limit: int = 10):
+    """Test a complete export-import cycle for a model."""
     logger.info(f"Testing export-import cycle for model: {model_name}")
 
     # Export path
@@ -276,37 +252,23 @@ def test_export_import_cycle(model_name: str, domain: Optional[str] = None,
         export_path=export_path
     )
 
-    if not export_success:
-        logger.error("Export step failed")
-        return False
+    assert export_success, "Export step failed"
 
     # Step 2: Import
-    import_success, import_result = test_import_flow(
+    import_success, import_result = _run_import_flow(
         model_name=model_name,
         input_path=export_path
     )
 
-    if not import_success:
-        logger.error("Import step failed")
-        return False
+    assert import_success, "Import step failed"
 
     logger.info("Export-import cycle completed successfully")
-    return True
 
 
+@pytest.mark.parametrize("parent_model, child_model, relation_field", [("res.partner", "res.partner.bank", "partner_id")])
 def test_related_models_export_import(parent_model: str, child_model: str,
-                                    relation_field: str, limit: int = 5) -> bool:
-    """Test export and import of related models.
-
-    Args:
-        parent_model: Name of the parent model
-        child_model: Name of the child model
-        relation_field: Field in the child model that relates to the parent
-        limit: Maximum number of parent records to export
-
-    Returns:
-        True if the test was successful, False otherwise
-    """
+                                    relation_field: str, limit: int = 5):
+    """Test export and import of related models."""
     logger.info(f"Testing related models export-import for {parent_model} and {child_model}")
 
     # Export path
@@ -327,14 +289,10 @@ def test_related_models_export_import(parent_model: str, child_model: str,
     )
 
     # Check if the export was successful
-    if export_result.get("error"):
-        logger.error(f"Related models export failed: {export_result['error']}")
-        return False
+    assert export_result.get("error") is None, f"Related models export failed: {export_result.get('error')}"
 
     # Check if the file was created
-    if not os.path.exists(export_path):
-        logger.error(f"Related models export file was not created: {export_path}")
-        return False
+    assert os.path.exists(export_path), f"Related models export file was not created: {export_path}"
 
     # Run the agent in import mode with related models
     import_result = run_export_import_agent(
@@ -350,117 +308,33 @@ def test_related_models_export_import(parent_model: str, child_model: str,
     )
 
     # Check if the import was successful
-    if import_result.get("error"):
-        logger.error(f"Related models import failed: {import_result['error']}")
-        return False
+    assert import_result.get("error") is None, f"Related models import failed: {import_result.get('error')}"
 
     logger.info("Related models export-import completed successfully")
-    return True
 
 
-def main():
-    """Main function to run the tests."""
-    parser = argparse.ArgumentParser(description="Test the Export/Import Agent")
-    parser.add_argument("--export", action="store_true", help="Test export flow")
-    parser.add_argument("--import_data", action="store_true", help="Test import flow")
-    parser.add_argument("--cycle", action="store_true", help="Test export-import cycle")
-    parser.add_argument("--related", action="store_true", help="Test related models export-import")
-    parser.add_argument("--model", default="res.partner", help="Model to test (default: res.partner)")
-    parser.add_argument("--limit", type=int, default=10, help="Maximum number of records to export")
-    parser.add_argument("--mock", action="store_true", help="Run in mock mode without connecting to Odoo")
-    args = parser.parse_args()
+def test_import_flow_standalone(model_name: str = "res.partner"):
+    """Standalone test for the import flow - requires a pre-existing export file."""
+    logger.info(f"Running standalone import test for model: {model_name}")
+    # This test requires a pre-exported file, which might not exist if export tests failed.
+    # For now, we'll skip this test if the cycle test is run, or add a dependency.
+    # A better approach would be to use a temporary directory and generate the file within the test.
+    export_path = os.path.join(TEST_DATA_DIR, f"{model_name.replace('.', '_')}_export.csv")
+    if not os.path.exists(export_path):
+        logger.warning(f"Skipping standalone import test: Export file not found at {export_path}")
+        pytest.skip(f"Export file not found at {export_path}")
 
-    # Check if Odoo is accessible
-    odoo_accessible = True
-    if not args.mock:
-        try:
-            # Try to connect to Odoo
-            import xmlrpc.client
-            common = xmlrpc.client.ServerProxy(f"{ODOO_URL}/xmlrpc/2/common")
-            common.version()
-        except Exception as e:
-            logger.warning(f"Odoo server is not accessible: {str(e)}")
-            logger.warning("Running tests in mock mode. Use --mock flag to suppress this warning.")
-            odoo_accessible = False
-    else:
-        odoo_accessible = False
-        logger.info("Running in mock mode (no Odoo connection)")
+    success, result = _run_import_flow(model_name, export_path)
+    assert success, f"Standalone import test failed: {result.get('error')}"
 
-    # If Odoo is not accessible, create mock data directory and files
-    if not odoo_accessible:
-        # Create mock export files
-        os.makedirs(TEST_DATA_DIR, exist_ok=True)
 
-        # Create a mock CSV file for res.partner
-        partner_csv_path = os.path.join(TEST_DATA_DIR, "res_partner_export.csv")
-        with open(partner_csv_path, "w") as f:
-            f.write("id,name,email,phone\n")
-            f.write("1,Test Partner 1,test1@example.com,+1234567890\n")
-            f.write("2,Test Partner 2,test2@example.com,+0987654321\n")
-
-        # Create a mock CSV file for related models
-        related_csv_path = os.path.join(TEST_DATA_DIR, "res_partner_related.csv")
-        with open(related_csv_path, "w") as f:
-            f.write("id,name,email,phone,_record_type,bank_id,acc_number\n")
-            f.write("1,Test Partner 1,test1@example.com,+1234567890,parent,,\n")
-            f.write("2,,,,,1,1234567890\n")
-            f.write("3,Test Partner 2,test2@example.com,+0987654321,parent,,\n")
-            f.write("4,,,,,2,0987654321\n")
-
-        logger.info(f"Created mock CSV files in {TEST_DATA_DIR}")
-
-    # Run the requested tests
-    if args.export:
-        if odoo_accessible:
-            test_export_flow(args.model, limit=args.limit)
-        else:
-            logger.info("Skipping export test in mock mode")
-
-    if args.import_data:
-        if odoo_accessible:
-            # First export to create a file to import
-            export_path = os.path.join(TEST_DATA_DIR, f"{args.model.replace('.', '_')}_for_import.csv")
-            test_export_flow(args.model, limit=args.limit, export_path=export_path)
-            test_import_flow(args.model, export_path)
-        else:
-            logger.info("Skipping import test in mock mode")
-
-    if args.cycle:
-        if odoo_accessible:
-            test_export_import_cycle(args.model, limit=args.limit)
-        else:
-            logger.info("Skipping export-import cycle test in mock mode")
-
-    if args.related:
-        # Test related models based on the selected model
-        if odoo_accessible:
-            if args.model == "res.partner":
-                test_related_models_export_import("res.partner", "res.partner.bank", "partner_id", limit=args.limit)
-            elif args.model == "sale.order":
-                test_related_models_export_import("sale.order", "sale.order.line", "order_id", limit=args.limit)
-            elif args.model == "account.move":
-                test_related_models_export_import("account.move", "account.move.line", "move_id", limit=args.limit)
-            elif args.model == "project.project":
-                test_related_models_export_import("project.project", "project.task", "project_id", limit=args.limit)
-            else:
-                logger.error(f"Related models test not implemented for model: {args.model}")
-        else:
-            logger.info("Skipping related models test in mock mode")
-
-    # If no specific test is requested, run all tests with default model
-    if not (args.export or args.import_data or args.cycle or args.related):
-        logger.info("Running all tests with default model: res.partner")
-
-        if odoo_accessible:
-            test_export_flow("res.partner", limit=args.limit)
-            test_export_import_cycle("res.partner", limit=args.limit)
-            test_related_models_export_import("res.partner", "res.partner.bank", "partner_id", limit=args.limit)
-        else:
-            logger.info("All tests skipped in mock mode. Use individual test flags with --mock to run specific tests.")
-
-    logger.info("Tests completed successfully")
-    return 0
-
+# Modify the main function to avoid running tests directly
+# This file is now intended to be run by pytest
+def main_for_pytest():
+    """Placeholder main function to avoid direct execution of tests."""
+    pass
 
 if __name__ == "__main__":
-    main()
+    # This block will not be executed by pytest
+    print("This script is intended to be run using pytest.")
+    sys.exit(1)

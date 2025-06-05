@@ -1,0 +1,26 @@
+{
+    'name': '{{ name|pascal }}',
+    'version': '1.0',
+    'category': 'Uncategorized',
+    'summary': 'A custom Odoo module',
+    'description': '''
+{{ name|pascal }} Module
+
+This module provides additional functionality for Odoo.
+''',
+    'author': 'Your Company',
+    'website': 'https://www.example.com',
+    'license': 'LGPL-3',
+    'depends': ['base'],
+    'data': [
+        'security/ir.model.access.csv',
+        'views/menu_views.xml',
+        'views/{{ name|snake }}_views.xml',
+    ],
+    'demo': [
+        'demo/demo_data.xml',
+    ],
+    'installable': True,
+    'application': False,
+    'auto_install': False,
+}

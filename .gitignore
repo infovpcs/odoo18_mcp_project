@@ -76,3 +76,9 @@ odoo_docs/
 
 # Generated Odoo modules
 generated_modules/
+
+# Bmad-agent
+/bmad-agent
+
+# Adding .windsurfrules
+.windsurfrules

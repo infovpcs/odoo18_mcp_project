@@ -116,7 +116,7 @@ class ChatState:
     current_message: str = ""
 
 class SessionState:
-    """Session state manager for the Streamlit client."""
+    """Session state for the Streamlit client."""
 
     def __init__(self):
         """Initialize the session state."""
@@ -129,6 +129,9 @@ class SessionState:
             st.session_state.chat = ChatState()
             st.session_state.mcp_server_url = "http://localhost:8001"
             st.session_state.current_page = "code_agent"
+            st.session_state.deepwiki_documentation = ""
+            st.session_state.last_generated_graph = ""
+            st.session_state.last_mermaid_code = ""
             logger.info("Session state initialized")
 
     @property
@@ -236,3 +239,12 @@ class SessionState:
     def reset_documentation(self):
         """Reset the documentation state."""
         st.session_state.documentation = DocumentationState()
+        
+    def reset_deepwiki(self):
+        """Reset the DeepWiki documentation."""
+        st.session_state.deepwiki_documentation = ""
+        
+    def reset_graph_visualization(self):
+        """Reset the graph visualization state."""
+        st.session_state.last_generated_graph = ""
+        st.session_state.last_mermaid_code = ""

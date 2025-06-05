@@ -9,7 +9,9 @@ import os
 import sys
 import json
 import logging
+import asyncio
 import importlib.util
+import xmlrpc.client # Added xmlrpc.client import
 from typing import Dict, Any, Optional
 from pathlib import Path
 from dotenv import load_dotenv
@@ -21,6 +23,7 @@ import uvicorn
 
 # Load environment variables
 load_dotenv()
+
 
 # Set up logging
 logging.basicConfig(
@@ -83,68 +86,65 @@ if not mcp:
 # Get the tools from the MCP server
 tools = {}
 try:
-    # Import the specific tools we want to test
+    # Import all necessary tools in a single block
     from mcp_server import (
-        # Documentation and search tools
         retrieve_odoo_documentation,
         advanced_search,
         search_records,
-        # CRUD operation tools
         create_record,
         update_record,
         delete_record,
         execute_method,
-        # Export/import tools with enhanced functionality
         export_records_to_csv,
         import_records_from_csv,
         export_related_records_to_csv,
         import_related_records_from_csv,
-        # Validation and code generation tools
         validate_field_value,
-        run_odoo_code_agent_tool,
-        # Field analysis tools
         analyze_field_importance,
         get_field_groups,
         get_record_template,
-        # Visualization tools
         generate_npx,
-        query_deepwiki, # Added import
+        query_deepwiki,
+        improved_generate_odoo_module,
     )
 
-    # Add the tools to our dictionary
-    # Documentation and search tools
+    # Register all imported tools
     tools["retrieve_odoo_documentation"] = retrieve_odoo_documentation
     tools["advanced_search"] = advanced_search
     tools["search_records"] = search_records
-
-    # CRUD operation tools
     tools["create_record"] = create_record
     tools["update_record"] = update_record
     tools["delete_record"] = delete_record
     tools["execute_method"] = execute_method
-
-    # Export/import tools with enhanced functionality
     tools["export_records_to_csv"] = export_records_to_csv
     tools["import_records_from_csv"] = import_records_from_csv
     tools["export_related_records_to_csv"] = export_related_records_to_csv
     tools["import_related_records_from_csv"] = import_related_records_from_csv
-
-    # Validation and code generation tools
     tools["validate_field_value"] = validate_field_value
-    tools["run_odoo_code_agent_tool"] = run_odoo_code_agent_tool
-
-    # Field analysis tools
     tools["analyze_field_importance"] = analyze_field_importance
     tools["get_field_groups"] = get_field_groups
     tools["get_record_template"] = get_record_template
-
-    # Visualization tools
     tools["generate_npx"] = generate_npx
-    tools["query_deepwiki"] = query_deepwiki # Added registration
+    tools["query_deepwiki"] = query_deepwiki
+    tools["improved_generate_odoo_module"] = improved_generate_odoo_module
+
+    logger.info(f"Successfully imported and registered {len(tools)} tools from mcp_server")
 
 except Exception as e:
-    logger.error(f"Error getting tools from MCP server: {str(e)}")
-    tools = {}
+    logger.error(f"Error importing tools from mcp_server: {str(e)}")
+    # Create placeholder functions for all expected tools to avoid KeyError later
+    expected_tools = [
+        "retrieve_odoo_documentation", "advanced_search", "search_records",
+        "create_record", "update_record", "delete_record", "execute_method",
+        "export_records_to_csv", "import_records_from_csv", "export_related_records_to_csv",
+        "import_related_records_from_csv", "validate_field_value", "analyze_field_importance",
+        "get_field_groups", "get_record_template", "generate_npx", "query_deepwiki",
+        "improved_generate_odoo_module"
+    ]
+    for tool_name in expected_tools:
+        tools[tool_name] = lambda **kwargs: {"success": False, "error": f"Tool '{tool_name}' not available due to import error: {str(e)}"}
+    logger.warning(f"Placeholder functions created for {len(expected_tools)} tools due to import error.")
+
 
 logger.info(f"Loaded {len(tools)} tools from MCP server: {', '.join(tools.keys())}")
 
@@ -169,8 +169,30 @@ async def call_tool(request: Request):
 
         # Call the tool
         logger.info(f"Calling tool '{tool_name}' with parameters: {params}")
+        
+        # Check if the tool is an async function and await it if necessary
         result = tools[tool_name](**params)
-
+        
+        # Check if the result is a coroutine (async function) and await it
+        if asyncio.iscoroutine(result):
+            logger.info(f"Tool '{tool_name}' is async, awaiting result")
+            result = await result
+        
+        # Ensure result is properly formatted as a JSON string if it's a dict
+        if isinstance(result, dict):
+            if "result" in result and not isinstance(result["result"], str):
+                try:
+                    # If the result has a nested result dict, ensure it's properly serialized
+                    result["result"] = json.dumps(result["result"], default=str)
+                except (TypeError, ValueError) as e:
+                    logger.warning(f"Failed to serialize result: {str(e)}")
+                    # If serialization fails, create a simple error response
+                    result = {
+                        "success": False,
+                        "error": f"Failed to serialize result: {str(e)}",
+                        "result": "{}"
+                    }
+        
         # Return the result
         return {"success": True, "result": result}
 

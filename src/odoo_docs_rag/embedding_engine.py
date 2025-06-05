@@ -122,7 +122,7 @@ class EmbeddingEngine:
             Numpy array of embeddings
         """
         if not self.model:
-            logger.error("Model not initialized")
+            logger.error("Embedding model is not initialized. Cannot create embeddings.")
             return np.array([])
 
         try:
@@ -632,15 +632,8 @@ class EmbeddingEngine:
             List of similar documents with scores
         """
         if not self.model or not self.index:
-            logger.error("Model or index not initialized. Cannot perform search.")
-            # Attempt to load if not initialized
-            if self.load_index_and_documents():
-                logger.info("Successfully loaded index and documents, retrying search.")
-            else:
-                logger.error(
-                    "Failed to load index and documents. Cannot perform search."
-                )
-                return []
+            logger.error("Embedding model or FAISS index is not initialized. Cannot perform search.")
+            return []
 
         try:
             # Create embedding for the query

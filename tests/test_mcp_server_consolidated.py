@@ -201,15 +201,6 @@ def test_advanced_search():
         "limit": 10
     }, timeout=120)
 
-def test_run_odoo_code_agent():
-    """Test the run_odoo_code_agent_tool."""
-    return call_tool("run_odoo_code_agent_tool", {
-        "query": "Create a simple Odoo 18 module for customer feedback",
-        "use_gemini": False,
-        "use_ollama": False,
-        "wait_for_validation": True
-    }, timeout=180)
-
 def test_export_records():
     """Test the export_records_to_csv tool."""
     return call_tool("export_records_to_csv", {
@@ -429,9 +420,6 @@ def main():
     parser.add_argument("--import-related", action="store_true", help="Test import_related_records_from_csv tool")
     parser.add_argument("--export-import", action="store_true", help="Test all export/import tools")
 
-    # Code agent tests
-    parser.add_argument("--code-agent", action="store_true", help="Test run_odoo_code_agent_tool")
-
     # Visualization tests
     parser.add_argument("--mermaid", action="store_true", help="Test generate_npx tool")
 
@@ -524,10 +512,6 @@ def main():
 
     if args.all or args.export_import or args.import_related:
         tests.append(("Import Related Records", test_import_related_records))
-
-    # Code agent tests
-    if args.all or args.code_agent:
-        tests.append(("Run Odoo Code Agent", test_run_odoo_code_agent))
 
     # Visualization tests
     if args.all or args.mermaid:

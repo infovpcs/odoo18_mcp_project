@@ -3,8 +3,14 @@
 
 import sys
 import traceback
+import os
+from pathlib import Path
 
 from dotenv import load_dotenv
+
+# Add the project root to the Python path
+project_root = Path(__file__).parent.absolute()
+sys.path.insert(0, str(project_root))
 
 load_dotenv()
 
@@ -15,6 +21,23 @@ logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger("odoo_mcp")
+
+# Get MCP log level from environment or default to INFO
+settings_log_level = os.getenv("MCP_LOG_LEVEL", "INFO").upper()
+
+# Set the root logger level based on settings
+# Note: basicConfig above already sets a handler to stderr by default if none exist
+root_logger = logging.getLogger()
+root_logger.setLevel(getattr(logging, settings_log_level, logging.INFO))
+
+# Explicitly set the level for the fastmcp logger to suppress debug output
+# when MCP_LOG_LEVEL is not DEBUG.
+# This targets the specific logger identified in the logs.
+mcp_fastmcp_logger = logging.getLogger("mcp.server.fastmcp")
+if settings_log_level != "DEBUG":
+    mcp_fastmcp_logger.setLevel(logging.INFO) # Set to INFO or higher to suppress DEBUG logs
+else:
+    mcp_fastmcp_logger.setLevel(logging.DEBUG)
 
 try:
     """
@@ -61,19 +84,19 @@ try:
         logger.error(f"Error importing Odoo documentation retriever and storage: {e}")
         odoo_docs_retriever_available = False
 
-    # Import the Odoo code agent
+    # Import the improved Odoo code generator
     try:
-        from src.odoo_code_agent.main import run_odoo_code_agent
+        from src.simple_odoo_code_agent.odoo_code_generator import generate_odoo_module, OdooCodeGenerator
 
-        odoo_code_agent_available = True
-        logger.info("Odoo code agent imported successfully")
+        odoo_code_generator_available = True
+        logger.info("Improved Odoo code generator imported successfully")
     except ImportError as e:
-        logger.warning(f"Odoo code agent not available. Import error: {e}")
-        logger.warning("Make sure the odoo_code_agent module is properly installed")
-        odoo_code_agent_available = False
+        logger.warning(f"Improved Odoo code generator not available. Import error: {e}")
+        logger.warning("Make sure the odoo_code_generator module is properly installed")
+        odoo_code_generator_available = False
     except Exception as e:
-        logger.error(f"Error importing Odoo code agent: {e}")
-        odoo_code_agent_available = False
+        logger.error(f"Error importing improved Odoo code generator: {e}")
+        odoo_code_generator_available = False
 
     from mcp.server.fastmcp import FastMCP, Context, Image
 
@@ -2799,345 +2822,8 @@ try:
             logger.error(f"Error validating field value: {str(e)}")
             return f"# Error validating field value\n\n{str(e)}"
 
-    # Tool for running the Odoo code agent
-    @mcp.tool()
-    def run_odoo_code_agent_tool(
-        query: str,
-        use_gemini: bool = False,
-        use_ollama: bool = False,
-        feedback: Optional[str] = None,
-        save_to_files: bool = False,
-        output_dir: Optional[str] = None,
-        wait_for_validation: bool = False,
-        current_phase: Optional[str] = None,
-        state_dict: Optional[Dict[str, Any]] = None,
-    ) -> str:
-        """Generate Odoo 18 module code based on a natural language query.
-
-        This tool uses the Odoo Code Agent to analyze requirements, plan, and generate
-        code for Odoo 18 modules based on your query. It follows a structured workflow:
-        1. Analysis: Understand requirements and gather documentation
-        2. Planning: Create a plan and tasks for implementation
-        3. Human Feedback 1: Get feedback on the plan
-        4. Coding: Generate module structure and code files
-        5. Human Feedback 2: Get feedback on the generated code
-        6. Finalization: Finalize the code based on feedback
-
-        The agent can optionally use Google Gemini or Ollama as fallback models for improved code generation.
-        It can also save the generated files to disk if requested.
-
-        Args:
-            query: The natural language query describing the module to create
-            use_gemini: Whether to use Google Gemini as a fallback (requires GEMINI_API_KEY in .env)
-            use_ollama: Whether to use Ollama as a fallback (requires Ollama running locally)
-            feedback: Optional feedback to incorporate into the code generation
-            save_to_files: Whether to save the generated files to disk
-            output_dir: Directory to save the generated files to (defaults to ./generated_modules)
-            wait_for_validation: Whether to wait for human validation at validation points
-            current_phase: The current phase to resume from (if continuing execution)
-            state_dict: Serialized state to resume from (if continuing execution)
-
-        Returns:
-            A formatted string with the code generation results
-        """
-        # Check if the Odoo code agent is available
-        if not odoo_code_agent_available:
-            return "# Error: Odoo Code Agent\n\nThe Odoo Code Agent is not available. Please check that the module is properly installed."
-
-        # Validate input parameters
-        if not query or not isinstance(query, str) or len(query.strip()) == 0:
-            return "# Error: Invalid Query\n\nPlease provide a valid query describing the Odoo module you want to create."
-
-        # Check Odoo connection
-        if not model_discovery:
-            return "# Error: Odoo Connection\n\nCould not connect to Odoo server. Please check your connection settings."
-
-        # Check Gemini API key if using Gemini
-        if use_gemini:
-            gemini_api_key = os.getenv("GEMINI_API_KEY")
-            if not gemini_api_key:
-                logger.warning("Gemini API key not found in environment variables")
-                return "# Error: Gemini API Key\n\nGemini API key not found in environment variables. Please set the GEMINI_API_KEY environment variable to use Gemini."
-
-        # Check Ollama if using Ollama
-        if use_ollama:
-            # Simple check to see if Ollama might be available
-            try:
-                import requests
-
-                response = requests.get("http://localhost:11434/api/version", timeout=2)
-                if response.status_code != 200:
-                    logger.warning("Ollama server not available")
-                    return "# Error: Ollama Server\n\nOllama server not available. Please make sure Ollama is running on http://localhost:11434."
-            except Exception as e:
-                logger.warning(f"Error checking Ollama server: {str(e)}")
-                return f"# Error: Ollama Server\n\nError checking Ollama server: {str(e)}. Please make sure Ollama is running on http://localhost:11434."
-
-        try:
-            # Run the Odoo code agent
-            logger.info(f"Running Odoo code agent with query: {query}")
-            logger.info(f"Use Gemini: {use_gemini}, Use Ollama: {use_ollama}")
-            if feedback:
-                logger.info(f"Feedback provided: {feedback[:100]}...")
-            if save_to_files:
-                logger.info(
-                    f"Will save files to disk (output_dir: {output_dir or './generated_modules'})"
-                )
-
-            result = run_odoo_code_agent(
-                query=query,
-                odoo_url=ODOO_URL,
-                odoo_db=ODOO_DB,
-                odoo_username=ODOO_USERNAME,
-                odoo_password=ODOO_PASSWORD,
-                use_gemini=use_gemini,
-                use_ollama=use_ollama,
-                feedback=feedback,
-                save_to_files=save_to_files,
-                output_dir=output_dir,
-                wait_for_validation=wait_for_validation,
-                current_phase=current_phase,
-                state_dict=state_dict,
-            )
-
-            # Check if result is valid
-            if not isinstance(result, dict):
-                logger.error(f"Invalid result from Odoo code agent: {result}")
-                return f"# Error: Invalid Result\n\nThe Odoo code agent returned an invalid result. Please try again."
-
-            # Format the output
-            output = f"# Odoo Code Agent Results\n\n"
-
-            # Add current phase and validation status
-            current_phase = result.get("current_phase", "unknown")
-            requires_validation = result.get("requires_validation", False)
-            is_complete = result.get("is_complete", False)
-
-            # Ensure these values are included in the result data for the client
-            result["current_phase"] = current_phase
-            result["requires_validation"] = requires_validation
-            result["is_complete"] = is_complete
-
-            # Add status information
-            output += f"## Status\n\n"
-            output += f"- **Current Phase**: {current_phase}\n"
-            output += (
-                f"- **Requires Validation**: {'Yes' if requires_validation else 'No'}\n"
-            )
-            output += f"- **Is Complete**: {'Yes' if is_complete else 'No'}\n\n"
-
-            # Add query
-            query_value = result.get("query", "No query provided")
-            output += f"## Query\n\n{query_value}\n\n"
-
-            # Add plan
-            plan_value = result.get("plan", "")
-            if plan_value:
-                # Make sure plan is included in the result data for the client
-                result["plan"] = plan_value
-                output += f"## Plan\n\n{plan_value}\n\n"
-
-            # Add tasks
-            tasks_value = result.get("tasks", [])
-            if tasks_value:
-                # Make sure tasks are included in the result data for the client
-                result["tasks"] = tasks_value
-                output += f"## Tasks\n\n"
-                for i, task in enumerate(tasks_value, 1):
-                    output += f"{i}. {task}\n"
-                output += "\n"
-
-            # Add module information
-            module_name = result.get("module_name", "")
-            if module_name:
-                # Make sure module_name is included in the result data for the client
-                result["module_name"] = module_name
-                output += f"## Module Information\n\n"
-                output += f"- **Module Name**: {module_name}\n"
-
-                # Add module structure if available
-                module_structure = result.get("module_structure", {})
-                if module_structure:
-                    # Make sure module_structure is included in the result data for the client
-                    result["module_structure"] = module_structure
-                    output += f"- **Module Structure**:\n"
-                    for path, info in module_structure.items():
-                        output += f"  - {path}\n"
-                output += "\n"
-
-            # Add files to create
-            files_to_create = result.get("files_to_create", [])
-            if files_to_create:
-                # Make sure files_to_create is included in the result data for the client
-                # Convert to a dictionary format for easier client-side handling
-                files_dict = {}
-                for file_info in files_to_create:
-                    if isinstance(file_info, dict):
-                        file_path = file_info.get("path", "unknown")
-                        file_content = file_info.get("content", "")
-                        files_dict[file_path] = file_content
-
-                # Store the files in a dictionary format in the result
-                result["files_to_create"] = files_dict
-
-                output += f"## Generated Files ({len(files_to_create)})\n\n"
-                for file_info in files_to_create[
-                    :5
-                ]:  # Limit to first 5 files to avoid too much text
-                    if not isinstance(file_info, dict):
-                        continue
-
-                    file_path = file_info.get("path", "unknown")
-                    file_content = file_info.get("content", "")
-
-                    output += f"### {file_path}\n\n"
-
-                    # Determine the language for syntax highlighting based on file extension
-                    file_extension = os.path.splitext(file_path)[1].lower()
-                    language = "python"  # Default to Python
-                    if file_extension == ".xml":
-                        language = "xml"
-                    elif file_extension == ".csv":
-                        language = "csv"
-                    elif file_extension == ".js":
-                        language = "javascript"
-                    elif file_extension == ".css":
-                        language = "css"
-                    elif file_extension == ".html":
-                        language = "html"
-
-                    output += f"```{language}\n"
-                    # Limit content to first 20 lines to avoid too much text
-                    content_lines = file_content.split("\n")[:20]
-                    output += "\n".join(content_lines)
-                    if len(content_lines) < len(file_content.split("\n")):
-                        output += "\n... (content truncated) ..."
-                    output += "\n```\n\n"
-
-                if len(files_to_create) > 5:
-                    output += f"*...and {len(files_to_create) - 5} more files*\n\n"
-
-            # Add error if any
-            error_value = result.get("error", "")
-            if error_value:
-                # Make sure error is included in the result data for the client
-                result["error"] = error_value
-                output += f"## Error\n\n{error_value}\n\n"
-
-            # Add feedback if any
-            feedback_value = result.get("feedback", "")
-            if feedback_value:
-                # Make sure feedback is included in the result data for the client
-                result["feedback"] = feedback_value
-                output += f"## Feedback\n\n{feedback_value}\n\n"
-
-            # Make sure history is included in the result data for the client
-            history = result.get("history", [])
-            if history:
-                result["history"] = history
-
-            # Add information about saved files if applicable
-            save_result = result.get("save_result", {})
-            if save_result:
-                output += "## Files Saved to Disk\n\n"
-                if save_result.get("success", False):
-                    module_dir = save_result.get("module_dir", "unknown")
-                    saved_count = save_result.get("saved_count", 0)
-                    output += (
-                        f"✅ **Success**: {saved_count} files saved to directory:\n"
-                    )
-                    output += f"`{module_dir}`\n\n"
-
-                    # List the first few saved files
-                    saved_files = save_result.get("saved_files", [])
-                    if saved_files:
-                        output += "**Files saved:**\n\n"
-                        for i, file_path in enumerate(saved_files[:5]):
-                            output += f"- `{file_path}`\n"
-                        if len(saved_files) > 5:
-                            output += f"- *...and {len(saved_files) - 5} more files*\n"
-                        output += "\n"
-                else:
-                    error = save_result.get("error", "Unknown error")
-                    output += f"❌ **Error**: Failed to save files: {error}\n\n"
-
-            # Add instructions for using the generated code
-            output += "## Usage Instructions\n\n"
-
-            if save_result and save_result.get("success", False):
-                output += "To use the generated module:\n\n"
-                output += f"1. Copy the module directory from `{save_result.get('module_dir', 'generated_modules')}` to your Odoo addons path\n"
-                output += "2. Install the module in Odoo\n\n"
-            else:
-                output += "To use the generated module:\n\n"
-                output += "1. Create a new directory with the module name in your Odoo addons path\n"
-                output += "2. Create the files as shown above\n"
-                output += "3. Install the module in Odoo\n\n"
-
-            output += "You can also:\n\n"
-
-            # Add different instructions based on validation status
-            if requires_validation:
-                output += "- Provide feedback by calling this tool again with the same parameters plus your feedback\n"
-                output += "- Continue the process by calling this tool again with the same parameters and `wait_for_validation=false`\n"
-
-                # Add state_dict for resuming
-                state_dict_value = result.get("state_dict")
-                if state_dict_value:
-                    # Make sure state_dict is included in the result data for the client
-                    result["state_dict"] = state_dict_value
-
-                    output += "\nTo resume the process later, you can use the following state_dict (truncated for readability):\n\n"
-                    output += "```json\n"
-                    output += "state_dict: <serialized state object>\n"
-                    output += "```\n\n"
-            else:
-                output += "- Provide feedback to refine the generated code by calling this tool again with the feedback parameter\n"
-                output += "- Save the generated files to disk by setting `save_to_files=true` when calling this tool\n"
-
-            # Create a response object with both the formatted output and the structured data
-            response = {
-                "result": output,
-                "data": result  # Include the full result data for the client
-            }
-            return response
-
-        except Exception as e:
-            logger.error(f"Error running Odoo code agent: {str(e)}")
-            error_message = str(e)
-
-            # Provide more helpful error messages for common issues
-            if "GEMINI_API_KEY" in error_message:
-                error_output = "# Error: Gemini API Key\n\nGemini API key not found or invalid. Please set the GEMINI_API_KEY environment variable to use Gemini."
-                return {
-                    "result": error_output,
-                    "data": {"success": False, "error": "Gemini API key not found or invalid"}
-                }
-            elif "Connection refused" in error_message:
-                error_output = "# Error: Connection Issue\n\nCould not connect to a required service. This could be the Odoo server or Ollama server if you're using it."
-                return {
-                    "result": error_output,
-                    "data": {"success": False, "error": "Connection refused to a required service"}
-                }
-            elif "ImportError" in error_message:
-                error_output = "# Error: Missing Dependencies\n\nSome required dependencies are missing. Please make sure all dependencies are installed."
-                return {
-                    "result": error_output,
-                    "data": {"success": False, "error": "Missing dependencies"}
-                }
-            elif "TimeoutError" in error_message:
-                error_output = "# Error: Timeout\n\nThe operation timed out. This could be due to slow network connection or the complexity of the request."
-                return {
-                    "result": error_output,
-                    "data": {"success": False, "error": "Operation timed out"}
-                }
-            else:
-                error_output = f"# Error Running Odoo Code Agent\n\n{error_message}\n\nPlease check the logs for more details."
-                return {
-                    "result": error_output,
-                    "data": {"success": False, "error": error_message}
-                }
-
+# The simple Odoo code agent tool has been removed in favor of the improved_generate_odoo_module tool
+# which provides better code generation with enhanced error handling and more comprehensive module structure.
     # Tool for generating Mermaid diagrams
     @mcp.tool()
     def generate_npx(
@@ -3263,278 +2949,140 @@ try:
 
     @mcp.tool()
     def query_deepwiki(target_url: str, query: Optional[str] = None) -> str:
-       '''Fetches content from a DeepWiki page.
+        '''Fetches content from a DeepWiki page.
 
-       Args:
-           target_url: The DeepWiki URL to fetch (e.g., https://deepwiki.com/odoo/documentation).
-           query: An optional query string (currently not used for server-side filtering,
-                  but can be used by the client or for future enhancements).
+        Args:
+            target_url: The DeepWiki URL to fetch (e.g., https://deepwiki.com/odoo/documentation).
+            query: An optional query string (currently not used for server-side filtering,
+                   but can be used by the client or for future enhancements).
 
-       Returns:
-           The plain text content of the DeepWiki page or an error message.
-       '''
-       import requests 
-       from bs4 import BeautifulSoup
+        Returns:
+            The plain text content of the DeepWiki page or an error message.
+        '''
+        import requests 
+        from bs4 import BeautifulSoup
 
-       logger.info(f"Querying DeepWiki URL: {target_url}")
-       if query:
-           logger.info(f"User query (currently informational): {query}")
+        logger.info(f"Querying DeepWiki URL: {target_url}")
+        if query:
+            logger.info(f"User query (currently informational): {query}")
 
-       if not target_url.startswith("https://deepwiki.com/"):
-           logger.warning(f"Invalid DeepWiki URL: {target_url}")
-           return "# Error: Invalid URL\n\nOnly URLs starting with 'https://deepwiki.com/' are allowed for this tool."
+        if not target_url.startswith("https://deepwiki.com/"):
+            logger.warning(f"Invalid DeepWiki URL: {target_url}")
+            return "# Error: Invalid URL\n\nOnly URLs starting with 'https://deepwiki.com/' are allowed for this tool."
 
-       try:
-           response = requests.get(target_url, timeout=10) # 10 second timeout
-           response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
-           
-           # For DeepWiki, the content seems to be HTML.
-           # To get plain text, we should parse the HTML.
-           soup = BeautifulSoup(response.content, 'html.parser')
-           
-           # Extract text from main content areas if possible, otherwise full text.
-           # This might need refinement based on DeepWiki's actual structure.
-           # Attempt to find common main content tags.
-           main_content = soup.find('main') or soup.find('article') or soup.find('div', class_='content') # Add more as needed
-           if main_content:
-               text_content = main_content.get_text(separator='\n', strip=True)
-           else:
-               # Fallback: try to remove common non-content tags
-               for SCRIPT_TAG in soup(["script", "style", "header", "footer", "nav", "aside"]): 
-                   SCRIPT_TAG.extract() 
-               text_content = soup.get_text(separator='\n', strip=True)
-
-
-           logger.info(f"Successfully fetched content from {target_url}. Length: {len(text_content)}")
-           return text_content
-
-       except requests.exceptions.RequestException as e:
-           logger.error(f"Error fetching DeepWiki URL {target_url}: {str(e)}")
-           return f"# Error: Could not fetch content\n\nFailed to retrieve content from {target_url}. Error: {str(e)}"
-       except Exception as e:
-           logger.error(f"An unexpected error occurred while processing {target_url}: {str(e)}", exc_info=True)
-           return f"# Error: An unexpected error occurred\n\nDetails: {str(e)}"
-
-
-    @mcp.tool()
-    def query_deepwiki(target_url: str, query: Optional[str] = None) -> str:
-       '''Fetches content from a DeepWiki page.
-
-       Args:
-           target_url: The DeepWiki URL to fetch (e.g., https://deepwiki.com/odoo/documentation).
-           query: An optional query string (currently not used for server-side filtering,
-                  but can be used by the client or for future enhancements).
-
-       Returns:
-           The plain text content of the DeepWiki page or an error message.
-       '''
-       logger.info(f"Querying DeepWiki URL: {target_url}")
-       if query:
-           logger.info(f"User query (currently informational): {query}")
-
-       if not target_url.startswith("https://deepwiki.com/"):
-           logger.warning(f"Invalid DeepWiki URL: {target_url}")
-           return "# Error: Invalid URL\n\nOnly URLs starting with 'https://deepwiki.com/' are allowed for this tool."
-
-       try:
-           response = requests.get(target_url, timeout=10) # 10 second timeout
-           response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
-           
-           # For DeepWiki, the content seems to be HTML.
-           # To get plain text, we should parse the HTML.
-           soup = BeautifulSoup(response.content, 'html.parser')
-           
-           # Extract text from main content areas if possible, otherwise full text.
-           # This might need refinement based on DeepWiki's actual structure.
-           # Attempt to find common main content tags.
-           main_content = soup.find('main') or soup.find('article') or soup.find('div', class_='content') # Add more as needed
-           if main_content:
-               text_content = main_content.get_text(separator='\n', strip=True)
-           else:
-               # Fallback: try to remove common non-content tags
-               for SCRIPT_TAG in soup(["script", "style", "header", "footer", "nav", "aside"]): 
-                   SCRIPT_TAG.extract() 
-               text_content = soup.get_text(separator='\n', strip=True)
-
-
-           logger.info(f"Successfully fetched content from {target_url}. Length: {len(text_content)}")
-           return text_content
-
-       except requests.exceptions.RequestException as e:
-           logger.error(f"Error fetching DeepWiki URL {target_url}: {str(e)}")
-           return f"# Error: Could not fetch content\n\nFailed to retrieve content from {target_url}. Error: {str(e)}"
-       except Exception as e:
-           logger.error(f"An unexpected error occurred while processing {target_url}: {str(e)}", exc_info=True)
-           return f"# Error: An unexpected error occurred\n\nDetails: {str(e)}"
-
-    @mcp.tool()
-    def query_deepwiki(target_url: str, query: Optional[str] = None) -> str:
-       '''Fetches content from a DeepWiki page.
-
-       Args:
-           target_url: The DeepWiki URL to fetch (e.g., https://deepwiki.com/odoo/documentation).
-           query: An optional query string (currently not used for server-side filtering,
-                  but can be used by the client or for future enhancements).
-
-       Returns:
-           The plain text content of the DeepWiki page or an error message.
-       '''
-       import requests 
-       from bs4 import BeautifulSoup
-
-       logger.info(f"Querying DeepWiki URL: {target_url}")
-       if query:
-           logger.info(f"User query (currently informational): {query}")
-
-       if not target_url.startswith("https://deepwiki.com/"):
-           logger.warning(f"Invalid DeepWiki URL: {target_url}")
-           return "# Error: Invalid URL\n\nOnly URLs starting with 'https://deepwiki.com/' are allowed for this tool."
-
-       try:
-           response = requests.get(target_url, timeout=10) # 10 second timeout
-           response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
-           
-           # For DeepWiki, the content seems to be HTML.
-           # To get plain text, we should parse the HTML.
-           soup = BeautifulSoup(response.content, 'html.parser')
-           
-           # Extract text from main content areas if possible, otherwise full text.
-           # This might need refinement based on DeepWiki's actual structure.
-           # Attempt to find common main content tags.
-           main_content = soup.find('main') or soup.find('article') or soup.find('div', class_='content') # Add more as needed
-           if main_content:
-               text_content = main_content.get_text(separator='\n', strip=True)
-           else:
-               # Fallback: try to remove common non-content tags
-               for SCRIPT_TAG in soup(["script", "style", "header", "footer", "nav", "aside"]): 
-                   SCRIPT_TAG.extract() 
-               text_content = soup.get_text(separator='\n', strip=True)
-
-
-           logger.info(f"Successfully fetched content from {target_url}. Length: {len(text_content)}")
-           return text_content
-
-       except requests.exceptions.RequestException as e:
-           logger.error(f"Error fetching DeepWiki URL {target_url}: {str(e)}")
-           return f"# Error: Could not fetch content\n\nFailed to retrieve content from {target_url}. Error: {str(e)}"
-       except Exception as e:
-           logger.error(f"An unexpected error occurred while processing {target_url}: {str(e)}", exc_info=True)
-           return f"# Error: An unexpected error occurred\n\nDetails: {str(e)}"
-
-
-    @mcp.tool()
-    def query_deepwiki(target_url: str, query: Optional[str] = None) -> str:
-       '''Fetches content from a DeepWiki page.
-
-       Args:
-           target_url: The DeepWiki URL to fetch (e.g., https://deepwiki.com/odoo/documentation).
-           query: An optional query string (currently not used for server-side filtering,
-                  but can be used by the client or for future enhancements).
-
-       Returns:
-           The plain text content of the DeepWiki page or an error message.
-       '''
-       import requests 
-       from bs4 import BeautifulSoup
-
-       logger.info(f"Querying DeepWiki URL: {target_url}")
-       if query:
-           logger.info(f"User query (currently informational): {query}")
-
-       if not target_url.startswith("https://deepwiki.com/"):
-           logger.warning(f"Invalid DeepWiki URL: {target_url}")
-           return "# Error: Invalid URL\n\nOnly URLs starting with 'https://deepwiki.com/' are allowed for this tool."
-
-       try:
-           response = requests.get(target_url, timeout=10) # 10 second timeout
-           response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
-           
-           # For DeepWiki, the content seems to be HTML.
-           # To get plain text, we should parse the HTML.
-           soup = BeautifulSoup(response.content, 'html.parser')
-           
-           # Extract text from main content areas if possible, otherwise full text.
-           # This might need refinement based on DeepWiki's actual structure.
-           # Attempt to find common main content tags.
-           main_content = soup.find('main') or soup.find('article') or soup.find('div', class_='content') # Add more as needed
-           if main_content:
-               text_content = main_content.get_text(separator='\n', strip=True)
-           else:
-               # Fallback: try to remove common non-content tags
-               for SCRIPT_TAG in soup(["script", "style", "header", "footer", "nav", "aside"]): 
-                   SCRIPT_TAG.extract() 
-               text_content = soup.get_text(separator='\n', strip=True)
-
-
-           logger.info(f"Successfully fetched content from {target_url}. Length: {len(text_content)}")
-           return text_content
-
-       except requests.exceptions.RequestException as e:
-           logger.error(f"Error fetching DeepWiki URL {target_url}: {str(e)}")
-           return f"# Error: Could not fetch content\n\nFailed to retrieve content from {target_url}. Error: {str(e)}"
-       except Exception as e:
-           logger.error(f"An unexpected error occurred while processing {target_url}: {str(e)}", exc_info=True)
-           return f"# Error: An unexpected error occurred\n\nDetails: {str(e)}"
-
-
-    @mcp.tool()
-    def query_deepwiki(target_url: str, query: Optional[str] = None) -> str:
-       '''Fetches content from a DeepWiki page.
-
-       Args:
-           target_url: The DeepWiki URL to fetch (e.g., https://deepwiki.com/odoo/documentation).
-           query: An optional query string (currently not used for server-side filtering,
-                  but can be used by the client or for future enhancements).
-
-       Returns:
-           The plain text content of the DeepWiki page or an error message.
-       '''
-       # requests and BeautifulSoup are imported at the top level now
-       logger.info(f"Querying DeepWiki URL: {target_url} with query: {query}")
-
-       if not target_url.startswith("https://deepwiki.com/"):
-           logger.warning(f"Invalid DeepWiki URL: {target_url}")
-           return "# Error: Invalid URL\n\nOnly URLs starting with 'https://deepwiki.com/' are allowed for this tool."
-
-       try:
-           response = requests.get(target_url, timeout=10) 
-           response.raise_for_status() 
-           
-           soup = BeautifulSoup(response.content, 'html.parser')
-           
-           main_content = soup.find('main') or soup.find('article') or soup.find('div', class_='content')
-           if main_content:
-               text_content = main_content.get_text(separator='\n', strip=True)
-           else:
-               # Fallback: remove common non-content tags and then get text
-               for SCRIPT_TAG in soup(["script", "style", "header", "footer", "nav", "aside", "form", "button", "input", "select", "textarea"]):
-                   SCRIPT_TAG.extract() 
-               text_content = soup.get_text(separator='\n', strip=True)
-
-           logger.info(f"Successfully fetched content from {target_url}. Length: {len(text_content)}")
-           if not text_content.strip(): # Check if the extracted text is empty or only whitespace
-               logger.warning(f"No meaningful content extracted from {target_url} after stripping tags.")
-               return f"# Warning: No Content\n\nNo meaningful text content found on {target_url} after processing."
-           return text_content
-
-       except requests.exceptions.HTTPError as http_err:
-           logger.error(f"HTTP error fetching DeepWiki URL {target_url}: {str(http_err)}")
-           return f"# Error: HTTP Error {http_err.response.status_code}\n\nFailed to retrieve content from {target_url}. Server responded with status: {http_err.response.status_code}"
-       except requests.exceptions.RequestException as e:
-           logger.error(f"Error fetching DeepWiki URL {target_url}: {str(e)}")
-           return f"# Error: Could not fetch content\n\nFailed to retrieve content from {target_url}. Error: {str(e)}"
-       except Exception as e:
-           logger.error(f"An unexpected error occurred while processing {target_url}: {str(e)}", exc_info=True)
-           return f"# Error: An unexpected error occurred\n\nDetails: {str(e)}"
-
-    # Main entry point
-    if __name__ == "__main__":
         try:
-            logger.info("Starting MCP server...")
-            mcp.run()
+            response = requests.get(target_url, timeout=10) # 10 second timeout
+            response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
+            
+            # For DeepWiki, the content seems to be HTML.
+            # To get plain text, we should parse the HTML.
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Extract text from main content areas if possible, otherwise full text.
+            # This might need refinement based on DeepWiki's actual structure.
+            # Attempt to find common main content tags.
+            main_content = soup.find('main') or soup.find('article') or soup.find('div', class_='content') # Add more as needed
+            if main_content:
+                text_content = main_content.get_text(separator='\n', strip=True)
+            else:
+                # Fallback: try to remove common non-content tags
+                for SCRIPT_TAG in soup(["script", "style", "header", "footer", "nav", "aside"]): 
+                    SCRIPT_TAG.extract() 
+                text_content = soup.get_text(separator='\n', strip=True)
+            logger.info(f"Successfully fetched content from {target_url}. Length: {len(text_content)}")
+            return text_content
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching DeepWiki URL {target_url}: {str(e)}")
+            return f"# Error: Could not fetch content\n\nFailed to retrieve content from {target_url}. Error: {str(e)}"
         except Exception as e:
-            logger.error(f"Error running MCP server: {str(e)}")
-            traceback.print_exc()
+            logger.error(f"An unexpected error occurred while processing {target_url}: {str(e)}", exc_info=True)
+            return f"# Error: An unexpected error occurred\n\nDetails: {str(e)}"
+            
+    @mcp.tool()
+    async def improved_generate_odoo_module(
+        module_name: str,
+        requirements: str,
+        documentation: Optional[List[Dict[str, str]]] = None,
+        save_to_disk: bool = True,
+        output_dir: str = "./generated_modules",
+        validation_iterations: int = 2
+    ) -> Dict[str, Any]:
+        '''Generates a complete Odoo 18 module with enhanced code generation capabilities.
+
+        This improved generator creates a fully functioning Odoo module with proper structure,
+        including models, views, security rules, and any JavaScript components needed.
+        It leverages technical documentation from DeepWiki and follows Odoo 18 best practices.
+        
+        The validation_iterations parameter controls how many times the generator will validate
+        and refine the code against the requirements, useful for complex modules like car sales
+        that need multiple models, views, and business logic components.
+
+        Args:
+            module_name: Technical name for the module (snake_case)
+            requirements: Detailed description of module requirements and functionality
+            documentation: Optional list of documentation references to include in generation context
+            save_to_disk: Whether to save generated files to disk (default: True)
+            output_dir: Directory to save files if save_to_disk is True (default: ./generated_modules)
+            validation_iterations: Number of validation and refinement loops to perform (default: 2)
+
+        Returns:
+            Dictionary containing:
+            - success: Boolean indicating if generation was successful
+            - message: Summary message about the generation
+            - files: List of generated files with metadata
+            - content: Dictionary mapping file paths to their content
+            - metadata: Generation metadata including version and timestamp
+            - save_result: Information about saved files (if save_to_disk=True)
+        '''
+        if not odoo_code_generator_available:
+            logger.error("Improved Odoo code generator not available")
+            return {
+                "success": False,
+                "message": "Improved Odoo code generator not available",
+                "error": "The improved Odoo code generator module is not properly installed"
+            }
+            
+        try:
+            # Combine any existing documentation with documentation from DeepWiki if available
+            if not documentation:
+                documentation = []
+                
+            # Add documentation for Odoo 18 best practices if none provided
+            if not any("best practices" in (doc.get("source", "") or "").lower() for doc in documentation):
+                try:
+                    # Try to get some documentation from DeepWiki for context
+                    odoo_docs = query_deepwiki("https://deepwiki.com/odoo/documentation", f"Odoo 18 {module_name} module")
+                    if odoo_docs and len(odoo_docs) > 100:  # Make sure we got something useful
+                        documentation.append({
+                            "source": "Odoo 18 Documentation from DeepWiki",
+                            "content": odoo_docs[:5000]  # Limit to first 5000 chars
+                        })
+                except Exception as e:
+                    logger.warning(f"Could not fetch Odoo documentation from DeepWiki: {str(e)}")
+            
+            # Call the generator tool
+            generator = OdooCodeGenerator(template_dir=os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "streamlit_client", "templates", "default"
+            ))
+            result = await generator.generate_odoo_module(
+                module_name=module_name,
+                requirements=requirements,
+                documentation=documentation,
+                save_to_disk=save_to_disk,
+                output_dir=output_dir,
+                validation_iterations=validation_iterations
+            )
+            
+            return result
+        except Exception as e:
+            logger.error(f"Error in improved_generate_odoo_module: {str(e)}", exc_info=True)
+            return {
+                "success": False,
+                "message": f"Error generating Odoo module: {str(e)}",
+                "error": str(e)
+            }
 
 
 except Exception as e:

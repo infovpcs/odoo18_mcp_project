@@ -28,33 +28,33 @@ This project aims to create a robust integration server that connects MCP (Maste
    - Mermaid diagram generation ✅
    - DeepWiki integration for documentation lookups ✅
 
-2. **Odoo Code Agent**
-   - Analysis phase ✅
-   - Planning phase ✅
-   - Human feedback loops ✅
-   - Coding phase ✅
-   - Code review phase ✅
-   - Finalization phase ✅
-   - Module structure generation ✅
-   - Documentation integration ✅
-   - Odoo connector integration ✅
-   - Fallback model support (Gemini, Ollama) ✅
-   - Improved Ollama integration with HTTP API ✅
-   - State management ✅
-   - LangGraph workflow ✅
-   - Code generator utility ✅
-   - Odoo 18 compliant view generation ✅
-   - Model class generation with mail.thread support ✅
-   - Dynamic model discovery integration ✅
-   - MCP server integration ✅
-   - File saving functionality ✅
-   - Improved error handling ✅
-   - Two-stage human validation workflow ✅
-   - State serialization and resumption ✅
-   - Streamlit client integration with validation steps ✅
-   - Comprehensive testing of validation workflow ✅
-   - Automatic code completeness review ✅
-   - Incomplete file detection and regeneration ✅
+2. **Enhanced Odoo Code Agent**
+   - Simplified code generation workflow with modular design ✅
+   - Modern Odoo 18 conventions and best practices ✅
+   - DeepWiki integration for technical documentation lookups ✅
+   - Brave Search integration for functional documentation ✅
+   - Streamlined planning and design with automated validation ✅
+   - Code generation with proper module structure and validation ✅
+   - Robust error handling and fallback mechanisms ✅
+   - Input validation and sanitization ✅
+   - Automatic retry mechanism for transient failures ✅
+   - Comprehensive logging and error reporting ✅
+   - Security enhancements including path validation ✅
+   - Performance optimizations with caching ✅
+   - Streamlit UI integration with enhanced user experience ✅
+   - Code visualization and download options ✅
+   - File saving functionality with directory structure preservation ✅
+   - Support for multiple model providers (Gemini, Ollama) ✅
+   - Visual workflow display with Mermaid.js ✅
+   - Automatic code completeness validation ✅
+   - Type hints and improved code documentation ✅
+   - Unit tests for critical components ✅
+   - **Improved Odoo Code Generator**: New module `odoo_code_generator.py` with enhanced prompting, extraction, and validation logic. ✅
+   - **Integrated into MCP Server**: MCP tool adapter created and registered for the improved generator. ✅
+   - **Streamlined Workflow**: Removed LangGraph dependency for a simpler, more maintainable code generation process. ✅
+   - **Enhanced Documentation Context**: DeepWiki integration for automatic documentation context enhancement. ✅
+   - **Robust Features**: Comprehensive input validation, automatic retries, detailed error handling, and path sanitization. ✅
+   - **Dedicated Streamlit Interface**: New Streamlit page `improved_odoo_generator.py` with comprehensive file management, download options, and real-time validation. ✅
 
 3. **Odoo 18 Connector**
    - XML-RPC client implementation ✅
@@ -89,56 +89,92 @@ This project aims to create a robust integration server that connects MCP (Maste
 
 ### Directory Structure
 ```
-odoo18-mcp-project/
+odoo18_mcp_project/
 ├── src/
+│   ├── __init__.py
+│   ├── agents/              # Agents for specific tasks
+│   │   └── export_import/
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── config.py        # Configuration management
+│   │   └── logger.py        # Logging configuration
 │   ├── mcp/
 │   │   ├── __init__.py
 │   │   ├── client.py        # MCP client implementation
-│   │   ├── handlers.py      # MCP request handlers
-│   │   └── dynamic_handlers.py # Dynamic model handlers
+│   │   ├── dynamic_handlers.py # Dynamic model handlers
+│   │   └── handlers.py      # MCP request handlers
 │   ├── odoo/
 │   │   ├── __init__.py
 │   │   ├── client.py        # Odoo client implementation
-│   │   ├── schemas.py       # Pydantic schemas
-│   │   └── dynamic/         # Dynamic model handling
-│   │       ├── __init__.py
-│   │       ├── model_discovery.py  # Model discovery
-│   │       ├── field_analyzer.py   # Field analysis
-│   │       ├── crud_generator.py   # CRUD operations
-│   │       └── nlp_analyzer.py     # NLP-based analysis
+│   │   ├── dynamic/         # Dynamic model handling
+│   │   └── schemas.py       # Pydantic schemas
 │   ├── odoo_docs_rag/       # Odoo documentation RAG tool
 │   │   ├── __init__.py
-│   │   ├── docs_retriever.py      # Main retrieval functionality
-│   │   ├── docs_processor.py      # Documentation processing
-│   │   ├── embedding_engine.py    # Embedding and vector storage
-│   │   └── utils.py               # Utility functions
-│   ├── odoo_code_agent/     # Odoo code generation agent
+│   │   ├── db_storage.py
+│   │   ├── docs_processor.py
+│   │   ├── docs_retriever.py
+│   │   ├── embedding_engine.py
+│   │   ├── gemini_summarizer.py
+│   │   ├── online_search.py
+│   │   └── utils.py
+│   ├── odoo_tools/
 │   │   ├── __init__.py
-│   │   ├── main.py          # Main agent flow
-│   │   ├── state.py         # State management
-│   │   ├── utils/           # Utility functions
-│   │   │   ├── __init__.py
-│   │   │   ├── documentation_helper.py  # Documentation integration
-│   │   │   ├── odoo_connector.py        # Odoo connector integration
-│   │   │   └── fallback_models.py       # Fallback model support
-│   └── core/
+│   │   └── csv_import.py
+│   ├── simple_odoo_code_agent/ # Odoo code generation agent
+│   │   ├── __init__.py
+│   │   ├── odoo_code_generator.py
+│   │   └── utils/
+│   └── streamlit_client/
 │       ├── __init__.py
-│       ├── config.py        # Configuration management
-│       └── logger.py        # Logging configuration
+│       ├── components/
+│       ├── examples/
+│       ├── main.py
+│       ├── pages/
+│       ├── templates/
+│       └── utils/
 ├── tests/
 │   ├── __init__.py
-│   ├── test_mcp/
-│   ├── test_odoo/
-│   ├── test_odoo_code_agent/
-│   └── test_core/
-├── main.py                  # Main entry point
-├── mcp_server.py            # MCP SDK server implementation
-├── client_test.py           # Basic client test
-├── advanced_client_test.py  # Advanced client test
-├── dynamic_model_test.py    # Dynamic model test
-├── test_odoo_code_agent.py  # Odoo code agent test
+│   ├── data/
+│   ├── test_deepwiki_tool.py
+│   ├── test_enhanced_rag.py
+│   ├── test_export_import_agent.py
+│   ├── test_gemini_code_gen.py
+│   ├── test_generate_npx_advanced.py
+│   ├── test_generate_npx_case1.py
+│   ├── test_generate_npx_case2.py
+│   ├── test_generator.py
+│   ├── test_mcp_server_consolidated.py
+│   └── test_odoo_code_generator.py
 ├── .env.example             # Environment variables example
-└── pyproject.toml           # Project configuration
+├── app.py
+├── claude_config.json
+├── direct_export_import.py
+├── docker-compose.override.yml
+├── docker-compose.prod.yml
+├── docker-compose.yml
+├── entrypoint.sh
+├── export_import_test.py
+├── export_import_tools.py
+├── field_converter.py
+├── get_product_fields.py
+├── main.py
+├── mcp_client_test.py
+├── mcp_server.py
+├── mcp_server_master.py
+├── mcp_wrapper.py
+├── odoo18_api_test.py
+├── pyproject.toml           # Project configuration
+├── query_parser.py
+├── relationship_handler.py
+├── requirements-streamlit.txt
+├── requirements.txt
+├── scripts/
+│   └── dynamic_data_tool.py
+├── setup.py
+├── simple_mcp_server.py
+├── standalone_mcp_server.py
+├── streamlit_code_agent_graph.py
+└── update_claude_config.sh
 ```
 
 ## Technical Specifications
@@ -412,44 +448,21 @@ odoo18-mcp-project/
 ### Odoo Code Agent
 1. **Agent Workflow**
    - Analysis phase for understanding requirements ✅
-   - Planning phase for creating implementation plan ✅
-   - Human feedback loop for plan refinement ✅
-   - Coding phase for generating Odoo module code ✅
-   - Code review phase for checking completeness ✅
-   - Automatic regeneration of incomplete files ✅
-   - Second human feedback loop for code refinement ✅
-   - Finalization phase for completing the module ✅
-   - Two-stage human validation workflow ✅
-   - Wait points for human feedback ✅
-   - Resumable workflow with state persistence ✅
+   - Documentation search and context gathering ✅
+   - Planning phase for code structure design ✅
+   - Code generation with modern Odoo 18 practices ✅
+   - Automatic code validation and completeness checks ✅
+   - Continuous progress updates via Streamlit UI ✅
+   - Easy code download and module packaging ✅
 
 2. **State Management**
-   - Pydantic models for state representation ✅
-   - Phase-specific state models ✅
-   - State transitions between phases ✅
-   - Error handling and recovery ✅
-   - History tracking ✅
-   - State serialization and deserialization ✅
-   - State dictionary for workflow resumption ✅
-   - Validation status tracking ✅
-   - Current phase tracking ✅
-   - Code review state tracking ✅
-   - Incomplete files tracking ✅
-   - Regenerated files tracking ✅
+   - Simplified state tracking with Pydantic models ✅
+   - Progress tracking and status updates ✅
+   - Error handling and recovery mechanisms ✅
+   - Clear validation status reporting ✅
+   - Automatic file completeness verification ✅
 
-3. **LangGraph Integration**
-   - StateGraph for workflow definition ✅
-   - Node functions for each workflow step ✅
-   - Conditional edges for dynamic flow ✅
-   - Error handling nodes ✅
-   - Compilation and execution ✅
-   - Human-in-the-loop validation points ✅
-   - Workflow resumption from saved state ✅
-   - Code review nodes for completeness checking ✅
-   - Regeneration nodes for incomplete files ✅
-   - Graph visualization in Streamlit client ✅
-
-4. **Module Generation**
+3. **Module Generation**
    - Dynamic module name extraction ✅
    - Standard Odoo module structure creation ✅
    - Model definition generation ✅

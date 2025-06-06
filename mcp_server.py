@@ -20,7 +20,7 @@ import logging
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
-logger = logging.getLogger("odoo_mcp")
+logger = logging.getLogger("odoo18-mcp")
 
 # Get MCP log level from environment or default to INFO
 settings_log_level = os.getenv("MCP_LOG_LEVEL", "INFO").upper()
@@ -3088,3 +3088,14 @@ try:
 except Exception as e:
     logger.error(f"Error during initialization: {str(e)}")
     traceback.print_exc()
+    sys.exit(1)
+
+# Main entry point
+if __name__ == "__main__":
+    try:
+        logger.info("Starting Odoo 18 MCP server...")
+        mcp.run()
+    except Exception as e:
+        logger.error(f"Error starting MCP server: {str(e)}")
+        traceback.print_exc()
+        sys.exit(1)

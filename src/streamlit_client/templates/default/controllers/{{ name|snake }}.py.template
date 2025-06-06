@@ -1,0 +1,21 @@
+# -*- coding: utf-8 -*-
+
+from odoo import http
+
+
+class {{ name|title|replace('_', '') }}(http.Controller):
+    @http.route('/{{ name|snake }}/{{ name|snake }}/', auth='public', website=True)
+    def index(self, **kw):
+        return "Hello, world!"
+
+    @http.route('/{{ name|snake }}/{{ name|snake }}/objects/', auth='public', website=True)
+    def list_objects(self, **kw):
+        return http.request.render('{{ name }}.listing_template', {
+            'objects': http.request.env['{{ name }}.{{ name|snake }}'].search([]),
+        })
+
+    @http.route('/{{ name|snake }}/{{ name|snake }}/objects/<model(\'{{ name }}.{{ name|snake }}\'):obj>/', auth='public', website=True)
+    def object(self, obj, **kw):
+        return http.request.render('{{ name }}.object_template', {
+            'object': obj
+        })

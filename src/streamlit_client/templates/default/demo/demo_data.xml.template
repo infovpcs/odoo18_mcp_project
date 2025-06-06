@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Demo Records -->
+        <record id="demo_{{ name|snake }}_1" model="{{ name|snake }}.{{ name|snake }}">
+            <field name="name">Demo {{ name|pascal }} 1</field>
+            <field name="description">This is a demo record for {{ name|pascal }}.</field>
+        </record>
+        
+        <record id="demo_{{ name|snake }}_2" model="{{ name|snake }}.{{ name|snake }}">
+            <field name="name">Demo {{ name|pascal }} 2</field>
+            <field name="description">This is another demo record for {{ name|pascal }}.</field>
+        </record>
+    </data>
+</odoo>

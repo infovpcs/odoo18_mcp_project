@@ -22,29 +22,56 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
+    # Core dependencies
     "pydantic>=2.0.0",
     "fastapi>=0.100.0",
     "uvicorn>=0.22.0",
     "python-dotenv>=1.0.0",
     "requests>=2.31.0",
-    "mcp>=1.7.0",
+    "mcp>=0.1.0",  # Aligned with requirements.txt
     "sqlparse>=0.4.4",
+    
+    # Database dependencies
     "pandas>=1.5.0,<2.0.0",  # Using pandas 1.x for compatibility with Python 3.12
+    "psycopg2-binary>=2.9.5",  # Added for database connectivity
+    
+    # RAG tool dependencies
+    "sentence-transformers>=2.2.2",  # Added for Odoo documentation retriever
     "torch>=2.2.0,<=2.2.2",  # Specify a compatible PyTorch version
     "faiss-cpu>=1.7.4",
     "beautifulsoup4>=4.12.2",
     "markdown>=3.4.3",
     "gitpython>=3.1.30",
-    "langchain>=0.0.300",
     "numpy>=1.26.0,<2.0.0",  # Using numpy 1.x for compatibility with Python 3.12
+    
+    # LangChain and LangGraph dependencies
+    "langchain>=0.0.300",
+    "langchain_openai>=0.0.2",
+    "langchain_google_genai>=0.0.5",
+    "langchain_anthropic>=0.1.1",
     "google-generativeai>=0.3.0",  # For Gemini integration in RAG tool and LangGraph
     "langgraph>=0.0.15",
     "ollama>=0.1.0",  # For Ollama integration
+    "aiohttp>=3.8.5",  # For async HTTP requests
+    
+    # Graph visualization dependencies
     "ipython>=8.12.0",  # For IPython.display
     "graphviz>=0.20.1",  # For graph visualization
     "pygraphviz>=1.10",  # For advanced graph visualization
     "mermaid-magic>=0.1.0",  # For mermaid diagram support
     "ipykernel==6.29.5", # For Jupyter notebook support
+    "pyppeteer>=1.0.2",  # For mermaid diagram rendering with NPX
+    
+    # Streamlit UI dependencies
+    "streamlit>=1.30.0",
+    "streamlit-extras>=0.3.0",
+    # Pytest dependencies
+    "pytest>=7.3.1",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.12.0",
+    "pytest-timeout>=2.1.0",
+    "pytest-xdist>=3.3.1"
 ]
 
 [project.optional-dependencies]
@@ -93,3 +120,7 @@ disallow_incomplete_defs = true
 module = "tests.*"
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+asyncio_mode = "auto"

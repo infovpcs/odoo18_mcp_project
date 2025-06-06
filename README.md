@@ -8,7 +8,7 @@ Last Updated: 2025-05-29
 [![Status](https://img.shields.io/badge/status-stable-brightgreen.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A robust integration server that connects MCP (Master Control Program) with Odoo 18.0 ERP system, focusing on efficient data synchronization, API management, and secure communications. This implementation provides a standardized interface for performing CRUD operations on Odoo 18 models through a simple API, with dynamic model discovery and field analysis capabilities. The project also includes an Odoo code agent that helps with generating Odoo 18 modules and code using a structured workflow with analysis, planning, human feedback, coding, and finalization phases.
+A robust integration server that connects MCP (Master Control Program) with Odoo 18.0 ERP system, focusing on efficient data synchronization, API management, and secure communications. This implementation provides a standardized interface for performing CRUD operations on Odoo 18 models through a simple API, with dynamic model discovery and field analysis capabilities. The project also includes a streamlined Odoo module generator that helps with generating Odoo 18 modules and code using a simplified LangGraph workflow with DeepWiki integration for enhanced documentation lookups.
 
 ## Features
 
@@ -46,23 +46,37 @@ A robust integration server that connects MCP (Master Control Program) with Odoo
 - **Monitoring**: Built-in monitoring capabilities for tracking performance
 - **Comprehensive Documentation**: API docs, setup guides, and troubleshooting information
 - **Odoo Documentation Retrieval**: RAG-based retrieval of information from the official Odoo 18 documentation with Gemini LLM integration and online search capability
-- **Odoo Code Agent**: Generate Odoo 18 modules and code using a structured workflow
-- **LangGraph Workflow**: Analysis, planning, human feedback, coding, and finalization phases
-- **Two-Stage Human Validation**: Interactive workflow with validation points after planning and coding
-- **State Persistence**: Serialization and resumption of workflow state between validation steps
-- **Google Gemini Integration**: Direct integration with Google Gemini API for code generation
-- **Environment Variable Configuration**: Use GEMINI_API_KEY and GEMINI_MODEL environment variables
-- **Fallback Models**: Integration with Google Gemini and Ollama for code generation
-- **Mermaid Diagram Generation**: Generate PNG diagrams from Mermaid markdown with customizable themes and colors
-- **Improved Module Name Extraction**: Better module name extraction from user queries
-- **Enhanced Model Field Generation**: Specialized field generation for different module types
-- **Module Name Suffix (_vpcs_ext)**: Prevent conflicts with existing Odoo apps
-- **Dynamic Field Suggestions**: Context-aware field suggestions based on model type and query
-- **Improved Model Name Derivation**: Better model names based on module type and query context
-- **Code Generator Utility**: Comprehensive utility for generating Odoo 18 model classes, views, and other components
-- **Odoo 18 Compliant Views**: Generate views following Odoo 18 guidelines (list view, single chatter tag)
-- **Mail Thread Integration**: Support for mail.thread and mail.activity.mixin in generated models
-- **Dynamic Model Discovery Integration**: Generate models based on existing Odoo models
+- **Enhanced Odoo Module Generator**: Generate Odoo 18 modules using an advanced workflow with DeepWiki and Brave Search integration.
+- **Streamlined Workflow**: Simplified code generation process with modular components, removing the LangGraph dependency for improved maintainability.
+- **Robust Code Generation**: Comprehensive input validation, automatic retries, detailed error handling, and path sanitization.
+- **Type Safety**: Full type hints and Pydantic models for reliable code generation.
+- **Multi-Model Support**: Seamlessly switch between OpenAI, Gemini, and Ollama models.
+- **Two-Stage Human Validation**: Interactive workflow with validation points after planning and coding.
+- **Streamlit UI**: User-friendly interface for generating Odoo modules with customization options, including comprehensive file management and download options.
+- **Modern Odoo 18 Best Practices**: Generated code follows latest Odoo 18 conventions, including list views, simplified chatter tags, avoidance of deprecated attrs, latest OWL component patterns, proper model inheritance, secure field definitions, comprehensive docstrings, type hints, automated test file generation, and proper module structure.
+- **DeepWiki Integration**: Access to latest Odoo 18 and OWL documentation patterns for enhanced documentation context.
+- **Multiple AI Model Support**: OpenAI, Gemini, Anthropic, and Ollama model integration.
+- **Customizable Module Generation**: Select features, demo data, and other options.
+- **State Persistence**: Serialization and resumption of workflow state between validation steps.
+- **Google Gemini Integration**: Direct integration with Google Gemini API for code generation.
+- **Environment Variable Configuration**: Use GEMINI_API_KEY and GEMINI_MODEL environment variables.
+- **Fallback Models**: Integration with Google Gemini and Ollama for code generation.
+- **Mermaid Diagram Generation**: Generate PNG diagrams from Mermaid markdown with customizable themes and colors.
+- **Improved Module Name Extraction**: Better module name extraction from user queries.
+- **Enhanced Model Field Generation**: Specialized field generation for different module types.
+- **Module Name Suffix (_vpcs_ext)**: Prevent conflicts with existing Odoo apps.
+- **Dynamic Field Suggestions**: Context-aware field suggestions based on model type and query.
+- **Improved Model Name Derivation**: Better model names based on module type and query context.
+- **Code Generator Utility**: Comprehensive utility for generating Odoo 18 model classes, views, and other components.
+- **Odoo 18 Compliant Views**: Generate views following Odoo 18 guidelines (list view, single chatter tag).
+- **Mail Thread Integration**: Support for mail.thread and mail.activity.mixin in generated models.
+- **Dynamic Model Discovery Integration**: Generate models based on existing Odoo models.
+- **Streamlit UI**: A user-friendly interface built with Streamlit for easy access to the MCP tools.
+    - **Odoo Module Generator**: Generate Odoo 18 modules with advanced customization.
+    - **Odoo Documentation Search**: Search and retrieve information from the official Odoo 18 documentation.
+    - **Data Export/Import**: Perform export and import operations for Odoo records, including related records.
+    - **CRUD Test Page**: Test Odoo CRUD and method execution tools directly.
+    - **Workflow Visualization**: Visualize the Odoo Code Agent workflow and custom diagrams.
 
 ## Installation
 
@@ -74,6 +88,39 @@ A robust integration server that connects MCP (Master Control Program) with Odoo
 - Claude Desktop (optional, for AI integration)
 - Compatible PyTorch version (2.2.x recommended for macOS)
 - NumPy <2.0.0 (for compatibility with other packages)
+
+### Odoo Module Generator UI
+
+The project includes a user-friendly Streamlit interface for generating Odoo modules with advanced customization options:
+
+### Features
+- **Multiple Model Provider Support**: Choose between Gemini, OpenAI, Anthropic, or Ollama
+- **Odoo Version Selection**: Target Odoo 18.0, 17.0, or 16.0
+- **Module Customization**: Select from multiple module features
+  - Basic CRUD operations
+  - Search/Filter functionality
+  - Multi-Company Support
+  - Access Rights implementation
+  - Kanban View
+  - Calendar View
+- **Demo Data**: Option to include sample demo data
+- **Custom Module Naming**: Specify a custom module name or auto-generate from query
+- **DeepWiki Integration**: Access to latest Odoo and OWL documentation patterns
+- **File Download**: Download individual files or complete ZIP package
+- **Organized Output**: Files organized by type (Models, Views, Security, etc.)
+
+### Running the Streamlit App
+
+```bash
+# Navigate to the project directory
+cd /path/to/odoo18_mcp_project
+
+# Activate the virtual environment
+source .venv/bin/activate  # or .venv/Scripts/activate on Windows
+
+# Run the Streamlit app
+streamlit run src/streamlit_client/app.py
+```
 
 ### Setup
 
@@ -121,7 +168,7 @@ ODOO_DB=llmdb18
 ODOO_USERNAME=admin
 ODOO_PASSWORD=admin
 
-# Gemini LLM integration for Odoo Code Agent and RAG tool
+# Gemini LLM integration for Odoo Module Generator and RAG tool
 GEMINI_API_KEY=your_gemini_api_key_here
 GEMINI_MODEL=gemini-2.0-flash
 
@@ -153,17 +200,26 @@ pip install "mcp[cli]"
 2. Install the MCP server in Claude Desktop:
 
 ```bash
+# Make sure to set these environment variables in your shell or .env file first:
+# export ODOO_URL=http://localhost:8069
+
+# export ODOO_PASSWORD=admin
+# export GEMINI_API_KEY=your_key
+# export BRAVE_API_KEY=your_key
+
 mcp install mcp_server.py --name "Odoo 18 Integration" \
-  -v ODOO_URL=http://localhost:8069 \
-  -v ODOO_DB=llmdb18 \
-  -v ODOO_USERNAME=admin \
-  -v ODOO_PASSWORD=admin \
-  -v GEMINI_API_KEY=your_gemini_api_key_here \
-  -v GEMINI_MODEL=gemini-2.0-flash \
-  -v ODOO_DOCS_DIR="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs" \
-  -v ODOO_INDEX_DIR="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index" \
-  -v ODOO_DB_PATH="/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index/embeddings.db" \
-  -v BRAVE_API_KEY=your_brave_api_key_here
+  --command "$(which python3)" \
+  --args "$(pwd)/mcp_server.py" \
+  --env ODOO_URL=${ODOO_URL} \
+  --env ODOO_DB=${ODOO_DB} \
+  --env ODOO_USERNAME=${ODOO_USERNAME} \
+  --env ODOO_PASSWORD=${ODOO_PASSWORD} \
+  --env GEMINI_API_KEY=${GEMINI_API_KEY} \
+  --env GEMINI_MODEL=gemini-2.0-flash \
+  --env BRAVE_API_KEY=${BRAVE_API_KEY} \
+  --env ODOO_DOCS_DIR="$(pwd)/odoo_docs" \
+  --env ODOO_INDEX_DIR="$(pwd)/odoo_docs_index" \
+  --env ODOO_DB_PATH="$(pwd)/odoo_docs_index/embeddings.db" \
 ```
 
 This command will:
@@ -200,7 +256,7 @@ You can also manually update the Claude Desktop configuration file:
    - **Windows**: `%APPDATA%\Claude\config.json`
    - **Linux**: `~/.config/Claude/config.json`
 
-2. Open the file in a text editor and add the following to the `servers` section:
+2. Open the `claude_config.json` file in a text editor and add the following to the `servers` section:
 
 ```json
 {
@@ -208,7 +264,7 @@ You can also manually update the Claude Desktop configuration file:
         "name": "Odoo 18 Integration",
         "description": "Dynamic Odoo 18 integration with MCP",
         "command": "/full/path/to/your/python",
-        "args": ["/Users/vinusoft85/workspace/odoo18_mcp_project/mcp_server.py"],
+        "args": ["/full/path/to/your/odoo18_mcp_project/mcp_server.py"],
         "env": {
             "ODOO_URL": "http://localhost:8069",
             "ODOO_DB": "llmdb18",
@@ -217,9 +273,9 @@ You can also manually update the Claude Desktop configuration file:
             "GEMINI_API_KEY": "your_gemini_api_key_here",
             "GEMINI_MODEL": "gemini-2.0-flash",
             "BRAVE_API_KEY": "your_brave_api_key_here",
-            "ODOO_DOCS_DIR": "/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs",
-            "ODOO_INDEX_DIR": "/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index",
-            "ODOO_DB_PATH" : "/Users/vinusoft85/workspace/odoo18_mcp_project/odoo_docs_index/embeddings.db"
+            "ODOO_DOCS_DIR": "/full/path/to/your/odoo18_mcp_project/odoo_docs",
+            "ODOO_INDEX_DIR": "/full/path/to/your/odoo18_mcp_project/odoo_docs_index",
+            "ODOO_DB_PATH" : "/full/path/to/your/odoo18_mcp_project/odoo_docs_index/embeddings.db"
         }
     }
 }
@@ -227,7 +283,7 @@ You can also manually update the Claude Desktop configuration file:
 
 **Important Configuration Notes**:
 - Replace `/full/path/to/your/python` with the actual full path to your Python executable. You can find this by running `which python3` in your terminal. For example, if you're using a virtual environment, it might be something like `/Users/username/workspace/odoo18_mcp_project/.venv/bin/python3`.
-- Replace `your_gemini_api_key_here` with your actual Google Gemini API key if you want to use the Odoo Code Agent with Gemini integration.
+- Replace `your_gemini_api_key_here` with your actual Google Gemini API key if you want to use the Odoo Module Generator with Gemini integration.
 - Replace `your_brave_api_key_here` with your actual Brave Search API key if you want to use the online search functionality in the enhanced RAG tool. You can obtain a Brave Search API key from the [Brave Search Developer Portal](https://brave.com/search/api/).
 - Make sure the path to `mcp_server.py` is correct for your installation.
 
@@ -439,7 +495,7 @@ The Docker setup includes several volumes for persistent data:
 - `mcp_logs`: Persistent logs storage
 - `./exports`: Directory for exported files
 - `./tmp`: Directory for temporary files
-- `./generated_modules`: Directory for Odoo module files generated by the Odoo Code Agent
+- `./generated_modules`: Directory for Odoo module files generated by the Odoo Module Generator
 
 #### Health Checks
 
@@ -714,11 +770,9 @@ You can check if the server is running using the `/health` endpoint:
 curl -X GET "http://127.0.0.1:8001/health"
 ```
 
-### Using the Odoo Code Agent
+### Using the Odoo Module Generator
 
-The project includes an Odoo code agent that helps with generating Odoo 18 modules and code using a structured workflow with analysis, planning, human feedback, coding, and finalization phases.
-
-#### Odoo Code Agent Features
+The Odoo Module Generator helps with creating Odoo 18 modules and code using a streamlined LangGraph workflow with DeepWiki integration for enhanced documentation lookups.
 
 - **Analysis Phase**: Analyzes requirements and gathers relevant Odoo documentation
 - **Planning Phase**: Creates a plan and tasks for implementing the requirements
@@ -734,13 +788,23 @@ The project includes an Odoo code agent that helps with generating Odoo 18 modul
 - **Mail Thread Integration**: Support for mail.thread and mail.activity.mixin in generated models
 - **Dynamic Model Discovery**: Generate models based on existing Odoo models
 
-#### Using the Odoo Code Agent
+#### Odoo Module Generator Features
 
-The Odoo Code Agent can be used in multiple ways:
+- **Streamlined Workflow**: Four-node LangGraph workflow for better performance and reduced complexity
+- **DeepWiki Integration**: Enhanced documentation lookups using DeepWiki for Odoo and OWL frameworks
+- **Visual Workflow Representation**: Interactive workflow visualization showing the current state
+- **Model Provider Options**: Support for OpenAI, Anthropic, Google Gemini, and Ollama
+- **Fully Asynchronous**: Built with async/await pattern for improved responsiveness
+- **Two-section UI**: Workflow visualization and code generation in a single view
+- **Direct File Downloads**: Download generated files individually or as a ZIP archive
+
+#### Using the Odoo Module Generator
+
+The Odoo Module Generator can be used in multiple ways:
 
 #### 1. Using the MCP Tool in Claude Desktop
 
-The easiest way to use the Odoo Code Agent is through the MCP tool in Claude Desktop:
+The easiest way to use the Odoo Module Generator is through the MCP tool in Claude Desktop:
 
 ```
 /tool run_odoo_code_agent query="Create a customer feedback module for Odoo 18" use_gemini=true
@@ -758,7 +822,7 @@ This will save the generated files to the specified directory (defaults to `./ge
 
 #### 2. Using the Standalone MCP Server
 
-You can also use the Odoo Code Agent through the standalone MCP server:
+You can also use the Odoo Module Generator through the standalone MCP server:
 
 ```bash
 # Start the standalone MCP server
@@ -775,7 +839,7 @@ curl -X POST "http://127.0.0.1:8001/call_tool" \
 For testing and development purposes, you can use the test script:
 
 ```bash
-# Run the Odoo code agent with a query
+# Run the Odoo module generator with a query
 python test_odoo_code_agent.py
 
 # Run with Google Gemini as a fallback
@@ -787,7 +851,7 @@ python test_odoo_code_agent.py --ollama
 
 #### 4. Using the Python API Directly
 
-You can also use the Odoo Code Agent directly from your Python code:
+You can also use the Odoo Module Generator directly from your Python code:
 
 ```python
 from src.odoo_code_agent.main import run_odoo_code_agent
@@ -806,9 +870,93 @@ result = run_odoo_code_agent(
 print(result)
 ```
 
+### Streamlit User Interface
+
+The Odoo Module Generator includes a dedicated Streamlit app that provides a user-friendly interface with enhanced documentation lookups via DeepWiki and visual workflow representation.
+
+#### 1. Using the MCP Tool in Claude Desktop
+
+To start the Streamlit app with the improved Odoo code generator:
+
+```
+/tool improved_generate_odoo_module module_name="customer_feedback" requirements="A module for managing customer feedback with ratings and comments"
+```
+
+Available parameters:
+
+- `module_name`: Technical name for the module (snake_case)
+- `requirements`: Detailed description of module requirements and functionality
+- `documentation`: Optional list of documentation references to include in generation context
+- `save_to_disk`: Whether to save generated files to disk (default: true)
+- `output_dir`: Directory to save files if save_to_disk is true (default: ./generated_modules)
+- `validation_iterations`: Number of validation and refinement loops to perform (default: 2)
+
+#### 2. Using the Standalone MCP Server
+
+The Streamlit app provides a user-friendly interface for generating Odoo modules. You can also use the API directly:
+
+```bash
+curl -X POST "http://127.0.0.1:8001/call_tool" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tool": "improved_generate_odoo_module", 
+    "params": {
+      "module_name": "customer_feedback",
+      "requirements": "A module for managing customer feedback with ratings and comments"
+    }
+  }'
+```
+
+#### 3. Using the Test Script
+
+For testing and development purposes, you can use the test script:
+
+```bash
+# Features available in the Streamlit app
+python -m pytest tests/
+```
+
+#### 4. Using the Python API Directly
+
+The app provides several tabs for different aspects of module generation:
+
+```python
+import asyncio
+from src.odoo_code_agent.workflow import run_workflow
+
+async def generate_module():
+    result = await run_workflow(
+        query="Create a customer feedback module",
+        model_provider="openai",  # or "anthropic", "gemini", "ollama"
+        save_to_files=True,
+        output_dir="./my_modules"
+    )
+    return result
+
+result = asyncio.run(generate_module())
+print(f"Module name: {result.get('module_name', '')}")
+print(f"Generated files: {len(result.get('generated_files', []))}")
+```
+
+#### 5. Using the Streamlit App
+
+The Streamlit app includes:
+
+1. **Workflow Visualization**: Interactive visualization of the workflow state
+2. **Code Generation**: Query input, results display, and file downloads
+
+To launch the Streamlit app:
+
+```bash
+cd /Users/vinusoft85/workspace/odoo18_mcp_project
+streamlit run src/streamlit_client/app.py
+```
+
+This provides a user-friendly interface for generating Odoo modules with real-time workflow visualization.
+
 #### Parameters
 
-The Odoo Code Agent accepts the following parameters:
+The Odoo Module Generator accepts the following parameters:
 
 | Parameter | Type | Description | Default |
 |-----------|------|-------------|---------|
@@ -823,7 +971,7 @@ The Odoo Code Agent accepts the following parameters:
 #### Example Output
 
 ```
-# Odoo Code Agent Results
+# Odoo Module Generator Results
 
 ## Query
 
@@ -902,7 +1050,7 @@ You can also provide feedback to refine the generated code by calling this tool 
 
 #### Human Validation Workflow
 
-The Odoo Code Agent supports a two-stage human validation workflow that allows you to provide feedback at critical points in the development process:
+The Odoo Module Generator supports a workflow that allows you to provide feedback during the development process:
 
 1. **First Validation Point (After Planning)**: The agent pauses after analyzing requirements and creating a plan, allowing you to review and provide feedback before code generation begins.
 
@@ -925,7 +1073,7 @@ The Streamlit client provides a user-friendly interface for this workflow, with 
 
 #### Iterative Development with Feedback
 
-The Odoo Code Agent supports an iterative development process through the feedback parameter. After reviewing the initial code generation, you can provide feedback to refine the code:
+The Odoo Module Generator supports an iterative development process through the feedback parameter. After reviewing the initial code generation, you can provide feedback to refine the code:
 
 ```
 /tool run_odoo_code_agent query="Create a customer feedback module" feedback="Please add a rating field with stars from 1 to 5 and make it required"
@@ -943,9 +1091,9 @@ For the best results, we recommend using Google Gemini as a fallback model. To e
    GEMINI_API_KEY=your_gemini_api_key_here
    GEMINI_MODEL=gemini-2.0-flash
    ```
-3. Use the `use_gemini=true` parameter when calling the Odoo Code Agent
+3. Use the `model_provider="gemini"` parameter when calling the Odoo Module Generator
 
-With Gemini enabled, the Odoo Code Agent can generate more sophisticated and context-aware code, with better analysis of requirements and more detailed implementation plans.
+With Gemini enabled, the Odoo Module Generator can generate more sophisticated and context-aware code, with better analysis of requirements and more detailed implementation plans.
 
 ### API Endpoints
 

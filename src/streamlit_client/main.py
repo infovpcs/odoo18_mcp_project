@@ -14,10 +14,12 @@ from typing import Any, Dict, List, Optional, Union
 import streamlit as st
 
 from src.streamlit_client.components.chat import render_chat
-from src.streamlit_client.pages.code_agent import render_code_agent_page
-from src.streamlit_client.pages.code_agent_graph import render_code_agent_graph_page
+from src.streamlit_client.pages.improved_odoo_generator import render_improved_odoo_generator_page
 from src.streamlit_client.pages.documentation import render_documentation_page, render_model_documentation, render_field_documentation
 from src.streamlit_client.pages.export_import import render_export_import_page
+from src.streamlit_client.pages.deepwiki import render_deepwiki_page
+from src.streamlit_client.pages.graph_visualization import render_graph_visualization_page
+from src.streamlit_client.pages.crud_test import render_crud_test_page
 from src.streamlit_client.utils.mcp_connector import MCPConnector
 from src.streamlit_client.utils.session_state import SessionState
 
@@ -91,15 +93,10 @@ def render_sidebar(session_state: SessionState) -> None:
 
     # Navigation
     st.sidebar.header("Navigation")
-
-    # Code Agent
-    if st.sidebar.button("Code Agent", use_container_width=True, type="primary" if session_state.current_page == "code_agent" else "secondary"):
-        session_state.current_page = "code_agent"
-        st.rerun()
-
-    # Code Agent Graph
-    if st.sidebar.button("Code Agent Graph", use_container_width=True, type="primary" if session_state.current_page == "code_agent_graph" else "secondary"):
-        session_state.current_page = "code_agent_graph"
+        
+    # Improved Odoo Module Generator
+    if st.sidebar.button("✨ Improved Generator", use_container_width=True, type="primary" if session_state.current_page == "improved_generator" else "secondary"):
+        session_state.current_page = "improved_generator"
         st.rerun()
 
     # Export/Import
@@ -110,6 +107,21 @@ def render_sidebar(session_state: SessionState) -> None:
     # Documentation
     if st.sidebar.button("Documentation", use_container_width=True, type="primary" if session_state.current_page == "documentation" else "secondary"):
         session_state.current_page = "documentation"
+        st.rerun()
+        
+    # DeepWiki
+    if st.sidebar.button("DeepWiki Docs", use_container_width=True, type="primary" if session_state.current_page == "deepwiki" else "secondary"):
+        session_state.current_page = "deepwiki"
+        st.rerun()
+        
+    # Graph Visualization
+    if st.sidebar.button("Workflow Graphs", use_container_width=True, type="primary" if session_state.current_page == "graph_visualization" else "secondary"):
+        session_state.current_page = "graph_visualization"
+        st.rerun()
+
+    # Odoo Tool Tester
+    if st.sidebar.button("🛠️ Odoo Tool Tester", use_container_width=True, type="primary" if session_state.current_page == "crud_test" else "secondary"):
+        session_state.current_page = "crud_test"
         st.rerun()
 
     # Advanced
@@ -125,10 +137,13 @@ def render_sidebar(session_state: SessionState) -> None:
     # Reset
     if st.sidebar.button("Reset All", use_container_width=True):
         # Reset all session state
-        session_state.reset_code_agent()
         session_state.reset_export_import()
         session_state.reset_documentation()
+        session_state.reset_deepwiki()
+        session_state.reset_graph_visualization()
+        session_state.reset_improved_generator()
         session_state.clear_chat()
+        session_state.current_page = "improved_generator" # Reset to a default page
         st.rerun()
 
     # Health check
@@ -426,21 +441,25 @@ def main():
     render_sidebar(session_state)
 
     # Render the current page
-    if session_state.current_page == "code_agent":
-        render_code_agent_page(session_state, mcp_connector)
-    elif session_state.current_page == "code_agent_graph":
-        render_code_agent_graph_page(session_state, mcp_connector)
+    if session_state.current_page == "improved_generator":
+        render_improved_odoo_generator_page(session_state, mcp_connector)
     elif session_state.current_page == "export_import":
         render_export_import_page(session_state, mcp_connector)
     elif session_state.current_page == "documentation":
         render_documentation_page(session_state, mcp_connector)
+    elif session_state.current_page == "deepwiki":
+        render_deepwiki_page(session_state, mcp_connector)
+    elif session_state.current_page == "graph_visualization":
+        render_graph_visualization_page(session_state, mcp_connector)
+    elif session_state.current_page == "crud_test":
+        render_crud_test_page(mcp_connector)
     elif session_state.current_page == "advanced":
         render_advanced_page(session_state, mcp_connector)
     elif session_state.current_page == "chat":
         render_chat_page(session_state, mcp_connector)
     else:
-        # Default to code agent page
-        render_code_agent_page(session_state, mcp_connector)
+        # Default to improved generator page (make it the new default)
+        render_improved_odoo_generator_page(session_state, mcp_connector)
 
 if __name__ == "__main__":
     main()

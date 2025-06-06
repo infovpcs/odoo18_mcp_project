@@ -17,6 +17,7 @@ import argparse
 import json
 from typing import Dict, Any, Optional, Tuple
 from dotenv import load_dotenv
+import pytest
 
 # Add the project root directory to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -39,7 +40,7 @@ try:
 except ImportError as e:
     logger.error(f"Failed to import RAG components: {str(e)}")
     logger.error("Make sure the package is installed.")
-    sys.exit(1)
+    pass # Allow pytest to continue collection
 
 # Import the MCP server components for testing the MCP tool
 import requests
@@ -70,15 +71,11 @@ def test_basic_retrieval():
         logger.info(f"Result snippet: {result[:200]}...")  # Show first 200 chars
         
         # Check if the result contains relevant information
-        if "module" in result.lower() and "odoo" in result.lower():
-            logger.info("Basic retrieval test passed")
-            return True, result
-        else:
-            logger.error("Basic retrieval test failed: Result doesn't contain relevant information")
-            return False, result
+        assert "module" in result.lower() and "odoo" in result.lower(), "Result doesn't contain relevant information"
+
     except Exception as e:
         logger.error(f"Error testing basic retrieval: {str(e)}")
-        return False, str(e)
+        pytest.fail(f"Error testing basic retrieval: {str(e)}")
 
 
 def test_online_search():
@@ -92,7 +89,7 @@ def test_online_search():
         # Check if online search is available
         if not online_search.is_available:
             logger.warning("Online search is not available, skipping test")
-            return False, "Online search is not available"
+            pytest.skip("Online search is not available")
         
         # Test a simple query
         query = "Odoo 18 module development guide"
@@ -101,19 +98,15 @@ def test_online_search():
         logger.info(f"Query: {query}")
         logger.info(f"Found {len(results)} results")
         
-        if results:
-            # Format the results
-            formatted_results = online_search.format_results(results)
-            logger.info(f"Formatted results snippet: {formatted_results[:200]}...")  # Show first 200 chars
-            
-            logger.info("Online search test passed")
-            return True, formatted_results
-        else:
-            logger.error("Online search test failed: No results found")
-            return False, "No results found"
+        assert results, "No results found"
+        
+        # Format the results
+        formatted_results = online_search.format_results(results)
+        logger.info(f"Formatted results snippet: {formatted_results[:200]}...")  # Show first 200 chars
+        
     except Exception as e:
         logger.error(f"Error testing online search: {str(e)}")
-        return False, str(e)
+        pytest.fail(f"Error testing online search: {str(e)}")
 
 
 def test_gemini_summarizer():
@@ -127,7 +120,7 @@ def test_gemini_summarizer():
         # Check if Gemini is available
         if not gemini_summarizer.is_available:
             logger.warning("Gemini summarizer is not available, skipping test")
-            return False, "Gemini summarizer is not available"
+            pytest.skip("Gemini summarizer is not available")
         
         # Create some sample results
         doc_results = [
@@ -159,15 +152,11 @@ def test_gemini_summarizer():
         logger.info(f"Summarized result snippet: {result[:200]}...")  # Show first 200 chars
         
         # Check if the result contains relevant information
-        if "module" in result.lower() and "odoo" in result.lower():
-            logger.info("Gemini summarizer test passed")
-            return True, result
-        else:
-            logger.error("Gemini summarizer test failed: Result doesn't contain relevant information")
-            return False, result
+        assert "module" in result.lower() and "odoo" in result.lower(), "Result doesn't contain relevant information"
+
     except Exception as e:
         logger.error(f"Error testing Gemini summarizer: {str(e)}")
-        return False, str(e)
+        pytest.fail(f"Error testing Gemini summarizer: {str(e)}")
 
 
 def test_enhanced_query():
@@ -202,18 +191,13 @@ def test_enhanced_query():
             logger.info(f"Enhanced result snippet: {result[:200]}...")  # Show first 200 chars
             
             # Check if the result contains relevant information
-            if "module" in result.lower() and "odoo" in result.lower():
-                logger.info("Enhanced query test passed")
-                return True, result
-            else:
-                logger.error("Enhanced query test failed: Result doesn't contain relevant information")
-                return False, result
+            assert "module" in result.lower() and "odoo" in result.lower(), "Result doesn't contain relevant information"
         else:
             logger.warning("Enhanced query is not available, skipping test")
-            return False, "Enhanced query is not available"
+            pytest.skip("Enhanced query is not available")
     except Exception as e:
         logger.error(f"Error testing enhanced query: {str(e)}")
-        return False, str(e)
+        pytest.fail(f"Error testing enhanced query: {str(e)}")
 
 
 def test_mcp_tool():
@@ -224,12 +208,10 @@ def test_mcp_tool():
         # Check if the MCP server is running
         try:
             response = requests.get(f"{MCP_SERVER_URL}/health", timeout=5)
-            if response.status_code != 200:
-                logger.warning("MCP server is not running, skipping test")
-                return False, "MCP server is not running"
+            assert response.status_code == 200, "MCP server is not running"
         except Exception as e:
             logger.warning(f"Error connecting to MCP server: {str(e)}")
-            return False, f"Error connecting to MCP server: {str(e)}"
+            pytest.skip(f"MCP server is not running or accessible: {str(e)}")
         
         # Call the MCP tool
         payload = {
@@ -250,101 +232,30 @@ def test_mcp_tool():
             timeout=120  # Longer timeout for documentation retrieval
         )
         
-        if response.status_code == 200:
-            data = response.json()
-            
-            if data.get("success", False):
-                result = data.get("data") or data.get("result")
-                logger.info(f"MCP tool result snippet: {result[:200]}...")  # Show first 200 chars
-                
-                # Check if the result contains relevant information
-                if "module" in result.lower() and "odoo" in result.lower():
-                    logger.info("MCP tool test passed")
-                    return True, result
-                else:
-                    logger.error("MCP tool test failed: Result doesn't contain relevant information")
-                    return False, result
-            else:
-                error = data.get("error", "Unknown error")
-                logger.error(f"MCP tool failed: {error}")
-                return False, error
-        else:
-            logger.error(f"MCP tool failed with status code {response.status_code}")
-            return False, f"Status code: {response.status_code}"
+        assert response.status_code == 200, f"MCP tool failed with status code {response.status_code}"
+        
+        data = response.json()
+        
+        assert data.get("success", False), f"MCP tool returned success: False. Error: {data.get('error', 'Unknown error')}"
+        
+        result = data.get("data") or data.get("result")
+        logger.info(f"MCP tool result snippet: {result[:200]}...")  # Show first 200 chars
+        
+        # Check if the result contains relevant information
+        assert "module" in result.lower() and "odoo" in result.lower(), "Result doesn't contain relevant information"
+
     except Exception as e:
         logger.error(f"Error testing MCP tool: {str(e)}")
-        return False, str(e)
+        pytest.fail(f"Error testing MCP tool: {str(e)}")
 
 
-def main():
-    """Main function."""
-    parser = argparse.ArgumentParser(description="Test the enhanced RAG tool")
-    parser.add_argument("--basic", action="store_true", help="Test basic retrieval")
-    parser.add_argument("--online", action="store_true", help="Test online search")
-    parser.add_argument("--gemini", action="store_true", help="Test Gemini summarizer")
-    parser.add_argument("--enhanced", action="store_true", help="Test enhanced query")
-    parser.add_argument("--mcp", action="store_true", help="Test MCP tool")
-    parser.add_argument("--all", action="store_true", help="Run all tests")
-    args = parser.parse_args()
-
-    logger.info("Testing enhanced RAG tool")
-
-    # Run the tests
-    tests = []
-    
-    if args.all or args.basic:
-        tests.append(("Basic Retrieval", test_basic_retrieval))
-    
-    if args.all or args.online:
-        tests.append(("Online Search", test_online_search))
-    
-    if args.all or args.gemini:
-        tests.append(("Gemini Summarizer", test_gemini_summarizer))
-    
-    if args.all or args.enhanced:
-        tests.append(("Enhanced Query", test_enhanced_query))
-    
-    if args.all or args.mcp:
-        tests.append(("MCP Tool", test_mcp_tool))
-    
-    # If no tests were specified, run all tests
-    if not tests:
-        tests = [
-            ("Basic Retrieval", test_basic_retrieval),
-            ("Online Search", test_online_search),
-            ("Gemini Summarizer", test_gemini_summarizer),
-            ("Enhanced Query", test_enhanced_query),
-            ("MCP Tool", test_mcp_tool)
-        ]
-    
-    # Run the tests
-    results = []
-    for test_name, test_func in tests:
-        logger.info(f"Running test: {test_name}")
-        try:
-            success, result = test_func()
-            results.append((test_name, success))
-        except Exception as e:
-            logger.error(f"Error running test {test_name}: {str(e)}")
-            results.append((test_name, False))
-    
-    # Print the results
-    logger.info("\n=== Test Results ===")
-    all_passed = True
-    for test_name, success in results:
-        status = "✅ PASSED" if success else "❌ FAILED"
-        logger.info(f"{test_name}: {status}")
-        if not success:
-            all_passed = False
-    
-    # Exit with appropriate status code
-    if all_passed:
-        logger.info("\nAll tests passed!")
-        sys.exit(0)
-    else:
-        logger.error("\nSome tests failed!")
-        sys.exit(1)
-
+# Modify the main function to avoid running tests directly
+# This file is now intended to be run by pytest
+def main_for_pytest():
+    """Placeholder main function to avoid direct execution of tests."""
+    pass
 
 if __name__ == "__main__":
-    main()
+    # This block will not be executed by pytest
+    print("This script is intended to be run using pytest.")
+    sys.exit(1)

@@ -17,7 +17,7 @@ import json
 import requests
 import uuid
 import asyncio
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 from enum import Enum
 from dotenv import load_dotenv
 
@@ -539,8 +539,6 @@ class MCPConnector:
         # Call the generate_npx tool
         return self.call_tool("generate_npx", params, timeout=120)
 
-
-
     def export_records_to_csv(self, model_name: str, fields: Optional[List[str]] = None,
                              filter_domain: Optional[str] = None, limit: int = 1000,
                              export_path: Optional[str] = None) -> Dict[str, Any]:
@@ -752,65 +750,6 @@ class MCPConnector:
         # The tool-specific settings are now handled in _http_call_tool
         return self.call_tool("retrieve_odoo_documentation", params)
 
-    def run_odoo_code_agent(self, query: str, use_gemini: bool = False,
-                           use_ollama: bool = False, no_llm: bool = False,
-                           feedback: Optional[str] = None,
-                           save_to_files: bool = False, output_dir: Optional[str] = None,
-                           wait_for_validation: bool = False, current_phase: Optional[str] = None,
-                           state_dict: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Run the Odoo code agent.
-
-        Args:
-            query: The natural language query describing the module to create
-            use_gemini: Whether to use Google Gemini as a fallback
-            use_ollama: Whether to use Ollama as a fallback
-            no_llm: Whether to disable all LLM models and use fallback analysis only
-            feedback: Optional feedback to incorporate
-            save_to_files: Whether to save the generated files to disk
-            output_dir: Directory to save the generated files to
-            wait_for_validation: Whether to wait for human validation at validation points
-            current_phase: The current phase to resume from (if continuing execution)
-            state_dict: Serialized state to resume from (if continuing execution)
-
-        Returns:
-            Code generation results
-        """
-        # If no_llm is True, set use_gemini and use_ollama to False
-        if no_llm:
-            use_gemini = False
-            use_ollama = False
-
-        params = {
-            "query": query,
-            "use_gemini": use_gemini,
-            "use_ollama": use_ollama
-        }
-
-        if feedback:
-            params["feedback"] = feedback
-
-        if save_to_files:
-            params["save_to_files"] = save_to_files
-
-        if output_dir:
-            params["output_dir"] = output_dir
-
-        if wait_for_validation:
-            params["wait_for_validation"] = wait_for_validation
-
-        if current_phase:
-            params["current_phase"] = current_phase
-
-        if state_dict:
-            params["state_dict"] = state_dict
-
-        # Log the query for debugging
-        logger.info(f"Generating Odoo module with query: {query}")
-        logger.info(f"Wait for validation: {wait_for_validation}, Current phase: {current_phase}")
-
-        # Use the improved Odoo module generator
-        return self.call_tool("improved_generate_odoo_module", params)
-
     def export_records_to_csv(self, model_name: str, fields: Optional[List[str]] = None,
                              filter_domain: Optional[str] = None, limit: int = 1000,
                              export_path: Optional[str] = None) -> Dict[str, Any]:
@@ -1005,6 +944,40 @@ class MCPConnector:
 
         # Call the MCP tool
         return self.call_tool("generate_npx", params)
+
+    def create_record(self, model_name: str, values: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """Create a new record in an Odoo model."""
+        params = {
+            "model_name": model_name,
+            "values": values
+        }
+        return self.call_tool("create_record", params)
+
+    def update_record(self, model_name: str, record_id: int, values: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """Update an existing record in an Odoo model."""
+        params = {
+            "model_name": model_name,
+            "record_id": record_id,
+            "values": values
+        }
+        return self.call_tool("update_record", params)
+
+    def delete_record(self, model_name: str, record_id: int) -> Dict[str, Any]:
+        """Delete a record from an Odoo model."""
+        params = {
+            "model_name": model_name,
+            "record_id": record_id
+        }
+        return self.call_tool("delete_record", params)
+
+    def execute_method(self, model_name: str, method: str, args: Union[str, List, Dict[str, Any]]) -> Dict[str, Any]:
+        """Execute a custom method on an Odoo model."""
+        params = {
+            "model_name": model_name,
+            "method": method,
+            "args": args
+        }
+        return self.call_tool("execute_method", params)
 
     async def close(self) -> None:
         """Close the MCP connection and clean up resources."""

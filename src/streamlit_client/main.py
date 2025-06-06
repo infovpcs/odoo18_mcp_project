@@ -19,6 +19,7 @@ from src.streamlit_client.pages.documentation import render_documentation_page, 
 from src.streamlit_client.pages.export_import import render_export_import_page
 from src.streamlit_client.pages.deepwiki import render_deepwiki_page
 from src.streamlit_client.pages.graph_visualization import render_graph_visualization_page
+from src.streamlit_client.pages.crud_test import render_crud_test_page
 from src.streamlit_client.utils.mcp_connector import MCPConnector
 from src.streamlit_client.utils.session_state import SessionState
 
@@ -118,6 +119,11 @@ def render_sidebar(session_state: SessionState) -> None:
         session_state.current_page = "graph_visualization"
         st.rerun()
 
+    # Odoo Tool Tester
+    if st.sidebar.button("🛠️ Odoo Tool Tester", use_container_width=True, type="primary" if session_state.current_page == "crud_test" else "secondary"):
+        session_state.current_page = "crud_test"
+        st.rerun()
+
     # Advanced
     if st.sidebar.button("Advanced", use_container_width=True, type="primary" if session_state.current_page == "advanced" else "secondary"):
         session_state.current_page = "advanced"
@@ -137,6 +143,7 @@ def render_sidebar(session_state: SessionState) -> None:
         session_state.reset_graph_visualization()
         session_state.reset_improved_generator()
         session_state.clear_chat()
+        session_state.current_page = "improved_generator" # Reset to a default page
         st.rerun()
 
     # Health check
@@ -444,6 +451,8 @@ def main():
         render_deepwiki_page(session_state, mcp_connector)
     elif session_state.current_page == "graph_visualization":
         render_graph_visualization_page(session_state, mcp_connector)
+    elif session_state.current_page == "crud_test":
+        render_crud_test_page(mcp_connector)
     elif session_state.current_page == "advanced":
         render_advanced_page(session_state, mcp_connector)
     elif session_state.current_page == "chat":

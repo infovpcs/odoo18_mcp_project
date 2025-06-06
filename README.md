@@ -71,6 +71,12 @@ A robust integration server that connects MCP (Master Control Program) with Odoo
 - **Odoo 18 Compliant Views**: Generate views following Odoo 18 guidelines (list view, single chatter tag).
 - **Mail Thread Integration**: Support for mail.thread and mail.activity.mixin in generated models.
 - **Dynamic Model Discovery Integration**: Generate models based on existing Odoo models.
+- **Streamlit UI**: A user-friendly interface built with Streamlit for easy access to the MCP tools.
+    - **Odoo Module Generator**: Generate Odoo 18 modules with advanced customization.
+    - **Odoo Documentation Search**: Search and retrieve information from the official Odoo 18 documentation.
+    - **Data Export/Import**: Perform export and import operations for Odoo records, including related records.
+    - **CRUD Test Page**: Test Odoo CRUD and method execution tools directly.
+    - **Workflow Visualization**: Visualize the Odoo Code Agent workflow and custom diagrams.
 
 ## Installation
 

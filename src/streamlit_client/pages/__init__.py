@@ -11,6 +11,7 @@ from .export_import import render_export_import_page
 from .improved_odoo_generator import render_improved_odoo_generator_page
 from .deepwiki import render_deepwiki_page
 from .graph_visualization import render_graph_visualization_page
+from .crud_test import render_crud_test_page
 
 # Note: The following modules are commented out as they don't exist yet
 # from .advanced import render_advanced_page

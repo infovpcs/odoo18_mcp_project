@@ -1,4 +1,3 @@
-
 # Odoo 18 Integration MCP Server - Project Planning
 
 Last Updated: 2025-05-29
@@ -130,6 +129,12 @@ odoo18_mcp_project/
 │       ├── examples/
 │       ├── main.py
 │       ├── pages/
+│       │   ├── __init__.py # List of pages
+│       │   ├── crud_test.py # CRUD and method execution test page
+│       │   ├── documentation.py # Odoo documentation search
+│       │   ├── export_import.py # Export/Import data
+│       │   ├── graph_visualization.py # Diagram visualizations
+│       │   └── improved_odoo_generator.py # Improved module generator
 │       ├── templates/
 │       └── utils/
 ├── tests/

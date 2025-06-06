@@ -59,6 +59,25 @@ This document provides instructions for setting up the project on GitHub and dep
    python main.py
    ```
 
+### Streamlit Client
+
+The project includes a Streamlit application that provides a user-friendly interface for interacting with the MCP server and its tools. It includes the following pages:
+
+- **Odoo Module Generator**: Generate Odoo 18 modules.
+- **Odoo Documentation Search**: Search and retrieve Odoo documentation.
+- **Data Export/Import**: Perform export and import operations.
+- **CRUD Test Page**: Test Odoo CRUD and method execution tools.
+- **Workflow Visualization**: Visualize workflows and diagrams.
+
+To run the Streamlit client:
+
+1. Ensure you have followed the steps under "Local Development" to set up the environment and install dependencies.
+2. Run the Streamlit app from the project root directory:
+   ```bash
+   streamlit run src/streamlit_client/app.py
+   ```
+3. The Streamlit app will open in your web browser.
+
 ### Cloud Desktop (VS Code Remote)
 
 1. Connect to your cloud desktop using VS Code Remote.

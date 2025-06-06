@@ -1,6 +1,6 @@
 # Odoo 18 MCP Integration (18.0 Branch)
 
-Last Updated: 2025-05-29
+Last Updated: 2025-06-06
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Odoo 18.0](https://img.shields.io/badge/odoo-18.0-green.svg)](https://www.odoo.com/)
@@ -8,75 +8,167 @@ Last Updated: 2025-05-29
 [![Status](https://img.shields.io/badge/status-stable-brightgreen.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A robust integration server that connects MCP (Master Control Program) with Odoo 18.0 ERP system, focusing on efficient data synchronization, API management, and secure communications. This implementation provides a standardized interface for performing CRUD operations on Odoo 18 models through a simple API, with dynamic model discovery and field analysis capabilities. The project also includes a streamlined Odoo module generator that helps with generating Odoo 18 modules and code using a simplified LangGraph workflow with DeepWiki integration for enhanced documentation lookups.
+A robust integration server that connects MCP (Master Control Program) with Odoo 18.0 ERP system, focusing on efficient data synchronization, API management, and secure communications. This implementation provides a standardized interface for performing CRUD operations on Odoo 18 models through a simple API, with dynamic model discovery and field analysis capabilities.
+
+## Project Structure
+
+```
+odoo18_mcp_project/
+├── src/                     # Main source code
+│   ├── agents/             # AI agents implementation
+│   ├── core/               # Core functionality
+│   ├── mcp/               # MCP integration code
+│   │   ├── server.py     # MCP server implementation
+│   │   └── ...           # Other MCP-related modules
+│   ├── odoo/              # Odoo integration code
+│   │   ├── client.py      # Odoo client implementation
+│   │   ├── schemas.py     # Data schemas and models
+│   │   └── ...            # Other Odoo-related modules
+│   ├── odoo_docs_rag/     # Odoo documentation retrieval
+│   ├── odoo_tools/        # Odoo utility tools
+│   ├── simple_odoo_code_agent/ # Simplified code agent
+│   └── streamlit_client/  # Streamlit UI client
+├── tests/                  # Test files
+├── exports/                # Exported data files
+├── generated_modules/      # Generated Odoo modules
+├── logs/                   # Log files
+├── odoo_docs/             # Odoo documentation
+├── odoo_docs_index/       # Documentation index
+└── tmp/                   # Temporary files
+```
 
 ## Features
 
-- **Odoo 18 Connectivity**: Connect to Odoo 18 using XML-RPC with proper authentication
-- **CRUD Operations**: Create, Read, Update, and Delete operations for any Odoo model
-- **Dynamic Model Support**: Work with any Odoo model including res.partner and product.product
-- **Model Discovery**: Explore model fields and relationships using ir.model and ir.model.fields
-- **Dynamic Field Analysis**: Automatically analyze field importance, requirements, and relationships
-- **NLP-Based Field Importance**: Use NLP techniques to determine field importance based on names and descriptions
-- **Intelligent CRUD Generation**: Generate appropriate CRUD operations based on model metadata
+- **Odoo Integration**
+  - XML-RPC connection to Odoo 18
+  - Model discovery using ir.model and ir.model.fields
+  - Dynamic field analysis and grouping
+  - NLP-based field importance analysis
+  - Relationship-aware search and operations
 
-- **Field Grouping**: Automatically group fields by purpose (basic info, contact info, etc.)
-- **Smart Search Fields**: Identify fields that are good candidates for search operations
-- **Advanced Natural Language Search**: Parse natural language queries to search across multiple models
-- **Multi-Model Query Support**: Handle complex queries that span multiple related models
-- **Relationship-Aware Search**: Automatically identify and traverse relationships between models
-- **Related Records Export/Import**: Export and import parent-child related records in a single operation
-- **Relationship Maintenance**: Automatically maintain relationships between models during import/export
-- **Direct Implementation Approach**: Efficient and reliable direct implementation for export/import operations
-- **Streamlined Export/Import**: Simplified approach for handling complex export/import operations
-- **Dynamic Query Parsing**: Natural language query parsing with dynamic model and field discovery using ir.model and ir.model.fields
-- **MCP Integration**: API endpoints for MCP integration with standardized request/response format
-- **Claude Desktop Integration**: Seamless integration with Claude Desktop using the MCP SDK
-- **Official MCP SDK Support**: Support for both HTTP API and official MCP SDK with STDIO transport
-- **Environment Configuration**: Easy configuration using environment variables
-- **Type Safety**: Pydantic models for data validation and type checking
-- **Logging**: Comprehensive logging system with detailed error information
-- **Error Handling**: Robust error handling and reporting with proper exception hierarchy
-- **Record Templates**: Generate templates for creating new records based on field analysis
-- **Batch Operations**: Support for batch CRUD operations
-- **Custom Method Execution**: Execute custom Odoo methods directly
-- **Schema Versioning**: Support for schema versioning and migration
-- **Security Features**: API key validation, rate limiting, and access control
-- **Performance Optimization**: Caching and resource usage optimization
-- **Monitoring**: Built-in monitoring capabilities for tracking performance
-- **Comprehensive Documentation**: API docs, setup guides, and troubleshooting information
-- **Odoo Documentation Retrieval**: RAG-based retrieval of information from the official Odoo 18 documentation with Gemini LLM integration and online search capability
-- **Enhanced Odoo Module Generator**: Generate Odoo 18 modules using an advanced workflow with DeepWiki and Brave Search integration.
-- **Streamlined Workflow**: Simplified code generation process with modular components, removing the LangGraph dependency for improved maintainability.
-- **Robust Code Generation**: Comprehensive input validation, automatic retries, detailed error handling, and path sanitization.
-- **Type Safety**: Full type hints and Pydantic models for reliable code generation.
-- **Multi-Model Support**: Seamlessly switch between OpenAI, Gemini, and Ollama models.
-- **Two-Stage Human Validation**: Interactive workflow with validation points after planning and coding.
-- **Streamlit UI**: User-friendly interface for generating Odoo modules with customization options, including comprehensive file management and download options.
-- **Modern Odoo 18 Best Practices**: Generated code follows latest Odoo 18 conventions, including list views, simplified chatter tags, avoidance of deprecated attrs, latest OWL component patterns, proper model inheritance, secure field definitions, comprehensive docstrings, type hints, automated test file generation, and proper module structure.
-- **DeepWiki Integration**: Access to latest Odoo 18 and OWL documentation patterns for enhanced documentation context.
-- **Multiple AI Model Support**: OpenAI, Gemini, Anthropic, and Ollama model integration.
-- **Customizable Module Generation**: Select features, demo data, and other options.
-- **State Persistence**: Serialization and resumption of workflow state between validation steps.
-- **Google Gemini Integration**: Direct integration with Google Gemini API for code generation.
-- **Environment Variable Configuration**: Use GEMINI_API_KEY and GEMINI_MODEL environment variables.
-- **Fallback Models**: Integration with Google Gemini and Ollama for code generation.
-- **Mermaid Diagram Generation**: Generate PNG diagrams from Mermaid markdown with customizable themes and colors.
-- **Improved Module Name Extraction**: Better module name extraction from user queries.
-- **Enhanced Model Field Generation**: Specialized field generation for different module types.
-- **Module Name Suffix (_vpcs_ext)**: Prevent conflicts with existing Odoo apps.
-- **Dynamic Field Suggestions**: Context-aware field suggestions based on model type and query.
-- **Improved Model Name Derivation**: Better model names based on module type and query context.
-- **Code Generator Utility**: Comprehensive utility for generating Odoo 18 model classes, views, and other components.
-- **Odoo 18 Compliant Views**: Generate views following Odoo 18 guidelines (list view, single chatter tag).
-- **Mail Thread Integration**: Support for mail.thread and mail.activity.mixin in generated models.
-- **Dynamic Model Discovery Integration**: Generate models based on existing Odoo models.
-- **Streamlit UI**: A user-friendly interface built with Streamlit for easy access to the MCP tools.
-    - **Odoo Module Generator**: Generate Odoo 18 modules with advanced customization.
-    - **Odoo Documentation Search**: Search and retrieve information from the official Odoo 18 documentation.
-    - **Data Export/Import**: Perform export and import operations for Odoo records, including related records.
-    - **CRUD Test Page**: Test Odoo CRUD and method execution tools directly.
-    - **Workflow Visualization**: Visualize the Odoo Code Agent workflow and custom diagrams.
+- **CRUD Operations**
+  - Create, Read, Update, Delete for any Odoo model
+  - Batch operations support
+  - Custom method execution
+  - Record templates generation
+
+- **Data Management**
+  - Export/Import tools for CSV files
+  - Related records handling
+  - Relationship maintenance
+  - Batch processing support
+
+- **AI Integration**
+  - DeepWiki integration for documentation
+  - Gemini LLM integration
+  - Natural language query parsing
+  - Code generation capabilities
+
+- **Development Tools**
+  - Streamlit UI for module generation
+  - Documentation search
+  - CRUD testing interface
+  - Workflow visualization
+  - Mermaid diagram generation
+
+## Setup
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/infovpcs/odoo18_mcp_project.git
+cd odoo18_mcp_project
+```
+
+2. Create and activate virtual environment:
+
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+3. Install dependencies:
+
+```bash
+pip install -e .
+```
+
+4. Configure environment:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your Odoo connection details:
+
+```
+ODOO_URL=http://localhost:8069
+ODOO_DB=llmdb18
+ODOO_USERNAME=admin
+ODOO_PASSWORD=admin
+
+# Optional AI/LLM integration
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-2.0-flash
+```
+
+## Usage
+
+### Running the Server
+
+```bash
+python src/mcp_server.py
+```
+
+### Running Tests
+
+```bash
+python -m pytest tests/
+```
+
+### Using Streamlit UI
+
+```bash
+streamlit run src/streamlit_code_agent_graph.py
+```
+
+## Tools
+
+1. **Basic CRUD Operations**
+   - `search_records`: Search for records in any Odoo model
+   - `create_record`: Create new records
+   - `update_record`: Update existing records
+   - `delete_record`: Delete records
+   - `get_record_template`: Get a template for creating records
+
+2. **Advanced Search and Documentation**
+   - `advanced_search`: Perform advanced natural language search
+   - `retrieve_odoo_documentation`: Retrieve information from Odoo 18 documentation
+   - `get_field_groups`: Get field groups for a model
+   - `analyze_field_importance`: Analyze field importance using NLP
+
+3. **Export/Import Tools**
+   - `export_records_to_csv`: Export records to CSV
+   - `import_records_from_csv`: Import records from CSV
+   - `export_related_records_to_csv`: Export parent-child related records
+   - `import_related_records_from_csv`: Import parent-child related records
+
+4. **Code Generation Tools**
+   - `generate_module`: Generate Odoo 18 module code using Simple Odoo Code Agent
+   - `generate_npx`: Generate diagrams from Mermaid markdown
+
+## Documentation
+
+For more detailed documentation, see:
+- [PLANNING.md](PLANNING.md) - Project planning and architecture
+- [TASK.md](TASK.md) - Current tasks and progress
+- [MCP_OVERVIEW.md](MCP_OVERVIEW.md) - MCP integration details
+- [MCP_SDK_README.md](MCP_SDK_README.md) - MCP SDK documentation
+- [CLIENT_README.md](CLIENT_README.md) - Client usage documentation
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Installation
 
@@ -2374,7 +2466,68 @@ The client now uses a more sophisticated approach to query processing:
 - MCP SDK Team
 - Streamlit Team
 
-## Odoo 18 Code Agent
+## Simple Odoo Code Agent
+
+The Simple Odoo Code Agent is a streamlined version of the Odoo module generator, designed for efficient and focused code generation. It provides a simpler interface for generating Odoo modules while maintaining core functionality.
+
+### Key Features
+
+1. **Module Generation**
+   - Generate complete Odoo modules with models, views, and security
+   - Follows Odoo 18 best practices and conventions
+   - Supports custom fields and relationships
+   - Automatic model inheritance and relationships
+
+2. **AI Integration**
+   - Gemini LLM integration for code generation
+   - Natural language query parsing
+   - Context-aware code suggestions
+   - Iterative code refinement
+
+3. **Code Quality**
+   - Proper docstrings and comments
+   - Type hints and Pydantic models
+   - Secure field definitions
+   - Comprehensive test file generation
+
+### Usage Example
+
+```python
+import asyncio
+from src.simple_odoo_code_agent.code_generator import generate_module
+
+# Generate a module with a query
+await generate_module(
+    query="Create a customer feedback module",
+    use_gemini=True,
+    use_ollama=False
+)
+```
+
+### Feedback System
+
+The Simple Odoo Code Agent supports an iterative development process through the feedback parameter. After reviewing the initial code generation, you can provide feedback to refine the code:
+
+```
+/tool generate_module query="Create a customer feedback module" feedback="Please add a rating field with stars from 1 to 5 and make it required"
+```
+
+### Module Structure
+
+Generated modules follow a standard structure:
+
+```
+module_name/
+├── __init__.py
+├── __manifest__.py
+├── models/
+│   └── models.py
+├── views/
+│   └── views.xml
+└── security/
+    ├── ir.model.access.csv
+    └── security.xml
+```
 
 The Odoo 18 Code Agent is a specialized agent that helps with generating Odoo 18 modules and code. It follows a structured workflow:
 

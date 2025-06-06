@@ -27,33 +27,31 @@ This project aims to create a robust integration server that connects MCP (Maste
    - Mermaid diagram generation ✅
    - DeepWiki integration for documentation lookups ✅
 
-2. **Enhanced Odoo Code Agent**
-   - Simplified code generation workflow with modular design ✅
+2. **Simple Odoo Code Agent**
+   - Streamlined code generation workflow without LangGraph dependency ✅
    - Modern Odoo 18 conventions and best practices ✅
-   - DeepWiki integration for technical documentation lookups ✅
-   - Brave Search integration for functional documentation ✅
-   - Streamlined planning and design with automated validation ✅
-   - Code generation with proper module structure and validation ✅
-   - Robust error handling and fallback mechanisms ✅
+   - DeepWiki integration for technical documentation ✅
+   - Simplified planning and design process ✅
+   - Efficient code generation with proper module structure ✅
+   - Robust error handling and validation ✅
    - Input validation and sanitization ✅
-   - Automatic retry mechanism for transient failures ✅
-   - Comprehensive logging and error reporting ✅
-   - Security enhancements including path validation ✅
-   - Performance optimizations with caching ✅
-   - Streamlit UI integration with enhanced user experience ✅
+   - Automatic retry for transient failures ✅
+   - Comprehensive logging ✅
+   - Security features including path validation ✅
+   - Performance optimizations ✅
+   - Streamlit UI integration ✅
    - Code visualization and download options ✅
-   - File saving functionality with directory structure preservation ✅
-   - Support for multiple model providers (Gemini, Ollama) ✅
-   - Visual workflow display with Mermaid.js ✅
-   - Automatic code completeness validation ✅
-   - Type hints and improved code documentation ✅
-   - Unit tests for critical components ✅
-   - **Improved Odoo Code Generator**: New module `odoo_code_generator.py` with enhanced prompting, extraction, and validation logic. ✅
-   - **Integrated into MCP Server**: MCP tool adapter created and registered for the improved generator. ✅
-   - **Streamlined Workflow**: Removed LangGraph dependency for a simpler, more maintainable code generation process. ✅
-   - **Enhanced Documentation Context**: DeepWiki integration for automatic documentation context enhancement. ✅
-   - **Robust Features**: Comprehensive input validation, automatic retries, detailed error handling, and path sanitization. ✅
-   - **Dedicated Streamlit Interface**: New Streamlit page `improved_odoo_generator.py` with comprehensive file management, download options, and real-time validation. ✅
+   - File saving functionality ✅
+   - Support for model providers (Gemini, Ollama) ✅
+   - Automatic code validation ✅
+   - Type hints and documentation ✅
+   - Unit tests ✅
+   - **Simplified Code Generator**: New module `odoo_code_generator.py` with streamlined prompting and validation. ✅
+   - **Integrated into MCP Server**: MCP tool adapter created for the simplified generator. ✅
+   - **Efficient Workflow**: Removed LangGraph dependency for a simpler workflow. ✅
+   - **Documentation Integration**: DeepWiki integration for documentation context. ✅
+   - **Core Features**: Input validation, retries, error handling, and path sanitization. ✅
+   - **Streamlit Interface**: Streamlit page with file management and validation. ✅
 
 3. **Odoo 18 Connector**
    - XML-RPC client implementation ✅

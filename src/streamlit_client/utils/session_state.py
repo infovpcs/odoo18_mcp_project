@@ -71,6 +71,8 @@ class ExportImportState:
     export_path: str = "/tmp/export.csv"
     input_path: str = "/tmp/import.csv"
     field_mapping: str = ""
+    parent_field_mapping: str = ""
+    child_field_mapping: str = ""
     create_if_not_exists: bool = True
     update_if_exists: bool = True
     parent_model: str = ""

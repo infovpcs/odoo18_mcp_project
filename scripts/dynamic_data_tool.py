@@ -10,6 +10,7 @@ import argparse
 import xmlrpc.client
 from dotenv import load_dotenv
 import ast
+import sys
 
 def connect():
     load_dotenv()
@@ -28,10 +29,26 @@ def fetch_fields(models, db, uid, pwd, model):
     fields = models.execute_kw(db, uid, pwd,
         'ir.model.fields', 'search_read', dom,
         {'fields':['name','ttype','relation','required','readonly'], 'order':'name'})
+    if not fields:
+        print(f"Error: No stored fields found for model {model}")
     # filter out readonly fields
     stored_fields = [f for f in fields if not f.get('readonly')]
     field_names = [f['name'] for f in stored_fields]
     return stored_fields, field_names
+
+def get_unique_filename(filepath):  
+    """Generate a unique filename by adding (1), (2), etc. if file exists."""  
+    if not os.path.exists(filepath):  
+        return filepath  
+    # Split the filepath into base and extension
+    base, ext = os.path.splitext(filepath)  
+    counter = 1  
+      
+    while True:  
+        new_filepath = f"{base}({counter}){ext}"  
+        if not os.path.exists(new_filepath):  
+            return new_filepath  
+        counter += 1
 
 def export_model(args):
     """Export model records to CSV file."""
@@ -50,7 +67,13 @@ def export_model(args):
 
         # Filter to only requested valid fields
         field_names = [f for f in requested_fields if f in all_field_names]
-        fields_meta = [fm for fm in all_fields_meta if fm['name'] in field_names]
+        # fields_meta = [fm for fm in all_fields_meta if fm['name'] in field_names]
+        fields_meta = []  
+        for field_name in field_names:  
+            for fm in all_fields_meta:  
+                if fm['name'] == field_name:  
+                    fields_meta.append(fm)  
+                    break
     else:
         fields_meta = all_fields_meta
         field_names = all_field_names
@@ -80,7 +103,7 @@ def export_model(args):
         # Perform search_read with optional domain
         print(f"Searching for records in {args.model}...")
         recs = models.execute_kw(db, uid, pwd,
-            args.model, 'search_read', [domain], {'fields': field_names, 'limit': False})
+            args.model, 'search_read', [domain], {'fields': field_names, 'limit': args.limit})
 
         if not recs:
             print(f"No records found in {args.model} with the given domain")
@@ -93,7 +116,9 @@ def export_model(args):
 
         print(f"Found {len(recs)} records. Exporting to CSV...")
 
-        with open(args.output, 'w', newline='') as f:
+        # with open(args.output, 'w', newline='') as f:
+        unique_output_path = get_unique_filename(args.output)
+        with open(unique_output_path, 'w', newline='') as f:  
             writer = csv.writer(f)
             writer.writerow(field_names)
 
@@ -137,16 +162,186 @@ def safe_int(s, default=None):
     try: return int(s)
     except: return default
 
+# With this dynamic approach
+def get_unique_fields(models, db, uid, pwd, model_name):
+    """Dynamically determine potential unique fields for a model."""
+    # Start with common unique fields by model type
+    common_unique_fields = {
+        'res.partner': ['email', 'vat', 'ref'],
+        'product.product': ['default_code', 'barcode'],
+        'product.template': ['default_code', 'barcode'],
+        'account.move': ['name', 'ref'],
+        'sale.order': ['name', 'client_order_ref'],
+        'purchase.order': ['name', 'partner_ref'],
+    }
+    
+    # Get model's potential unique fields
+    result = common_unique_fields.get(model_name, [])
+    
+    # Add 'name' if it exists in the model and isn't already included
+    fields_info = models.execute_kw(db, uid, pwd, model_name, 'fields_get', [['name']])
+    if 'name' in fields_info and 'name' not in result:
+        result.append('name')
+    
+    # Try to get SQL constraints that might indicate unique fields
+    try:
+        constraints = models.execute_kw(db, uid, pwd, 'ir.model.constraint', 'search_read',
+                                    [[('model', '=', model_name)]], 
+                                    {'fields': ['name', 'definition']})
+        for constraint in constraints:
+            if 'UNIQUE' in constraint.get('definition', ''):
+                # Extract field name from constraint name (common pattern in Odoo)
+                parts = constraint['name'].split('_')
+                if len(parts) > 2 and parts[-1] == 'uniq':
+                    potential_field = parts[-2]
+                    # Verify field exists
+                    field_exists = models.execute_kw(db, uid, pwd, 'ir.model.fields', 'search_count',
+                                                [[('model', '=', model_name), ('name', '=', potential_field)]])
+                    if field_exists and potential_field not in result:
+                        result.append(potential_field)
+    except Exception:
+        # If we can't get constraints, just continue with what we have
+        pass
+    return result
+
+def find_existing_record(models, db, uid, pwd, model_name, row, vals, match_field='id', unique_fields=None):
+    """
+    Detect existing record by:
+    1. ID
+    2. External ID
+    3. Unique field (auto-detected if not provided)
+    4. Special case for product.product by template + default_code
+    """
+    try:
+        raw_val = row.get(match_field)
+        if raw_val:
+            if '.' in raw_val:
+                print("using external ID ----------", file=sys.stderr)
+                # External ID
+                module, name = raw_val.split('.', 1)
+                data = models.execute_kw(db, uid, pwd, 'ir.model.data', 'search_read',
+                                         [[('module', '=', module), ('name', '=', name)]],
+                                         {'fields': ['res_id', 'model']})
+                if data and data[0]['model'] == model_name:
+                    return data[0]['res_id']
+            else:
+                print("using numeric ID ----------", file=sys.stderr)
+                # Numeric ID
+                record_id = int(raw_val)
+                ids = models.execute_kw(db, uid, pwd, model_name, 'search', [[('id', '=', record_id)]])
+                if ids:
+                    return ids[0]
+    except Exception as e:
+        print(f"Warning: ID/external ID check failed: {e}", file=sys.stderr)
+
+    # Auto-detect unique fields if not provided
+    if not unique_fields:
+        unique_fields = get_unique_fields(models, db, uid, pwd, model_name)
+
+    # Match on unique fields
+    for field in unique_fields:
+        val = vals.get(field)
+        if val:
+            print("using unique field ----------", file=sys.stderr)
+            try:
+                ids = models.execute_kw(db, uid, pwd, model_name, 'search', [[(field, '=', val)]])
+                if ids:
+                    return ids[0]
+            except Exception as e:
+                print(f"Warning: Error searching {model_name}.{field} = {val}: {e}", file=sys.stderr)
+
+    # Special case for product.product
+    if model_name == 'product.product' and 'product_tmpl_id' in vals:
+        print("Special case for product.product ----------", file=sys.stderr)
+        tmpl_id = vals['product_tmpl_id']
+        try:
+            domain = [['product_tmpl_id', '=', tmpl_id]]
+            ids = models.execute_kw(db, uid, pwd, model_name, 'search', [domain])
+            if ids:
+                if len(ids) == 1:
+                    return ids[0]
+                elif 'default_code' in vals:
+                    for rec_id in ids:
+                        rec = models.execute_kw(db, uid, pwd, model_name, 'read', [[rec_id]], {'fields': ['default_code']})
+                        if rec and rec[0].get('default_code') == vals['default_code']:
+                            return rec_id
+        except Exception as e:
+            print(f"Warning: Error finding product variant: {e}", file=sys.stderr)
+
+    return None
+
+
+def process_field(raw, field, meta_fields, selection_fields, models=None, db=None, uid=None, pwd=None):
+    raw_str = str(raw).strip() if raw else ''
+    if not raw_str or raw_str.lower() in ('false', 'none'):
+        return None
+
+    fmeta = meta_fields.get(field)
+    if not fmeta:
+        return raw_str
+
+    ttype = fmeta['ttype']
+    relation = fmeta.get('relation')
+
+    try:
+        if ttype == 'boolean':
+            return raw_str.lower() in ('1', 'true', 'yes', 'y')
+        elif ttype == 'integer':
+            return int(raw_str)
+        elif ttype == 'float':
+            return float(raw_str)
+        elif ttype == 'selection':
+            if raw_str not in selection_fields.get(field, []):
+                print(f"Warning: Invalid selection '{raw_str}' for field '{field}'")
+                return None
+            return raw_str
+        elif ttype == 'many2one':
+            if raw_str.isdigit():
+                return int(raw_str)
+            elif relation and models:
+                res = models.execute_kw(db, uid, pwd, relation, 'name_search', [[raw_str]], {'limit': 1})
+                if res:
+                    return res[0][0]
+        elif ttype == 'many2many':
+            parts = [p.strip() for p in raw_str.split(',')]
+            ids = []
+            if relation and models:
+                for part in parts:
+                    if part.isdigit():
+                        ids.append(int(part))
+                    else:
+                        res = models.execute_kw(db, uid, pwd, relation, 'name_search', [[part]], {'limit': 1})
+                        if res:
+                            ids.append(res[0][0])
+            if ids:
+                return [(6, 0, ids)]
+        elif ttype == 'date':
+            for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%d-%m-%Y', '%m-%d-%Y'):
+                try:
+                    from datetime import datetime
+                    return datetime.strptime(raw_str, fmt).strftime('%Y-%m-%d')
+                except ValueError:
+                    continue
+            print(f"Warning: Unrecognized date format: {raw_str}")
+        else:
+            return raw_str
+    except Exception as e:
+        print(f"Error processing field '{field}' value '{raw_str}': {e}")
+    return None
+
+
 def import_model(args):
     models, db, uid, pwd = connect()
     fields_meta, field_names = fetch_fields(models, db, uid, pwd, args.model)
 
     # Get required fields
     required_fields = [f['name'] for f in fields_meta if f.get('required')]
+    print("required_fields ----------", required_fields, file=sys.stderr)
 
     # Parse default values if provided
     default_values = {}
     if hasattr(args, 'defaults') and args.defaults:
+        print("yes -------- default values ----", file=sys.stderr)
         try:
             default_values = ast.literal_eval(args.defaults)
             if not isinstance(default_values, dict):
@@ -175,53 +370,10 @@ def import_model(args):
             field_info = models.execute_kw(db, uid, pwd, args.model, 'fields_get', [[fm['name']]])
             if fm['name'] in field_info and 'selection' in field_info[fm['name']]:
                 selection_fields[fm['name']] = [s[0] for s in field_info[fm['name']]['selection']]
-                
-    # With this dynamic approach
-    def get_unique_fields(models, db, uid, pwd, model_name):
-        """Dynamically determine potential unique fields for a model."""
-        # Start with common unique fields by model type
-        common_unique_fields = {
-            'res.partner': ['email', 'vat', 'ref'],
-            'product.product': ['default_code', 'barcode'],
-            'product.template': ['default_code', 'barcode'],
-            'account.move': ['name', 'ref'],
-            'sale.order': ['name', 'client_order_ref'],
-            'purchase.order': ['name', 'partner_ref'],
-        }
-        
-        # Get model's potential unique fields
-        result = common_unique_fields.get(model_name, [])
-        
-        # Add 'name' if it exists in the model and isn't already included
-        fields_info = models.execute_kw(db, uid, pwd, model_name, 'fields_get', [['name']])
-        if 'name' in fields_info and 'name' not in result:
-            result.append('name')
-        
-        # Try to get SQL constraints that might indicate unique fields
-        try:
-            constraints = models.execute_kw(db, uid, pwd, 'ir.model.constraint', 'search_read',
-                                        [[('model', '=', model_name)]], 
-                                        {'fields': ['name', 'definition']})
-            for constraint in constraints:
-                if 'UNIQUE' in constraint.get('definition', ''):
-                    # Extract field name from constraint name (common pattern in Odoo)
-                    parts = constraint['name'].split('_')
-                    if len(parts) > 2 and parts[-1] == 'uniq':
-                        potential_field = parts[-2]
-                        # Verify field exists
-                        field_exists = models.execute_kw(db, uid, pwd, 'ir.model.fields', 'search_count',
-                                                    [[('model', '=', model_name), ('name', '=', potential_field)]])
-                        if field_exists and potential_field not in result:
-                            result.append(potential_field)
-        except Exception:
-            # If we can't get constraints, just continue with what we have
-            pass
-        
-        return result
 
     # Get unique fields for this model dynamically
     model_unique_fields = get_unique_fields(models, db, uid, pwd, args.model)
-    print(f"Detected potential unique fields for {args.model}: {', '.join(model_unique_fields)}")
+    print(f"Detected potential unique fields for {args.model}: {', '.join(model_unique_fields)}", file=sys.stderr)
 
     # Get the match field for finding existing records
     match_field = getattr(args, 'match_field', 'id')
@@ -247,113 +399,15 @@ def import_model(args):
                 vals[key] = value
 
             # Process CSV values
-            for fm in fields_meta:
-                name = fm['name']; t = fm['ttype']
+            csv_field = next(iter(args.field_mapping))   # CSV field name
+            odoo_field = args.field_mapping[csv_field]   # Odoo field name
 
-                # Skip if field not in CSV
-                if name not in row:
-                    continue
-
-                raw = row.get(name)
-                # normalize raw to string and strip
-                raw_str = str(raw).strip() if raw is not None else ''
-                # skip empty or false-like
-                if not raw_str or raw_str.lower() in ('false', 'none'):
-                    continue
-                # now use raw_str
-                raw = raw_str
-                # skip one2many fields on import (not direct importable)
-                if t == 'one2many':
-                    continue
-
-                # Validate selection fields
-                if t == 'selection' and name in selection_fields:
-                    if raw not in selection_fields[name]:
-                        print(f"Warning: Invalid value '{raw}' for selection field '{name}' in row {row_num}.")
-                        print(f"Valid values are: {', '.join(selection_fields[name])}")
-                        if args.skip_invalid:
-                            continue
-
-                # Process field based on type
-                if t in ('integer', 'float'):
-                    vals[name] = safe_int(raw, 0)
-                elif t == 'boolean':
-                    vals[name] = raw.lower() in ('1', 'true', 'yes', 't', 'y')
-                elif t == 'many2one':
-                    # Try to handle name lookup for many2one fields
-                    if not raw.isdigit() and '/' not in raw:  # Not an ID or external ID
-                        relation = fm.get('relation')
-                        if relation:
-                            try:
-                                # Try to find the record by name
-                                rel_ids = models.execute_kw(db, uid, pwd, relation, 'name_search',
-                                                         [[raw]], {'limit': 1})
-                                if rel_ids:
-                                    vals[name] = rel_ids[0][0]
-                                else:
-                                    print(f"Warning: Could not find {relation} with name '{raw}' for field '{name}' in row {row_num}")
-                            except Exception as e:
-                                print(f"Error looking up {relation} by name: {e}")
-                                vals[name] = safe_int(raw)
-                        else:
-                            vals[name] = safe_int(raw)
-                    else:
-                        vals[name] = safe_int(raw)
-                elif t == 'many2many':
-                    # Handle comma-separated IDs or names
-                    if ',' in raw:
-                        parts = [p.strip() for p in raw.split(',')]
-                        ids = []
-                        relation = fm.get('relation')
-                        
-                        for part in parts:
-                            if part.isdigit():
-                                ids.append(int(part))
-                            elif relation:
-                                try:
-                                    # Try to find by name
-                                    rel_ids = models.execute_kw(db, uid, pwd, relation, 'name_search',
-                                                             [[part]], {'limit': 1})
-                                    if rel_ids:
-                                        ids.append(rel_ids[0][0])
-                                except Exception:
-                                    pass
-                        
-                        if ids:
-                            vals[name] = [(6, 0, ids)]
-                    else:
-                        # Single value
-                        if raw.isdigit():
-                            vals[name] = [(6, 0, [int(raw)])]
-                        else:
-                            relation = fm.get('relation')
-                            if relation:
-                                try:
-                                    rel_ids = models.execute_kw(db, uid, pwd, relation, 'name_search',
-                                                             [[raw]], {'limit': 1})
-                                    if rel_ids:
-                                        vals[name] = [(6, 0, [rel_ids[0][0]])]
-                                except Exception:
-                                    pass
-                elif t == 'date':
-                    # Ensure date is in YYYY-MM-DD format
-                    try:
-                        from datetime import datetime
-                        date_formats = ['%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%d-%m-%Y', '%m-%d-%Y']
-                        for fmt in date_formats:
-                            try:
-                                parsed_date = datetime.strptime(raw, fmt)
-                                vals[name] = parsed_date.strftime('%Y-%m-%d')
-                                break
-                            except ValueError:
-                                continue
-                        else:
-                            print(f"Warning: Could not parse date '{raw}' for field '{name}' in row {row_num}")
-                    except Exception as e:
-                        print(f"Error parsing date: {e}")
-                        vals[name] = raw
-                else:
-                    vals[name] = raw
+            key = row.get(csv_field)
+            vals = {**default_values}
+            for csv_field, odoo_field in args.field_mapping.items():
+                val = process_field(row.get(csv_field), odoo_field, {f['name']: f for f in fields_meta}, selection_fields, models, db, uid, pwd)
+                if val is not None:
+                    vals[odoo_field] = val
 
             # override name if prefix provided
             if hasattr(args, 'name_prefix') and args.name_prefix and 'name' in vals:
@@ -363,102 +417,33 @@ def import_model(args):
             # Final check for required fields
             missing_vals = [f for f in required_fields if f not in vals]
             if missing_vals and not args.force:
-                print(f"Error: Missing required fields in row {row_num}: {', '.join(missing_vals)}")
+                print(f"Error: Missing required fields in row {row_num}: {', '.join(missing_vals)}",file=sys.stderr)
                 error_count += 1
                 continue
 
             # Check if record exists
-            existing_id = None
-
-            # First check by ID if available
-            if match_field in row and row[match_field]:
-                try:
-                    # Check if it's an external ID (contains a dot)
-                    if '.' in row[match_field]:
-                        # Try to get the database ID from the external ID
-                        external_id = row[match_field]
-                        try:
-                            # Split the external ID into module and name
-                            module, name = external_id.split('.', 1)
-                            
-                            # Search for the record in ir.model.data
-                            ir_model_data = models.execute_kw(db, uid, pwd, 'ir.model.data', 'search_read',
-                                                           [[('module', '=', module), ('name', '=', name)]],
-                                                           {'fields': ['res_id', 'model']})
-                            
-                            if ir_model_data and ir_model_data[0]['model'] == args.model:
-                                record_id = ir_model_data[0]['res_id']
-                                # Check if record with this ID exists
-                                existing_records = models.execute_kw(db, uid, pwd, args.model, 'search',
-                                                                  [[('id', '=', record_id)]])
-                                if existing_records:
-                                    existing_id = existing_records[0]
-                                    print(f"Found existing record with external ID {external_id}: ID {existing_id}")
-                        except Exception as e:
-                            print(f"Warning: Error resolving external ID {external_id}: {e}")
-                    else:
-                        # It's a numeric ID
-                        record_id = safe_int(row[match_field])
-                        if record_id:
-                            # Check if record with this ID exists
-                            existing_records = models.execute_kw(db, uid, pwd, args.model, 'search',
-                                                              [[('id', '=', record_id)]])
-                            if existing_records:
-                                existing_id = existing_records[0]
-                                print(f"Found existing record with ID {record_id}")
-                except Exception as e:
-                    print(f"Warning: Error checking for existing record by ID: {e}")
-
-            # If not found by ID, try other unique fields
-            if not existing_id:
-                for field in model_unique_fields:
-                    if field in vals and vals[field]:
-                        try:
-                            existing_records = models.execute_kw(db, uid, pwd, args.model, 'search',
-                                                              [[(field, '=', vals[field])]])
-                            if existing_records:
-                                existing_id = existing_records[0]
-                                print(f"Found existing record with {field}='{vals[field]}': ID {existing_id}")
-                                break
-                        except Exception as e:
-                            print(f"Warning: Error checking for existing record by {field}: {e}")
-
-            # Handle special cases for specific models
-            if not existing_id and args.model == 'product.product' and 'product_tmpl_id' in vals:
-                try:
-                    # Get the product template ID
-                    tmpl_id = vals['product_tmpl_id']
-                    if tmpl_id:
-                        # Search for products with this template
-                        existing_records = models.execute_kw(db, uid, pwd, 'product.product', 'search',
-                                                          [['&', ('product_tmpl_id', '=', tmpl_id),
-                                                             ('active', 'in', [True, False])]])
-                        if existing_records:
-                            # If there's only one variant or we're dealing with a simple product, use it
-                            if len(existing_records) == 1:
-                                existing_id = existing_records[0]
-                                print(f"Found existing product with template ID {tmpl_id}: ID {existing_id}")
-                            # Otherwise, we need more criteria to identify the specific variant
-                            elif 'default_code' in vals and vals['default_code']:
-                                for record_id in existing_records:
-                                    product = models.execute_kw(db, uid, pwd, 'product.product', 'read',
-                                                             [[record_id]], {'fields': ['default_code']})
-                                    if product and product[0]['default_code'] == vals['default_code']:
-                                        existing_id = record_id
-                                        print(f"Found existing product variant with default_code '{vals['default_code']}': ID {existing_id}")
-                                        break
-                except Exception as e:
-                    print(f"Warning: Error checking for existing product by template ID: {e}")
+            existing_id =  find_existing_record(
+                models=models,
+                db=db,
+                uid=uid,
+                pwd=pwd,
+                model_name=args.model,
+                row=row,
+                vals=vals,
+                match_field=match_field,
+                unique_fields=model_unique_fields
+            )
 
             # Handle account.move special case (reset to draft)
             if existing_id and update_existing and args.model == 'account.move':
                 try:
+                    print(f"Checking state of existing account.move {existing_id}...",file=sys.stderr)
                     # Check if the move is posted
                     move_info = models.execute_kw(db, uid, pwd, 'account.move', 'read',
                                                [[existing_id]], {'fields': ['state']})
                     if move_info and move_info[0]['state'] == 'posted':
                         if getattr(args, 'reset_to_draft', False):
-                            print(f"Resetting account.move {existing_id} to draft state")
+                            print(f"Resetting account.move {existing_id} to draft state",file=sys.stderr)
                             models.execute_kw(db, uid, pwd, 'account.move', 'button_draft', [[existing_id]])
                         else:
                             print(f"Warning: Cannot update posted account.move {existing_id} without reset_to_draft option")
@@ -467,14 +452,15 @@ def import_model(args):
                                 readonly_fields = ['partner_id', 'invoice_date', 'date', 'currency_id']
                                 for field in readonly_fields:
                                     if field in vals:
-                                        print(f"Removing readonly field {field} for posted move")
+                                        print("Removing readonly field  for posted move",field,file=sys.stderr)
                                         del vals[field]
                 except Exception as e:
-                    print(f"Warning: Error checking account.move state: {e}")
+                    print("Warning: Error checking account.move state: ",e ,file=sys.stderr)
 
             try:
                 # Update or create record
                 if existing_id and update_existing:
+                    print("Updating existing record..............",file=sys.stderr)
                     # Remove ID from vals if present to avoid errors
                     if 'id' in vals:
                         del vals['id']
@@ -502,19 +488,25 @@ def import_model(args):
                     print(f"Skipping existing {args.model} {existing_id} (update not enabled)")
                     skipped_count += 1
                 elif not existing_id and create_if_not_exists:
+                    print("Creating new record..............",file=sys.stderr)
                     # Create new record
                     rid = models.execute_kw(db, uid, pwd, args.model, 'create', [vals])
-                    print(f"Created {args.model} {rid}")
+                    print(f"Created {args.model} {rid}",    file=sys.stderr)
                     created_count += 1
                 else:
                     print(f"Skipping record in row {row_num} (create not enabled)")
                     skipped_count += 1
             except Exception as e:
-                print(f"Error processing {args.model} in row {row_num}: {e}")
+                print(f"Error processing {args.model} in row {row_num}: {e}", file=sys.stderr)
                 error_count += 1
 
-    print(f"Import summary: {created_count} records created, {updated_count} records updated, {skipped_count} skipped, {error_count} errors")
-    return
+    print(f"Import summary: {created_count} records created, {updated_count} records updated, {skipped_count} skipped, {error_count} errors",file=sys.stderr)
+    return {
+        "created_count": created_count,
+        "updated_count": updated_count,
+        "error_count": error_count,
+        "skipped_count": skipped_count,
+    }
 
 def export_rel(args):
     """Export parent and child model relation to a flat CSV."""
@@ -576,7 +568,7 @@ def export_rel(args):
 
         print(f"Searching for parent records in {args.parent_model}...")
         parents = models.execute_kw(db, uid, pwd,
-            args.parent_model, 'search_read', [parent_domain], {'fields': p_fields, 'limit': False})
+            args.parent_model, 'search_read', [parent_domain], {'fields': p_fields, 'limit': args.limit})
 
         if not parents:
             print(f"No parent records found in {args.parent_model} with the given domain")
@@ -598,7 +590,7 @@ def export_rel(args):
         print(f"Searching for child records in {args.child_model}...")
         domain = [(args.relation_field, 'in', parent_ids)]
         children = models.execute_kw(db, uid, pwd,
-            args.child_model, 'search_read', [domain], {'fields': c_fields, 'limit': False})
+            args.child_model, 'search_read', [domain], {'fields': c_fields, 'limit': args.limit})
 
         if not children:
             print(f"No child records found in {args.child_model} related to the parent records")
@@ -627,7 +619,9 @@ def export_rel(args):
         print(f"Found {len(children)} child records. Exporting to CSV...")
 
         # Write CSV
-        with open(args.output, 'w', newline='') as f:
+        # with open(args.output, 'w', newline='') as f:
+        unique_output_path = get_unique_filename(args.output)  
+        with open(unique_output_path, 'w', newline='') as f: 
             writer = csv.writer(f)
             header = p_fields + c_fields
             writer.writerow(header)
@@ -698,95 +692,170 @@ def import_rel(args):
     parent_meta, _ = fetch_fields(models, db, uid, pwd, args.parent_model)
     child_meta, _ = fetch_fields(models, db, uid, pwd, args.child_model)
 
+    parent_fields = {f['name']: f for f in parent_meta}
+    child_fields = {f['name']: f for f in child_meta}
+
+    # Fetch selection fields for parent model
+    selection_fields_parent = {}
+    for fm in parent_meta:
+        if fm['ttype'] == 'selection':
+            field_info = models.execute_kw(db, uid, pwd, args.parent_model, 'fields_get', [[fm['name']]])
+            if fm['name'] in field_info and 'selection' in field_info[fm['name']]:
+                selection_fields_parent[fm['name']] = [s[0] for s in field_info[fm['name']]['selection']]
+
+    # Fetch selection fields for child model
+    selection_fields_child = {}
+    for fm in child_meta:
+        if fm['ttype'] == 'selection':
+            field_info = models.execute_kw(db, uid, pwd, args.child_model, 'fields_get', [[fm['name']]])
+            if fm['name'] in field_info and 'selection' in field_info[fm['name']]:
+                selection_fields_child[fm['name']] = [s[0] for s in field_info[fm['name']]['selection']]
+
     parent_required = [f['name'] for f in parent_meta if f.get('required')]
     child_required = [f['name'] for f in child_meta if f.get('required')]
-
-    # parse parent and child fields
-    p_fields = [s.strip() for s in args.parent_fields.split(',')]
-    c_fields = [s.strip() for s in args.child_fields.split(',')]
-
-    # Check for missing required fields
-    missing_parent = [f for f in parent_required if f not in p_fields and f not in parent_defaults]
-    if missing_parent and not args.force:
-        print(f"Warning: Missing required parent fields: {', '.join(missing_parent)}")
-        print("Use --parent-defaults or --force to continue")
-        return
-
-    missing_child = [f for f in child_required if f not in c_fields and f not in child_defaults and f != args.relation_field]
-    if missing_child and not args.force:
-        print(f"Warning: Missing required child fields: {', '.join(missing_child)}")
-        print("Use --child-defaults or --force to continue")
-        return
-
+   
     # Handle reset to draft for account.move
     if args.reset_to_draft and args.parent_model == 'account.move':
         print("Note: Will reset account.move records to draft before updating")
 
     parent_ids = {}
     counter = 1
-    parent_success = 0
+    parent_create = 0
+    parent_update = 0
     parent_error = 0
-    child_success = 0
+    child_create = 0
+    child_update = 0
     child_error = 0
-
-    # create parent records
+    
+    # Create parent records
     for r in rows:
-        key = r[p_fields[0]]
-        if key in parent_ids:
+         # Get first CSV column name (e.g., 'parent_name') and its Odoo field (e.g., 'name')
+        csv_field = next(iter(args.parent_field_mapping))   # CSV field name
+        odoo_field = args.parent_field_mapping[csv_field]   # Odoo field name
+        key = r.get(csv_field)
+        if not key or key in parent_ids:
             continue
 
-        vals = {}
-        # Add defaults first
-        for k, v in parent_defaults.items():
-            vals[k] = v
+        vals = {**parent_defaults}
+        for csv_field, odoo_field in args.parent_field_mapping.items():
+            val = process_field(r.get(csv_field), odoo_field, parent_fields, selection_fields_parent, models, db, uid, pwd)
+            if val is not None:
+                vals[odoo_field] = val
 
-        # Add CSV values
-        for f in p_fields:
-            raw = r.get(f)
-            if raw and raw.strip() and raw.lower() not in ('false', 'none'):
-                vals[f] = raw.strip()
+        if getattr(args, 'name_prefix', None):
+            # vals[args.parent_field_mapping[0]] = f"{args.name_prefix}-{counter:03d}"
+            first_csv_field = next(iter(args.parent_field_mapping))
+            odoo_field = args.parent_field_mapping[first_csv_field]
+            vals[odoo_field] = f"{args.name_prefix}-{counter:03d}"
 
-        if args.name_prefix:
-            vals[p_fields[0]] = f"{args.name_prefix}-{counter:03d}"
             counter += 1
 
-        try:
-            pid = models.execute_kw(db, uid, pwd, args.parent_model, 'create', [vals])
-            parent_ids[key] = pid
-            print(f"Created {args.parent_model} {pid}")
-            parent_success += 1
-        except Exception as e:
-            print(f"Error creating {args.parent_model}: {e}")
+        missing = [f for f in parent_required if f not in vals]
+        if missing and not getattr(args, 'force', False):
+            print(f"Skipping parent record due to missing fields: {missing}", file=sys.stderr)
             parent_error += 1
+            continue
+        unique_fields=get_unique_fields(models, db, uid, pwd, args.parent_model)
+        existing_pid = find_existing_record(
+            models, db, uid, pwd, args.parent_model,vals,
+            vals, match_field='id', unique_fields=unique_fields
+        )
 
-    # create child records
+        if existing_pid:
+            if getattr(args, 'update_if_exists', False):
+                try:
+                    models.execute_kw(db, uid, pwd, args.parent_model, 'write', [[existing_pid], vals])
+                    print(f"Updated existing parent {args.parent_model} ID: {existing_pid}", file=sys.stderr)
+                    parent_ids[key] = existing_pid
+                    parent_update += 1
+                except Exception as e:
+                    print(f"Error updating parent {args.parent_model}: {e}", file=sys.stderr)
+                    parent_error += 1
+            else:
+                print(f"Skipped existing parent {args.parent_model} ID: {existing_pid} (update not enabled)", file=sys.stderr)
+                parent_ids[key] = existing_pid
+        else:
+            if getattr(args, 'create_if_not_exists', True):
+                try:
+                    pid = models.execute_kw(db, uid, pwd, args.parent_model, 'create', [vals])
+                    parent_ids[key] = pid
+                    print(f"Created parent {args.parent_model} ID: {pid}", file=sys.stderr)
+                    parent_create += 1
+                except Exception as e:
+                    print(f"Error creating parent {args.parent_model}: {e}", file=sys.stderr)
+                    parent_error += 1
+            else:
+                print(f"Skipping parent {args.parent_model} ID: {existing_pid} (create not enabled)", file=sys.stderr)
+                parent_ids[key] = None
+
+
+    # Create child records
     for r in rows:
-        parent_key = r[p_fields[0]]
+        parent_csv_field = next(iter(args.parent_field_mapping))
+        odoo_field = args.parent_field_mapping[parent_csv_field]
+        parent_key = r.get(parent_csv_field)
         pid = parent_ids.get(parent_key)
+
         if not pid:
             continue
 
-        vals = {args.relation_field: pid}
-        # Add defaults first
-        for k, v in child_defaults.items():
-            vals[k] = v
+        vals = {args.relation_field: pid, **child_defaults}
+        for csv_field, odoo_field in args.child_field_mapping.items():
+            val = process_field(r.get(csv_field), odoo_field, child_fields, selection_fields_child, models, db, uid, pwd)
+            if val is not None:
+                vals[odoo_field] = val
 
-        # Add CSV values
-        for f in c_fields:
-            raw = r.get(f)
-            if raw and raw.strip() and raw.lower() not in ('false', 'none'):
-                vals[f] = raw.strip()
-
-        try:
-            cid = models.execute_kw(db, uid, pwd, args.child_model, 'create', [vals])
-            print(f"Created {args.child_model} {cid}")
-            child_success += 1
-        except Exception as e:
-            print(f"Error creating {args.child_model}: {e}")
+        missing = [f for f in child_required if f not in vals]
+        if missing and not getattr(args, 'force', False):
+            print(f"Skipping child record due to missing fields: {missing}", file=sys.stderr)
             child_error += 1
+            continue
+        
+        unique_fields_child = get_unique_fields(models, db, uid, pwd, args.child_model)
+        domain = [(args.relation_field, '=', pid)]
+        for field in unique_fields_child:
+            if field in vals:
+                domain.append((field, '=', vals[field]))
 
-    print(f"Import summary: {parent_success} parent records created ({parent_error} errors), {child_success} child records created ({child_error} errors)")
-    return
+        existing_cid = models.execute_kw(db, uid, pwd, args.child_model, 'search', [domain], {'limit': 1})
+        if existing_cid:
+            if getattr(args, 'update_if_exists', False):
+                try:
+                    models.execute_kw(db, uid, pwd, args.child_model, 'write', [[existing_cid[0]], vals])
+                    print(f"Updated child {args.child_model} ID: {existing_cid[0]}", file=sys.stderr)
+                    child_update += 1
+                except Exception as e:
+                    print(f"Error updating child {args.child_model}: {e}", file=sys.stderr)
+                    child_error += 1
+            else:
+                print(f"Skipped existing child {args.child_model} ID: {existing_cid[0]} (update not enabled)", file=sys.stderr)
+        else:
+            if getattr(args, 'create_if_not_exists', True):
+                try:
+                    cid = models.execute_kw(db, uid, pwd, args.child_model, 'create', [vals])
+                    print(f"Created child {args.child_model} ID: {cid}", file=sys.stderr)
+                    child_create += 1
+                except Exception as e:
+                    print(f"Error creating child {args.child_model}: {e}", file=sys.stderr)
+                    child_error += 1
+            else:
+                print(f"Skipping child {args.child_model} ID: {existing_cid[0]} (create not enabled)", file=sys.stderr)
+            
+
+    print(f"\n=== Import Summary ===", file=sys.stderr)
+    print(f"Parent: {parent_create} created, {parent_update} updated, {parent_error} errors", file=sys.stderr)
+    print(f"Child: {child_create} created, {child_update} updated, {child_error} errors", file=sys.stderr)
+
+    print(f"Import summary: {parent_create} parent records created ({parent_error} errors), {child_create} child records created ({child_error} errors)")
+    return {
+        "parent_created": parent_create,
+        "parent_failed": parent_error,
+        "parent_updated": parent_update,
+        "child_created": child_create,
+        "child_failed": child_error,
+        "child_updated": child_update,
+        "validation_errors": [],  # collect errors if needed
+    }
 
 
 def model_info(args):

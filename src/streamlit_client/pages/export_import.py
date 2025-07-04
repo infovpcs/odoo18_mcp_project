@@ -479,6 +479,22 @@ def render_related_import_tab(session_state: SessionState, mcp_connector: MCPCon
         key="related_import_path"
     )
 
+    # Parent model field mapping
+    parent_field_mapping = st.text_area(
+        "Parent Field Mapping",
+        value=session_state.export_import.parent_field_mapping,
+        placeholder='{"csv_field": "odoo_field"}',
+        help="JSON string with mapping from CSV field names to Odoo field names for parent model."
+    )
+
+    # Child model field mapping
+    child_field_mapping = st.text_area(
+        "Child Field Mapping",
+        value=session_state.export_import.child_field_mapping,
+        placeholder='{"csv_field": "odoo_field"}',
+        help="JSON string with mapping from CSV field names to Odoo field names for child model."
+    )
+
     # Options
     col1, col2 = st.columns(2)
 
@@ -533,6 +549,8 @@ def render_related_import_tab(session_state: SessionState, mcp_connector: MCPCon
         session_state.export_import.child_model = child_model
         session_state.export_import.relation_field = relation_field
         session_state.export_import.input_path = input_path
+        session_state.export_import.parent_field_mapping = parent_field_mapping
+        session_state.export_import.child_field_mapping = child_field_mapping
         session_state.export_import.create_if_not_exists = create_if_not_exists
         session_state.export_import.update_if_exists = update_if_exists
 
@@ -544,6 +562,8 @@ def render_related_import_tab(session_state: SessionState, mcp_connector: MCPCon
                 "child_model": child_model,
                 "relation_field": relation_field,
                 "input_path": input_path,
+                "parent_field_mapping": parent_field_mapping,
+                "child_field_mapping": child_field_mapping,
                 "create_if_not_exists": create_if_not_exists,
                 "update_if_exists": update_if_exists,
                 "draft_only": draft_only,

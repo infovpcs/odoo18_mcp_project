@@ -1892,6 +1892,8 @@ try:
         relation_field: str,
         create_if_not_exists: bool = True,
         update_if_exists: bool = True,
+        parent_field_mapping: Optional[str] = None,
+        child_field_mapping: Optional[str] = None,
         draft_only: bool = False,
         reset_to_draft: bool = False,
         skip_readonly_fields: bool = True,
@@ -1964,6 +1966,141 @@ try:
             if not input_path.lower().endswith(".csv"):
                 return f"# Error: Invalid File Format\n\nThe file '{input_path}' is not a CSV file."
 
+            # Read CSV headers to validate field mapping
+            try:
+                import csv
+
+                with open(input_path, "r") as f:
+                    reader = csv.reader(f)
+                    csv_headers = next(reader)
+            except Exception as e:
+                return f"# Error: Invalid CSV File\n\nCould not read headers from CSV file: {str(e)}"
+
+            # Step 1: Load or initialize parent mapping
+            parent_mapping = {}
+            if parent_field_mapping:
+                try:
+                    parent_mapping = json.loads(parent_field_mapping)
+                except json.JSONDecodeError:
+                    return f'# Error: Invalid Field Mapping\n\nThe field mapping format is invalid: {parent_field_mapping}\n\nExample valid format:\n```json\n{{\n  "csv_field1": "odoo_field1",\n  "csv_field2": "odoo_field2"\n}}\n```'
+
+            # Step 2: Auto-detect missing mappings
+            for csv_field in csv_headers:
+                if csv_field in parent_mapping:
+                    continue
+                normalized = csv_field.lower().replace('_', '')
+                for odoo_field in parent_available_fields:
+                    if odoo_field.lower().replace('_', '') == normalized:
+                        parent_mapping[csv_field] = odoo_field
+                        break
+
+            # Step 4: Validation
+            invalid_csv_fields = [field for field in parent_mapping.keys() if field not in csv_headers]
+            if invalid_csv_fields:
+                return f"# Error: Invalid CSV Fields in parent_mapping\n\nThe following CSV fields in the parent_mapping do not exist in the CSV file:\n- {', '.join(invalid_csv_fields)}\n\nAvailable CSV fields:\n- {', '.join(csv_headers)}"
+
+            invalid_odoo_fields = [field for field in parent_mapping.values() if field not in parent_available_fields and field != "id"]
+            if invalid_odoo_fields:
+                return f"# Error: Invalid Odoo Fields in parent_mapping\n\nThe following Odoo fields in the parent_mapping do not exist in model '{parent_model}':\n- {', '.join(invalid_odoo_fields)}\n\nAvailable Odoo fields include:\n- {', '.join(list(parent_available_fields.keys())[:20])}\n- ..."
+
+            # =================== CHILD ===================
+
+            child_mapping = {}
+            if child_field_mapping:
+                try:
+                    child_mapping = json.loads(child_field_mapping)
+                except json.JSONDecodeError:
+                    return f'# Error: Invalid Field Mapping\n\nThe field mapping format is invalid: {child_field_mapping}\n\nExample valid format:\n```json\n{{\n  "csv_field1": "odoo_field1",\n  "csv_field2": "odoo_field2"\n}}\n```'
+
+            for csv_field in csv_headers:
+                if csv_field in parent_mapping or csv_field in child_mapping:
+                    continue
+                normalized = csv_field.lower().replace('_', '')
+                for odoo_field in child_available_fields:
+                    if odoo_field.lower().replace('_', '') == normalized:
+                        child_mapping[csv_field] = odoo_field
+                        break
+
+            # Final validation
+            invalid_csv_fields = [field for field in child_mapping.keys() if field not in csv_headers]
+            if invalid_csv_fields:
+                return f"# Error: Invalid CSV Fields in child_mapping\n\nThe following CSV fields in the child_mapping do not exist in the CSV file:\n- {', '.join(invalid_csv_fields)}\n\nAvailable CSV fields:\n- {', '.join(csv_headers)}"
+
+            invalid_odoo_fields = [field for field in child_mapping.values() if field not in child_available_fields and field != "id"]
+            if invalid_odoo_fields:
+                return f"# Error: Invalid Odoo Fields in child_mapping\n\nThe following Odoo fields in the child_mapping do not exist in model '{child_model}':\n- {', '.join(invalid_odoo_fields)}\n\nAvailable Odoo fields include:\n- {', '.join(list(child_available_fields.keys())[:20])}\n- ..."
+
+            # Step 3: Try prefix-based fallback if mapping is still empty
+            # if not parent_mapping:
+            shared_prefix_fields = set()
+            for csv_field in csv_headers:
+                if csv_field.startswith("parent_"):
+                    stripped = csv_field.replace("parent_", "")
+                    corresponding_child_field = f"child_{stripped}"
+                    
+                    # Check if both parent_XXX and child_XXX exist
+                    if corresponding_child_field in csv_headers:
+                        print("getting child and parent stripped", stripped, corresponding_child_field)
+                        # Only map if XXX exists in both parent and child models
+                        if stripped in parent_available_fields and stripped in child_available_fields:
+                            # Add only if not already mapped
+                            parent_mapping[csv_field] = stripped
+                            child_mapping[corresponding_child_field] = stripped
+                            shared_prefix_fields.add(stripped)
+                            continue  # Skip default logic to avoid double-mapping
+
+                    # If only parent_XXX exists and it's not a shared one
+                    if stripped in parent_available_fields and stripped not in shared_prefix_fields:
+                        parent_mapping[csv_field] = stripped
+
+                    if csv_field.startswith("child_"):
+                        stripped = csv_field.replace("child_", "")
+                        if stripped in child_available_fields and stripped not in shared_prefix_fields:
+                            child_mapping[csv_field] = stripped
+            
+            # If both mappings are still empty, raise error
+            if not parent_mapping and not child_mapping:
+                return (
+                    "# Error: Could not determine parent or child mappings.\n\n"
+                    "Suggestions:\n"
+                    "- Provide a mapping JSON string for --parent_field_mapping and/or --child_field_mapping.\n"
+                    "- Or use CSV headers like 'parent_name' or 'child_product_id'.\n"
+                    "- Or make sure your CSV fields exactly match Odoo field names.\n"
+                )
+
+            # Check for parent required fields
+            parent_required_fields = [
+                field
+                for field, info in parent_available_fields.items()
+                if info.get("required", False) and field != "id"
+            ]
+            print("parent_required_fields", parent_required_fields)
+
+            child_required_fields = [
+                field
+                for field, info in child_available_fields.items()
+                if info.get("required", False) and field != "id"
+            ]
+            print("child_required_fields", child_required_fields)
+
+            mapped_parent_odoo_fields = set(parent_mapping.values() if parent_mapping else [])
+            missing_parent_required = [
+                field for field in parent_required_fields if field not in mapped_parent_odoo_fields
+            ]
+            print("missing_parent_required", missing_parent_required)
+
+            if missing_parent_required and create_if_not_exists:
+                return f"# Warning: Missing Parent Required Fields\n\nThe following required fields are not mapped but are needed for creating new records:\n- {', '.join(missing_parent_required)}\n\nPlease update your field mapping to include these fields or set create_if_not_exists=False."
+
+            mapped_child_odoo_fields = set(child_mapping.values() if child_mapping else [])
+            missing_child_required = [
+                field for field in child_required_fields if field not in mapped_child_odoo_fields
+            ]
+            print("missing_child_required", missing_child_required)
+
+            if missing_child_required and create_if_not_exists:
+                return f"# Warning: Missing Child Required Fields\n\nThe following required fields are not mapped but are needed for creating new records:\n- {', '.join(missing_child_required)}\n\nPlease update your field mapping to include these fields or set create_if_not_exists=False."
+
             # Parse default values if provided
             p_defaults = None
             if parent_defaults:
@@ -1999,8 +2136,8 @@ try:
                 parent_model=parent_model,
                 child_model=child_model,
                 relation_field=relation_field,
-                parent_fields=None,  # Not needed for import
-                child_fields=None,  # Not needed for import
+                parent_field_mapping=parent_mapping,
+                child_field_mapping=child_mapping,
                 input_path=input_path,
                 name_prefix=name_prefix,
                 parent_defaults=p_defaults,
@@ -2122,45 +2259,37 @@ try:
                 return f"# Error: Invalid CSV File\n\nCould not read headers from CSV file: {str(e)}"
 
             # Parse field mapping if provided
-            mapping = None
+            mapping = {}
             if field_mapping:
                 try:
                     mapping = json.loads(field_mapping)
                 except json.JSONDecodeError:
                     return f'# Error: Invalid Field Mapping\n\nThe field mapping format is invalid: {field_mapping}\n\nExample valid format:\n```json\n{{\n  "csv_field1": "odoo_field1",\n  "csv_field2": "odoo_field2"\n}}\n```'
+            
+            # Auto mapping
+            for csv_field in csv_headers:
+                if csv_field in mapping:
+                    continue
+                normalized = csv_field.lower().replace('_', '')
+                for odoo_field in available_fields:
+                    if odoo_field.lower().replace('_', '') == normalized:
+                        mapping[csv_field] = odoo_field
+                        break
+            
+            # Validate field mapping
+            # Check if CSV fields exist in the CSV file
+            invalid_csv_fields = [
+                field for field in mapping.keys() if field not in csv_headers
+            ]
+            if invalid_csv_fields:
+                return f"# Error: Invalid CSV Fields in Mapping\n\nThe following CSV fields in the mapping do not exist in the CSV file:\n- {', '.join(invalid_csv_fields)}\n\nAvailable CSV fields:\n- {', '.join(csv_headers)}"
 
-                # Validate field mapping
-                if mapping:
-                    # Check if CSV fields exist in the CSV file
-                    invalid_csv_fields = [
-                        field for field in mapping.keys() if field not in csv_headers
-                    ]
-                    if invalid_csv_fields:
-                        return f"# Error: Invalid CSV Fields in Mapping\n\nThe following CSV fields in the mapping do not exist in the CSV file:\n- {', '.join(invalid_csv_fields)}\n\nAvailable CSV fields:\n- {', '.join(csv_headers)}"
-
-                    # Check if Odoo fields exist in the model
-                    invalid_odoo_fields = [
-                        field
-                        for field in mapping.values()
-                        if field not in available_fields and field != "id"
-                    ]
-                    if invalid_odoo_fields:
-                        return f"# Error: Invalid Odoo Fields in Mapping\n\nThe following Odoo fields in the mapping do not exist in model '{model_name}':\n- {', '.join(invalid_odoo_fields)}\n\nAvailable Odoo fields include:\n- {', '.join(list(available_fields.keys())[:20])}\n- ..."
-            else:
-                # If no mapping is provided, suggest one based on matching field names
-                mapping = {}
-                for csv_field in csv_headers:
-                    # Direct match
-                    if csv_field in available_fields:
-                        mapping[csv_field] = csv_field
-                    # Try normalized match (lowercase, no underscores)
-                    else:
-                        normalized_csv_field = csv_field.lower().replace("_", "")
-                        for odoo_field in available_fields.keys():
-                            normalized_odoo_field = odoo_field.lower().replace("_", "")
-                            if normalized_csv_field == normalized_odoo_field:
-                                mapping[csv_field] = odoo_field
-                                break
+            # Check if Odoo fields exist in the model
+            invalid_odoo_fields = [
+                field for field in mapping.values() if field not in available_fields and field != "id"
+            ]
+            if invalid_odoo_fields:
+                return f"# Error: Invalid Odoo Fields in Mapping\n\nThe following Odoo fields in the mapping do not exist in model '{model_name}':\n- {', '.join(invalid_odoo_fields)}\n\nAvailable Odoo fields include:\n- {', '.join(list(available_fields.keys())[:20])}\n- ..."
 
             # Check for required fields
             required_fields = [

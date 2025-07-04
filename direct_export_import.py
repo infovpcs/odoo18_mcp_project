@@ -80,7 +80,8 @@ def export_related_records(parent_model, child_model, relation_field, parent_fie
     }
 
 
-def import_related_records(parent_model, child_model, relation_field, parent_fields=None, child_fields=None,
+def import_related_records(parent_model, child_model, relation_field, parent_fields=None, child_fields=None,parent_field_mapping = None,
+                           child_field_mapping = None,
                       input_path=None, name_prefix=None, parent_defaults=None, child_defaults=None,
                       force=False, reset_to_draft=False, skip_readonly_fields=False, create_if_not_exists=True, update_if_exists=True):
     """
@@ -117,27 +118,13 @@ def import_related_records(parent_model, child_model, relation_field, parent_fie
             reader = csv.reader(f)
             header = next(reader)
 
-            # Determine parent and child fields from the header
-            # For simplicity, use the first field as parent field and the relation field as child field
-            p_fields = ['name']
-            c_fields = [relation_field]
+            # If parent_field_mapping or child_fields were provided, use them instead
+            if parent_field_mapping:
+                args.parent_field_mapping = parent_field_mapping
 
-            # If parent_fields or child_fields were provided, use them instead
-            if parent_fields:
-                if isinstance(parent_fields, list):
-                    p_fields = parent_fields
-                else:
-                    p_fields = [f.strip() for f in parent_fields.split(',')]
+            if child_field_mapping:
+                args.child_field_mapping = child_field_mapping
 
-            if child_fields:
-                if isinstance(child_fields, list):
-                    c_fields = child_fields
-                else:
-                    c_fields = [f.strip() for f in child_fields.split(',')]
-
-            # Set the fields in the args
-            args.parent_fields = ','.join(p_fields)
-            args.child_fields = ','.join(c_fields)
     except Exception as e:
         return {
             "success": False,
@@ -177,7 +164,7 @@ def import_related_records(parent_model, child_model, relation_field, parent_fie
     # Call the import_rel function
     try:
         from scripts.dynamic_data_tool import import_rel
-        import_rel(args)
+        summary = import_rel(args)
         success = True
         error = None
     except Exception as e:
@@ -207,12 +194,12 @@ def import_related_records(parent_model, child_model, relation_field, parent_fie
         "imported_records": total_records,
         "import_path": input_path,
         "total_records": total_records,
-        "parent_created": total_records // 2,  # Placeholder
-        "parent_updated": 0,  # Placeholder
-        "parent_failed": 0,  # Placeholder
-        "child_created": total_records,  # Placeholder
-        "child_updated": 0,  # Placeholder
-        "child_failed": 0,  # Placeholder
+        "parent_created": summary["parent_created"],
+        "parent_updated": summary["parent_updated"],
+        "parent_failed": summary["parent_failed"],
+        "child_created": summary["child_created"],
+        "child_updated": summary["child_updated"],
+        "child_failed": summary["child_failed"],
         "validation_errors": []  # Placeholder
     }
 
@@ -328,17 +315,7 @@ def import_records(input_path, model_name, field_mapping=None, create_if_not_exi
 
         f = io.StringIO()
         with redirect_stdout(f):
-            import_model(args)
-
-        output = f.getvalue()
-
-        # Parse the import summary to get counts
-        import re
-        summary_match = re.search(r"Import summary: (\d+) records created, (\d+) records updated, (\d+) errors", output)
-        if summary_match:
-            created_count = int(summary_match.group(1))
-            updated_count = int(summary_match.group(2))
-            error_count = int(summary_match.group(3))
+            summary = import_model(args)
 
         success = True
         error = None
@@ -362,11 +339,11 @@ def import_records(input_path, model_name, field_mapping=None, create_if_not_exi
         "success": success,
         "error": error,
         "model_name": model_name,
-        "imported_records": created_count,
-        "updated_records": updated_count,
+        "imported_records": summary["created_count"],
+        "updated_records": summary["updated_count"],
         "import_path": input_path,
         "field_mapping": field_mapping or {},
         "total_records": total_records,
-        "failed_records": error_count,
+        "failed_records": summary["error_count"],
         "validation_errors": []  # Placeholder
     }

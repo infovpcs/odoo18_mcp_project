@@ -117,7 +117,7 @@ GEMINI_MODEL=gemini-2.0-flash
 ### Running the Server
 
 ```bash
-python src/mcp_server.py
+python mcp_server.py
 ```
 
 ### Running Tests
@@ -129,7 +129,7 @@ python -m pytest tests/
 ### Using Streamlit UI
 
 ```bash
-streamlit run src/streamlit_code_agent_graph.py
+streamlit run app.py
 ```
 
 ## Tools
@@ -211,7 +211,7 @@ cd /path/to/odoo18_mcp_project
 source .venv/bin/activate  # or .venv/Scripts/activate on Windows
 
 # Run the Streamlit app
-streamlit run src/streamlit_client/app.py
+streamlit run app.py
 ```
 
 ### Setup
@@ -1041,7 +1041,7 @@ To launch the Streamlit app:
 
 ```bash
 cd /Users/vinusoft85/workspace/odoo18_mcp_project
-streamlit run src/streamlit_client/app.py
+streamlit run app.py
 ```
 
 This provides a user-friendly interface for generating Odoo modules with real-time workflow visualization.

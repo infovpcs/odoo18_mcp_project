@@ -74,7 +74,7 @@ To run the Streamlit client:
 1. Ensure you have followed the steps under "Local Development" to set up the environment and install dependencies.
 2. Run the Streamlit app from the project root directory:
    ```bash
-   streamlit run src/streamlit_client/app.py
+   streamlit run app.py
    ```
 3. The Streamlit app will open in your web browser.
 

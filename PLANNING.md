@@ -176,7 +176,6 @@ odoo18_mcp_project/
 ├── setup.py
 ├── simple_mcp_server.py
 ├── standalone_mcp_server.py
-├── streamlit_code_agent_graph.py
 └── update_claude_config.sh
 ```
 

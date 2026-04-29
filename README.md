@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/infovpcs-odoo18-mcp-project-badge.png)](https://mseep.ai/app/infovpcs-odoo18-mcp-project)
+
 # Odoo 18 MCP Integration (18.0 Branch)
 
 Last Updated: 2025-06-06

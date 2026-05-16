@@ -659,6 +659,13 @@ class QueryParser:
 
         return domain
 
+    # Words that look like entity values but are actually field/sort descriptors
+    _GENERIC_WORDS = {
+        "name", "id", "date", "status", "state", "type", "customer", "partner",
+        "user", "all", "record", "records", "value", "field", "order", "orders",
+        "their", "them", "it", "the", "a", "an",
+    }
+
     def _extract_entities(self, query: str, model_name: str) -> Dict[str, str]:
         """Extract named entities from the query.
 
@@ -690,48 +697,62 @@ class QueryParser:
             pattern = rf'{entity_type}\s+(?:name\s+)?(?:is\s+)?["\']?([^"\']+)["\']?'
             match = re.search(pattern, query)
             if match:
-                entities[entity_type] = match.group(1).strip()
+                value = match.group(1).strip()
+                if value.lower() not in self._GENERIC_WORDS and len(value) > 1:
+                    entities[entity_type] = value
 
         # Extract customer/partner name (common case)
         if 'customer' in field_mappings or model_name in ["res.partner", "sale.order", "account.move", "project.project"]:
-            customer_match = re.search(r'(customer|client|partner)(?:\'s|\s+name)?\s+(?:is\s+)?["\']?([^"\']+)["\']?', query)
+            customer_match = re.search(r'(customer|client|partner)(?:\'s|\s+name)?\s+(?:is\s+)?["\']?([^"\',]+)["\']?', query)
             if customer_match:
-                entities["customer"] = customer_match.group(2).strip()
+                value = customer_match.group(2).strip()
+                if value.lower() not in self._GENERIC_WORDS and len(value) > 1:
+                    entities["customer"] = value
             else:
-                # Try alternative patterns
+                # Try alternative patterns — only "for/under" (not "by") to avoid "ordered by customer name"
                 for pattern in [
-                    r'(?:for|under|by)\s+(?:customer|client|partner)\s+["\']?([^"\']+)["\']?',
-                    r'(?:for|under|by)\s+["\']?([^"\']+)["\']?'
+                    r'(?:for|under)\s+(?:customer|client|partner)\s+["\']?([^"\']+)["\']?',
+                    r'(?:for|under)\s+["\']?([^"\']+)["\']?'
                 ]:
                     match = re.search(pattern, query)
                     if match:
-                        entities["customer"] = match.group(1).strip()
-                        break
+                        value = match.group(1).strip()
+                        if value.lower() not in self._GENERIC_WORDS and len(value) > 1:
+                            entities["customer"] = value
+                            break
 
         # Extract model-specific entities based on model name
         if model_display_name:
             pattern = rf'{model_display_name}\s+(?:name\s+)?(?:is\s+)?["\']?([^"\']+)["\']?'
             match = re.search(pattern, query)
             if match:
-                entities[model_display_name] = match.group(1).strip()
+                value = match.group(1).strip()
+                if value.lower() not in self._GENERIC_WORDS and len(value) > 1:
+                    entities[model_display_name] = value
 
         # Extract project name (common case)
         if 'project' in field_mappings or model_name in ["project.project", "project.task"]:
             project_match = re.search(r'project\s+(?:name\s+)?(?:is\s+)?["\']?([^"\']+)["\']?', query)
             if project_match:
-                entities["project"] = project_match.group(1).strip()
+                value = project_match.group(1).strip()
+                if value.lower() not in self._GENERIC_WORDS and len(value) > 1:
+                    entities["project"] = value
 
         # Extract deadline date (common case)
         if model_name in ["project.task", "crm.lead"] or any('deadline' in field for field in field_mappings.get('date', [])):
             deadline_match = re.search(r'deadline\s+(?:date\s+)?(?:is\s+)?["\']?([^"\']+)["\']?', query)
             if deadline_match:
-                entities["deadline"] = deadline_match.group(1).strip()
+                value = deadline_match.group(1).strip()
+                if value.lower() not in self._GENERIC_WORDS and len(value) > 1:
+                    entities["deadline"] = value
 
         # Extract generic name entity if nothing else was found
         if not entities and 'name' in query:
-            name_match = re.search(r'name\s+(?:is\s+)?["\']?([^"\']+)["\']?', query)
+            name_match = re.search(r'name\s+is\s+["\']?([^"\']+)["\']?', query)
             if name_match:
-                entities["name"] = name_match.group(1).strip()
+                value = name_match.group(1).strip()
+                if value.lower() not in self._GENERIC_WORDS and len(value) > 1:
+                    entities["name"] = value
 
         return entities
 
@@ -1100,6 +1121,18 @@ class QueryParser:
             # Note: We'll need to specify ordering in the search_read call
 
             return [(task_model, task_domain, task_fields)]
+
+        # Generic "list/show all [model]" pattern — return all records with empty domain
+        # Must check BEFORE specific entity extraction to avoid false filters from sort phrases
+        list_all_match = re.search(r'\b(?:list|show|get|display)\b.{0,20}\b(?:all|out all)\b', normalized_query)
+        if list_all_match:
+            model_name = self._identify_model(normalized_query)
+            if model_name:
+                model_fields = self._get_model_fields_dynamic(model_name)
+                if model_fields:
+                    display_fields = self._determine_display_fields(model_name, model_fields)
+                    logger.info(f"'list all' pattern detected — returning all records for {model_name}")
+                    return [(model_name, [], display_fields)]
 
         # Try to identify models dynamically based on the query
         if self._model_mappings_cache:

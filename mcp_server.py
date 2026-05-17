@@ -4,6 +4,7 @@
 import sys
 import traceback
 import os
+import re
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -725,14 +726,19 @@ try:
             return "# Error: Odoo Connection\n\nCould not connect to Odoo server. Please check your connection settings."
 
         try:
-            # Create a simple domain based on the query
+            # Build domain: only filter by name when query looks like a specific name search.
+            # Phrases like "all orders", "all records", list/show/get all → empty domain.
             domain = []
+            _list_all_words = {"all", "list", "show", "get", "display", "records", "orders",
+                                "invoices", "customers", "partners", "products", "projects", "tasks"}
             if query:
-                if "List out all" in query or "list all" in query.lower():
-                    # Just list all records with a reasonable limit
-                    domain = []
-                else:
-                    # Try to find records matching the query in name field
+                query_words = set(query.lower().split())
+                looks_like_name_search = (
+                    not query_words.issubset(_list_all_words)
+                    and not re.search(r'\b(?:list|show|get|display)\b.{0,20}\ball\b', query, re.IGNORECASE)
+                    and len(query.split()) <= 4  # short specific queries only
+                )
+                if looks_like_name_search:
                     domain = [("name", "ilike", query)]
 
             records, fields_to_show, fields_info = model_discovery.get_model_records(
